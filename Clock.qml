@@ -4,6 +4,8 @@ import Quickshell
 Item {
     id: root
 
+    signal toggleDashboard()
+
     implicitWidth: row.implicitWidth + 16
     implicitHeight: 15
 
@@ -29,34 +31,11 @@ Item {
         Text {
             id: timeText
             anchors.verticalCenter: parent.verticalCenter
-            text: Qt.formatDateTime(clock.date, "h:mm:ss")
+            text: Qt.formatDateTime(clock.date, "h:mm AP")
             font.family: Theme.font
             font.pixelSize: 15
             font.bold: true
             color: Theme.fg
-        }
-
-        // Blinking colon: dims every other second
-        Text {
-            anchors.verticalCenter: parent.verticalCenter
-            text: ":"
-            font.family: Theme.font
-            font.pixelSize: 12
-            font.bold: true
-            color: Theme.accent
-            opacity: clock.date.getSeconds() % 2 ? 0.2 : 1
-            Behavior on opacity { NumberAnimation { duration: 300 } }
-        }
-
-        // Meridiem, dimmed and smaller
-        Text {
-            anchors.verticalCenter: parent.verticalCenter
-            text: Qt.formatDateTime(clock.date, "AP")
-            font.family: Theme.font
-            font.pixelSize: 12
-            font.bold: true
-            font.letterSpacing: 1
-            color: Qt.alpha(Theme.accent, 0.8)
         }
     }
 
@@ -65,7 +44,6 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: calendar.visible = !calendar.visible
+        onClicked: root.toggleDashboard()
     }
-
 }

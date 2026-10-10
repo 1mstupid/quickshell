@@ -1,6 +1,10 @@
 singleton Theme Theme.qml
 singleton Sys Sys.qml
 Bar Bar.qml
+Pomodoro Pomodoro.qml
+MediaContent MediaContent.qml
+ClockPage ClockPage.qml
+MediaState MediaState.qml
 BarModule BarModule.qml
 Commands Commands.qml
 Title Title.qml
