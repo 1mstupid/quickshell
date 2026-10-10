@@ -56,6 +56,11 @@ PanelWindow {
             }
         }
 
+        // shared by the bar's recording indicator and the Record page
+        Recorder {
+            id: recorder
+        }
+
         // the bar's modules; the clock steps aside while the dashboard is open
         RowLayout {
             id: bar
@@ -64,12 +69,14 @@ PanelWindow {
                 top: parent.top
                 left: parent.left
                 right: parent.right
-                topMargin: 10
+                bottom: parent.bottom
+                topMargin: 5
                 leftMargin: 10
                 rightMargin: 10
+                bottomMargin: 5
             }
             height: 10
-            spacing: 12
+            spacing: 10
             opacity: root.expanded ? 0 : 1
             visible: opacity > 0
 
@@ -77,10 +84,78 @@ PanelWindow {
                 NumberAnimation { duration: 90 }
             }
 
+            // Left side: recording indicator (takes up space only when active, or has a fixed/matching footprint)
+            Item {
+                id: recIndicator
+
+                Layout.alignment: Qt.AlignVCenter
+                // Use implicitWidth so it takes zero space when not recording, 
+                // but wait—if it takes zero space, the center shifts! 
+                // To keep the clock centered, we can either keep its width constant or use a balancing spacer.
+                Layout.preferredWidth: recorder.recording ? recRow.implicitWidth : 0
+                Layout.preferredHeight: recRow.implicitHeight
+                visible: recorder.recording // or true, but with width 0 when not recording
+
+                Behavior on Layout.preferredWidth {
+                    NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+                }
+
+                RowLayout {
+                    id: recRow
+                    anchors.centerIn: parent
+                    spacing: 5
+
+                    Rectangle {
+                        Layout.alignment: Qt.AlignVCenter
+                        implicitWidth: 6
+                        implicitHeight: 6
+                        radius: 3
+                        color: "#e5484d"
+
+                        SequentialAnimation on opacity {
+                            running: recIndicator.visible
+                            loops: Animation.Infinite
+                            NumberAnimation { to: 0.2; duration: 600 }
+                            NumberAnimation { to: 1; duration: 600 }
+                        }
+                    }
+
+                    Text {
+                        Layout.alignment: Qt.AlignVCenter
+                        text: recorder.fmt(recorder.elapsed)
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 12
+                        font.bold: true
+                        color: "#e5484d"
+                    }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    anchors.margins: -4
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        root.expanded = true
+                        dashboard.page = 3
+                    }
+                }
+            }
+
+            // Center: The Clock component
             Clock {
+                Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 onToggleDashboard: root.expanded = !root.expanded
+            }
+
+            // Right balancing item: matches the width of the recording indicator 
+            // so the clock stays mathematically centered in the pill container.
+            Item {
+                Layout.preferredWidth: recIndicator.Layout.preferredWidth
+                Layout.preferredHeight: recIndicator.Layout.preferredHeight
+                Layout.alignment: Qt.AlignVCenter
+                visible: recIndicator.visible
             }
         }
 
@@ -96,7 +171,7 @@ PanelWindow {
                 NumberAnimation { duration: 90 }
             }
 
-            readonly property var pageNames: ["Clock", "Pomodoro", "Media"]
+            readonly property var pageNames: ["Clock", "Pomodoro", "Media", "Record"]
             property int page: 0
 
             function go(delta) {
@@ -209,6 +284,17 @@ PanelWindow {
                             font.family: Theme.fontFamily
                             font.pixelSize: 11
                             color: Qt.alpha(Theme.fg, 0.4)
+                        }
+                    }
+
+                    Item {
+                        width: viewport.width
+                        height: viewport.height
+
+                        RecordPage {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: parent.width
+                            recorder: recorder
                         }
                     }
                 }
