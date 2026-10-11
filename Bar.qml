@@ -26,7 +26,7 @@ PanelWindow {
     Item {
         id: pill
 
-        readonly property real collapsedWidth: 220
+        readonly property real collapsedWidth: 190
         readonly property real expandedWidth: 320
         readonly property real collapsedHeight: Theme.effectiveBarHeight
         readonly property real expandedHeight: 240
@@ -37,7 +37,7 @@ PanelWindow {
         height: root.expanded ? expandedHeight : collapsedHeight
 
         Behavior on height {
-            NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
+
         }
 
         Behavior on width {
@@ -55,13 +55,9 @@ PanelWindow {
                 NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
             }
         }
-
-        // shared by the bar's recording indicator and the Record page
         Recorder {
             id: recorder
         }
-
-        // the bar's modules; the clock steps aside while the dashboard is open
         RowLayout {
             id: bar
 
@@ -89,15 +85,12 @@ PanelWindow {
                 id: recIndicator
 
                 Layout.alignment: Qt.AlignVCenter
-                // Use implicitWidth so it takes zero space when not recording, 
-                // but wait—if it takes zero space, the center shifts! 
-                // To keep the clock centered, we can either keep its width constant or use a balancing spacer.
                 Layout.preferredWidth: recorder.recording ? recRow.implicitWidth : 0
                 Layout.preferredHeight: recRow.implicitHeight
                 visible: recorder.recording // or true, but with width 0 when not recording
 
                 Behavior on Layout.preferredWidth {
-                    NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+                    NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
                 }
 
                 RowLayout {
@@ -149,8 +142,6 @@ PanelWindow {
                 onToggleDashboard: root.expanded = !root.expanded
             }
 
-            // Right balancing item: matches the width of the recording indicator 
-            // so the clock stays mathematically centered in the pill container.
             Item {
                 Layout.preferredWidth: recIndicator.Layout.preferredWidth
                 Layout.preferredHeight: recIndicator.Layout.preferredHeight

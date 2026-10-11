@@ -2,10 +2,6 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Screen recording state. Starts via ~/.local/bin/record and stops by sending
-// SIGINT to wf-recorder, so the MP4 is finalized. Recording state and elapsed
-// time come from the wf-recorder process itself, so a recording started from
-// a terminal shows up here too.
 Item {
     id: root
 

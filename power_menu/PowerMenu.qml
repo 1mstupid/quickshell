@@ -183,25 +183,11 @@ PanelWindow {
             Item { Layout.preferredHeight: 4 }
 
             PowerButton {
-                label: "Lock"
-                icon: "󰌾"
-                hoverColor: Colors.colCyan
-                selected: root.selectedIndex === 0
-                onActivated: root.runAndClose(procLock)
-            }
-            PowerButton {
                 label: "Suspend"
                 icon: "󰒲"
                 hoverColor: Theme.primary
                 selected: root.selectedIndex === 1
                 onActivated: root.runAndClose(procSuspend)
-            }
-            PowerButton {
-                label: "Hibernate"
-                icon: "󰋊"
-                hoverColor: Colors.colPurple
-                selected: root.selectedIndex === 2
-                onActivated: root.runAndClose(procHibernate)
             }
             PowerButton {
                 label: "Reboot"

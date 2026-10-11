@@ -160,7 +160,7 @@ Column {
 
         TransportButton {
             text: "󰒮"
-            font.pixelSize: 18
+            font.pixelSize: 24
             allowed: root.player?.canGoPrevious ?? false
             onTapped: root.player.previous()
         }
@@ -172,7 +172,7 @@ Column {
         }
         TransportButton {
             text: "󰒭"
-            font.pixelSize: 18
+            font.pixelSize: 24
             allowed: root.player?.canGoNext ?? false
             onTapped: root.player.next()
         }
