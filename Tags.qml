@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import Quickshell.Wayland
 import Quickshell
 
 PanelWindow {
@@ -7,12 +8,17 @@ PanelWindow {
 
     property var modelData
     screen: modelData
+    WlrLayershell.layer: WlrLayer.Top
+
 
     anchors {
-        left: true
         top: true
+        left: true
     }
 
+    margins {
+        top: 8
+    }
     readonly property real topGap: 8
 
     implicitWidth: tag.width
@@ -28,11 +34,14 @@ PanelWindow {
     Item {
         id: tag
 
-        readonly property real collapsedWidth: 60
+        readonly property real collapsedWidth: 40
         readonly property real collapsedHeight: Theme.effectiveBarHeight
+        width: collapsedWidth
+        height: collapsedHeight
 
         x: 0
-        y: root.topGap
+        y: 0
+        z: 0
         
         Behavior on height {
 
@@ -44,6 +53,7 @@ PanelWindow {
 
         Rectangle {
             anchors.fill: parent
+            radius: root.expanded ? 18 : Math.min(width, height) / 2 - 5
             color: Qt.alpha(Theme.bg, 0.92)
             border.color: Qt.alpha(Theme.accent, 0.6)
             border.width: 1

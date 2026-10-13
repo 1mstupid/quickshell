@@ -4,19 +4,23 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Io
 import QtQuick
+import "./player"
 import "./app_launcher"
 import "./network"
 import "./power_menu"
 
 ShellRoot {
-    // This instantiates the notification toast window.
+
     NotificationToast {}
 
     WallpaperPicker {}
 
-    Tags {}
-
     VolumeOsd {}
+    Variants {
+        model: Quickshell.screens
+
+        Player {}
+    }
 
     Variants {
         model: Quickshell.screens
@@ -46,19 +50,5 @@ ShellRoot {
         }
     }
 
-
-
     property var notifications: Notifications.notifications
-
-    IpcHandler {
-        target: "wm"
-
-        function applyGaps(): void {
-            Wm.applyGaps(Wm.gaps)
-        }
-
-        function applyEffects(): void {
-            Wm.applyEffects()
-        }
-    }
 }

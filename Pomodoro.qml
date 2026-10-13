@@ -128,19 +128,6 @@ Item {
     }
 
     Text {
-        id: heading
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.margins: 10
-        text: "POMODORO"
-        font.family: Theme.font
-        font.pixelSize: 9
-        font.bold: true
-        font.letterSpacing: 1.5
-        color: Qt.alpha(Theme.accent, 0.8)
-    }
-
-    Text {
         anchors.top: parent.top
         anchors.right: parent.right
         anchors.margins: 10

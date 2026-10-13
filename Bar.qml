@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import Quickshell.Wayland
 import Quickshell
 
 PanelWindow {
@@ -10,6 +11,8 @@ PanelWindow {
     property bool expanded: false
 
     anchors { top: true }
+
+    WlrLayershell.layer: WlrLayer.Top
 
     readonly property real topGap: 8
 
@@ -33,28 +36,34 @@ PanelWindow {
 
         x: 0
         y: root.topGap
+        z: 0
         width: root.expanded ? expandedWidth : collapsedWidth
         height: root.expanded ? expandedHeight : collapsedHeight
 
         Behavior on height {
-
+            NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
         }
 
         Behavior on width {
-            NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
+            NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
         }
 
         Rectangle {
             anchors.fill: parent
-            radius: root.expanded ? 18 : Math.min(width, height) / 2 - 5
+            radius: 2
             color: Qt.alpha(Theme.bg, 0.92)
-            border.color: Qt.alpha(Theme.accent, 0.6)
+            border.color: Qt.alpha("#34302f", 0.6)
             border.width: 1
 
             Behavior on radius {
-                NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
+                NumberAnimation { duration: 60; easing.type: Easing.OutCubic }
             }
         }
+        Rectangle { z: 10; width: 7; height: 1; color: "#cc1515" }
+        Rectangle { z: 10; width: 1; height: 7; color: "#cc1515" }
+        Rectangle { z: 10; anchors.right: parent.right; anchors.bottom: parent.bottom; width: 7; height: 1; color: "#cc1515" }
+        Rectangle { z: 10; anchors.right: parent.right; anchors.bottom: parent.bottom; width: 1; height: 7; color: "#cc1515" }
+
         Recorder {
             id: recorder
         }
