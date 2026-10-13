@@ -25,7 +25,7 @@ PanelWindow {
 
     Timer {
         id: hideTimer
-        interval: 1500
+        interval: 1200
         onTriggered: osd.shown = false
     }
 
@@ -38,13 +38,12 @@ PanelWindow {
     onVolumeChanged: poke()
     onMutedChanged: poke()
 
-    // Sidebar along the right edge, doesn't reserve space
     anchors {
         right: true
         top: true
         bottom: true
     }
-    implicitWidth: 80
+    implicitWidth: 56
     exclusiveZone: 0
     color: "transparent"
     mask: Region {}   // empty mask: clicks pass through the window
@@ -52,52 +51,56 @@ PanelWindow {
     Rectangle {
         id: panel
         anchors.right: parent.right
-        anchors.rightMargin: 16
+        anchors.rightMargin: 14
         anchors.verticalCenter: parent.verticalCenter
-        width: 48
-        height: 280
-        radius: 24
-        color: Qt.alpha(Theme.bg, 0.25)   // swap for your Theme colors
+        width: 22
+        height: 200
+        radius: 6
+        color: Qt.alpha(Theme.bg, 0.6)
+        border.width: 1
+        border.color: Qt.alpha(osd.muted ? Theme.fg : Theme.accent, 0.35)
 
-        // fades and slides in/out; the window itself stays mapped
         opacity: osd.shown ? 1 : 0
-        x: osd.shown ? 0 : 20
-        Behavior on opacity { NumberAnimation { duration: 200 } }
-        Behavior on x { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+        x: osd.shown ? 0 : 12
+        Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
+        Behavior on x { NumberAnimation { duration: 180; easing.type: Easing.OutExpo } }
 
-        // track
         Rectangle {
             id: track
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
             anchors.bottom: label.top
-            anchors.topMargin: 20
-            anchors.bottomMargin: 12
-            width: 10
-            radius: 5
-            color: Qt.alpha(Theme.accent, 0.15)
+            anchors.topMargin: 12
+            anchors.bottomMargin: 8
+            width: 4
+            radius: 2
+            color: Qt.alpha(Theme.fg, 0.08)
 
-            // fill grows from the bottom
             Rectangle {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
                 height: parent.height * (osd.muted ? 0 : osd.volume / 100)
                 radius: parent.radius
-                color: osd.muted ? Qt.alpha(Theme.fg, 0.45) : Theme.green
+                color: osd.muted ? Qt.alpha(Theme.fg, 0.4) : Theme.accent
 
-                Behavior on height { NumberAnimation { duration: 120 } }
+                Behavior on height { NumberAnimation { duration: 90; easing.type: Easing.OutCubic } }
             }
         }
 
         Text {
             id: label
-            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.left: parent.left
+            anchors.right: parent.right
             anchors.bottom: parent.bottom
-            anchors.bottomMargin: 16
-            text: osd.muted ? "--" : osd.volume + "%"
-            color: Theme.fg
-            font.pixelSize: 14
+            anchors.bottomMargin: 8
+            horizontalAlignment: Text.AlignHCenter
+            text: osd.muted ? "MU" : osd.volume.toString()
+            color: osd.muted ? Qt.alpha(Theme.fg, 0.5) : Theme.fg
+            font.family: "monospace"
+            font.pixelSize: 9
+            font.bold: true
+            elide: Text.ElideNone
         }
     }
 }

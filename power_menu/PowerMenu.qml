@@ -17,11 +17,9 @@ PanelWindow {
 
     function activateSelected() {
         switch (selectedIndex) {
-            case 0: runAndClose(procLock); break;
             case 1: runAndClose(procSuspend); break;
-            case 2: runAndClose(procHibernate); break;
-            case 3: runAndClose(procReboot); break;
-            case 4: runAndClose(procShutdown); break;
+            case 2: runAndClose(procReboot); break;
+            case 3: runAndClose(procShutdown); break;
         }
     }
 
@@ -193,14 +191,14 @@ PanelWindow {
                 label: "Reboot"
                 icon: "󰜉"
                 hoverColor: Colors.colYellow
-                selected: root.selectedIndex === 3
+                selected: root.selectedIndex === 2
                 onActivated: root.runAndClose(procReboot)
             }
             PowerButton {
                 label: "Shutdown"
                 icon: "󰐥"
                 hoverColor: Colors.colRed
-                selected: root.selectedIndex === 4
+                selected: root.selectedIndex === 3
                 onActivated: root.runAndClose(procShutdown)
             }
 
