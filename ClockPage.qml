@@ -17,7 +17,7 @@ Item {
 
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: Qt.formatDateTime(clock.date, "h:mm AP")
+            text: Qt.formatDateTime(clock.date, "hh:mm:ss")
             font.family: Theme.fontFamily
             font.pixelSize: 40
             font.bold: true

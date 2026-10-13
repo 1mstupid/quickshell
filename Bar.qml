@@ -171,17 +171,11 @@ PanelWindow {
                 NumberAnimation { duration: 90 }
             }
 
-            readonly property var pageNames: ["Clock", "Pomodoro", "Media", "Record"]
+            readonly property var pageNames: ["Clock", "Pomodoro", "Record"]
             property int page: 0
 
             function go(delta) {
                 page = Math.max(0, Math.min(pageNames.length - 1, page + delta))
-            }
-
-            // position is only polled while the Media page is on screen (index 2)
-            MediaState {
-                id: mediaState
-                active: root.expanded && dashboard.page === 2
             }
 
             // header: current page name and a close button
@@ -263,27 +257,6 @@ PanelWindow {
                         Pomodoro {
                             anchors.verticalCenter: parent.verticalCenter
                             width: parent.width
-                        }
-                    }
-
-                    Item {
-                        width: viewport.width
-                        height: viewport.height
-
-                        MediaContent {
-                            anchors.top: parent.top
-                            width: parent.width
-                            media: mediaState
-                            visible: mediaState.player !== null
-                        }
-
-                        Text {
-                            anchors.centerIn: parent
-                            visible: mediaState.player === null
-                            text: "Nothing playing"
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 11
-                            color: Qt.alpha(Theme.fg, 0.4)
                         }
                     }
 

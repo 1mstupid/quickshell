@@ -139,7 +139,7 @@ PanelWindow {
         topRightRadius: 18
         bottomRightRadius: 18
 
-        color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, 0.85) 
+        color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, 1.0) 
 
         // Border overlay
         Rectangle {

@@ -53,7 +53,7 @@ Singleton {
     readonly property color cyan: secondary
     readonly property color magenta: secondary
 
-    readonly property string fontFamily: "CaskaydiaMono Nerd Font"
+    readonly property string fontFamily: "Maple Mono NL NF"
 
     // Resolution-aware base scale from the first output's logical height:
     // 1.0 at 1080p, 1.33 at 1440p, 2.0 at unscaled 4K. An output scale set
@@ -69,42 +69,16 @@ Singleton {
     // gaps to the same value so windows float with the same margin.
     readonly property int edgeInset: Math.round(8 * autoScale)
     // matches border_radius in config.conf
-    readonly property int barRadius: 0
+    readonly property int barRadius: 10
 
     // In-bar elements follow autoScale × the scale slider; popups stay
     // fixed. barHeight is a floor: the window grows when scaled modules
     // (26px at 1.0, + inset above + 8px padding) outgrow it.
-    readonly property real barScale: autoScale * barUserScale
+    readonly property real barScale: 0.95
     readonly property int fontSize: Math.round(13 * barScale)
     readonly property int iconSize: Math.round(15 * barScale)
     readonly property int moduleHeight: Math.round(26 * barScale)
     readonly property int effectiveBarHeight: 30
-
-    FileView {
-        path: root.configDir + "/bar-height"
-        watchChanges: true
-        onFileChanged: reload()
-        onLoadFailed: root._barStateLoads++
-        onLoaded: {
-            root._barStateLoads++
-            const v = parseInt(text())
-            if (!isNaN(v))
-                root.barHeight = Math.min(Math.max(v, 32), 80)
-        }
-    }
-
-    FileView {
-        path: root.configDir + "/bar-scale"
-        watchChanges: true
-        onFileChanged: reload()
-        onLoadFailed: root._barStateLoads++
-        onLoaded: {
-            root._barStateLoads++
-            const v = parseFloat(text())
-            if (!isNaN(v))
-                root.barUserScale = Math.min(Math.max(v, 0.7), 2.0)
-        }
-    }
 
     FileView {
         path: root.configDir + "/../.local/state/colors.ini"
