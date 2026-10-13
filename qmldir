@@ -3,6 +3,9 @@ singleton Sys Sys.qml
 Bar Bar.qml
 Recorder Recorder.qml
 RecordPage RecordPage.qml
+Tags Tags.qml
+Wm Wm.qml
+VolumeOsd VolumeOsd.qml
 Pomodoro Pomodoro.qml
 MediaContent MediaContent.qml
 ClockPage ClockPage.qml

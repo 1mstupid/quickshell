@@ -14,6 +14,10 @@ ShellRoot {
 
     WallpaperPicker {}
 
+    Tags {}
+
+    VolumeOsd {}
+
     Variants {
         model: Quickshell.screens
 
