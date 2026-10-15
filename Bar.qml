@@ -125,7 +125,7 @@ PanelWindow {
                     Text {
                         Layout.alignment: Qt.AlignVCenter
                         text: recorder.fmt(recorder.elapsed)
-                        font.family: Theme.fontFamily
+                        font.family: "UAV OSD Sans Mono"
                         font.pixelSize: 12
                         font.bold: true
                         color: "#e5484d"
@@ -192,7 +192,7 @@ PanelWindow {
                 Text {
                     Layout.fillWidth: true
                     text: dashboard.pageNames[dashboard.page].toUpperCase()
-                    font.family: Theme.fontFamily
+                    font.family: "UAV OSD Sans Mono"
                     font.pixelSize: 9
                     font.bold: true
                     font.letterSpacing: 1.5
@@ -201,7 +201,7 @@ PanelWindow {
 
                 Text {
                     text: "󰅖"
-                    font.family: Theme.fontFamily
+                    font.family: "UAV OSD Sans Mono"
                     font.pixelSize: 12
                     color: closeMa.containsMouse ? Theme.accent : Qt.alpha(Theme.fg, 0.6)
                     Behavior on color { ColorAnimation { duration: 120 } }

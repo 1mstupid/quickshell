@@ -32,7 +32,7 @@ Item {
             id: timeText
             anchors.verticalCenter: parent.verticalCenter
             text: Qt.formatDateTime(clock.date, "h:mm AP")
-            font.family: Theme.font
+            font.family: "Matrix Mono"
             font.pixelSize: 15
             font.bold: true
             color: Theme.fg

@@ -53,7 +53,7 @@ Singleton {
     readonly property color cyan: secondary
     readonly property color magenta: secondary
 
-    readonly property string fontFamily: "Maple Mono NL NF"
+    readonly property string fontFamily: "UAV OSD Sans Mono"
 
     // Resolution-aware base scale from the first output's logical height:
     // 1.0 at 1080p, 1.33 at 1440p, 2.0 at unscaled 4K. An output scale set

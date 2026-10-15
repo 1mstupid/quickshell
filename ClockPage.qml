@@ -18,7 +18,7 @@ Item {
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
             text: Qt.formatDateTime(clock.date, "hh:mm:ss")
-            font.family: Theme.fontFamily
+            font.family: "UAV OSD Sans Mono"
             font.pixelSize: 40
             font.bold: true
             color: Theme.fg

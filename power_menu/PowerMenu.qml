@@ -13,7 +13,7 @@ PanelWindow {
 
     // ── Keyboard selection state ─────────────────────────────────────────────
     property int selectedIndex: -1
-    readonly property int buttonCount: 5
+    readonly property int buttonCount: 3
 
     function activateSelected() {
         switch (selectedIndex) {
