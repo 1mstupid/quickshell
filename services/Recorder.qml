@@ -8,7 +8,7 @@ Item {
     width: 0
     height: 0
 
-    readonly property string script: "/home/waltz/.local/bin/record"
+    readonly property string script: "/etc/profiles/per-user/waltz/bin/record"
     property bool recording: false
     property int elapsed: 0
 
