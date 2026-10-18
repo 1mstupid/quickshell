@@ -2,6 +2,8 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Services.Notifications
+import "../../services"
+
 
 PanelWindow {
     anchors { top: true; right: true;}

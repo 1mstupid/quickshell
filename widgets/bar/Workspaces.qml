@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import QtQuick.Layouts
+import "../../services"
 
 // Row of dots for one output. The focused dot grows and takes the accent.
 RowLayout {

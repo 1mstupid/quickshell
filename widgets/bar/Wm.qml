@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "../../services"
 
 // Workspaces for one output, pushed by `umbriel subscribe workspaces`.
 // No polling: one long-lived process, restarted if it exits.

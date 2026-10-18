@@ -4,7 +4,7 @@ import Quickshell.Hyprland
 import Quickshell.Io
 import QtQuick
 import QtQuick.Layouts
-import "./state"
+import "../../services"
 
 PanelWindow {
     id: root

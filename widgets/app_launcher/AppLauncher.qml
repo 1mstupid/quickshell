@@ -2,7 +2,7 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Io
 import QtQuick
-import "./state"
+import "../../services"
 
 PanelWindow {
     id: root

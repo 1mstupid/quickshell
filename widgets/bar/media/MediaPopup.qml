@@ -1,4 +1,6 @@
 import QtQuick
+import "../../../components"
+
 
 // Right-click popup for the Media pill. The body is MediaContent, the same
 // component the dashboard's Media page uses.

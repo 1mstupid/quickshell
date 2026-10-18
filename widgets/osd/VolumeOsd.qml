@@ -2,6 +2,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Services.Pipewire
+import "../../services"
+
 
 PanelWindow {
     id: osd

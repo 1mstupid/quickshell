@@ -1,5 +1,8 @@
 import QtQuick
 import Quickshell.Services.Mpris
+import "../../services"
+import "../../../components"
+
 
 // Now-playing pill. Click toggles play/pause, scroll skips tracks, right
 // click opens MediaPopup, middle click dismisses the pill until the track

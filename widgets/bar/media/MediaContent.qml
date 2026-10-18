@@ -1,5 +1,7 @@
 import QtQuick
 import Quickshell.Services.Mpris
+import "../../services"
+
 
 // Now-playing body: album art, track info, click-to-seek bar, transport
 // buttons, and a player switcher. Shared by MediaPopup and the dashboard's
