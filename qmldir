@@ -2,16 +2,13 @@ singleton Theme Theme.qml
 singleton Sys Sys.qml
 Bar Bar.qml
 Recorder Recorder.qml
-RecordPage RecordPage.qml
-Tags Tags.qml
+Workspaces Workspaces.qml
 Wm Wm.qml
 VolumeOsd VolumeOsd.qml
 Pomodoro Pomodoro.qml
 MediaContent MediaContent.qml
-ClockPage ClockPage.qml
 MediaState MediaState.qml
 BarModule BarModule.qml
-Commands Commands.qml
 Title Title.qml
 Media Media.qml
 MediaPopup MediaPopup.qml
@@ -23,12 +20,10 @@ VolumePopup VolumePopup.qml
 Network Network.qml
 Tray Tray.qml
 Clock Clock.qml
-CalendarPopup CalendarPopup.qml
 Launcher Launcher.qml
 WallpaperPicker WallpaperPicker.qml
 PowerButton PowerButton.qml
 Screenshot Screenshot.qml
-CapsLock CapsLock.qml
 MicMute MicMute.qml
 Updates Updates.qml
 Bell Bell.qml
