@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import "../../services"
+import "./media"
 
 PanelWindow {
     id: root
@@ -80,6 +81,9 @@ PanelWindow {
             spacing: 8
 
             // recording indicator; click stops it
+            MediaDisc {
+                Layout.alignment: Qt.AlignVCenter
+            }
             Item {
                 id: recIndicator
                 Layout.alignment: Qt.AlignVCenter
