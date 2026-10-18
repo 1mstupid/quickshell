@@ -3,29 +3,10 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Live palette sourced from the bspwm theme switcher. The switcher rewrites
-// polybar/colors.ini (and colors.sh) in place on every switch, so watching
-// that file re-colors the bar with no restart — polybar itself can be
-// retired without breaking this. Defaults are github_dark placeholders.
-//
-// The polybar palette is smaller than dwm's xresources+ANSI set, so the
-// semantic names below collapse onto it: red→alert, yellow→primary,
-// blue/green/cyan/magenta→secondary. Cohesive by construction.
 Singleton {
     id: root
 
-    // config root = parent of the running quickshell dir, derived rather
-    // than hardcoded so vendored copies (openbox etc.) need no path edits
     readonly property string configDir: Quickshell.env("HOME") + "/.config"
-
-    // bar height (px) and element scale, persisted to plain files (like
-    // weather-location) so the tweaks sliders survive restarts
-    property int barHeight: 42
-    property real barUserScale: 1.0
-
-    // both state files attempted (present or not); bars gate their first
-    // map on this to appear once at final size (openbox re-clamps docks
-    // on resize). The timer failsafe guarantees the bar always maps.
     property int _barStateLoads: 0
     readonly property bool barStateReady: _barStateLoads >= 2
     Timer {
@@ -53,27 +34,15 @@ Singleton {
     readonly property color cyan: secondary
     readonly property color magenta: secondary
 
-    readonly property string fontFamily: "UAV OSD Sans Mono"
-
-    // Resolution-aware base scale from the first output's logical height:
-    // 1.0 at 1080p, 1.33 at 1440p, 2.0 at unscaled 4K. An output scale set
-    // in mango (the proper hi-dpi fix) shrinks the logical height, so this
-    // stays at 1.0 there and nothing is scaled twice.
+    readonly property string fontFamily: "Maple Mono NL NF"
+    readonly property string fontFamilyAlt: "UAV OSD Sans Mono"
     readonly property real autoScale: {
         const s = Quickshell.screens.length > 0 ? Quickshell.screens[0] : null
         const h = s ? s.height : 1080
         return Math.min(Math.max(h / 1080, 0.75), 2.5)
     }
 
-    // The bar's inset from the screen edges. Wm.qml sets mango's outer
-    // gaps to the same value so windows float with the same margin.
     readonly property int edgeInset: Math.round(8 * autoScale)
-    // matches border_radius in config.conf
-    readonly property int barRadius: 10
-
-    // In-bar elements follow autoScale × the scale slider; popups stay
-    // fixed. barHeight is a floor: the window grows when scaled modules
-    // (26px at 1.0, + inset above + 8px padding) outgrow it.
     readonly property real barScale: 0.95
     readonly property int fontSize: Math.round(13 * barScale)
     readonly property int iconSize: Math.round(15 * barScale)

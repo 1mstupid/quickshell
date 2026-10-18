@@ -4,8 +4,6 @@ import Quickshell
 Item {
     id: root
 
-    signal toggleDashboard()
-
     implicitWidth: row.implicitWidth + 16
     implicitHeight: 15
 
@@ -32,18 +30,10 @@ Item {
             id: timeText
             anchors.verticalCenter: parent.verticalCenter
             text: Qt.formatDateTime(clock.date, "h:mm AP")
-            font.family: "Matrix Mono"
+            font.family: Theme.fontFamilyAlt
             font.pixelSize: 15
             font.bold: true
             color: Theme.fg
         }
-    }
-
-    MouseArea {
-        id: mouse
-        anchors.fill: parent
-        hoverEnabled: true
-        cursorShape: Qt.PointingHandCursor
-        onClicked: root.toggleDashboard()
     }
 }
