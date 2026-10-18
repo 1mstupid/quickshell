@@ -42,10 +42,13 @@ PanelWindow {
         id: pill
 
         readonly property int pad: Math.round(12 * Theme.barScale)
+        readonly property bool timerShown: Pomodoro.active || Pomodoro.done
         readonly property int recWidth: recRow.implicitWidth + pad
+        readonly property int timerWidth: timerDot.width + pad
 
-        // reserve the same space on both sides so the clock stays centered
-        readonly property int side: recorder.recording ? recWidth : 0
+        // both indicators reserve the same width, so the clock stays centered
+        readonly property int side: Math.max(recorder.recording ? recWidth : 0,
+                                             timerShown ? timerWidth : 0)
 
         y: root.topGap
         anchors.horizontalCenter: parent.horizontalCenter
@@ -61,7 +64,7 @@ PanelWindow {
             NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
         }
 
-        // left side, only while wf-recorder runs; click stops it
+        // left: recording, only while wf-recorder runs; click stops it
         RowLayout {
             id: recRow
             anchors.verticalCenter: parent.verticalCenter
@@ -103,6 +106,63 @@ PanelWindow {
                 Layout.fillHeight: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: recorder.stop()
+            }
+        }
+
+        // right: pomodoro ring; click pauses or resumes, or dismisses when finished
+        Item {
+            id: timerDot
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.right: parent.right
+            anchors.rightMargin: pill.pad
+            width: 16
+            height: 16
+            opacity: pill.timerShown ? 1 : 0
+
+            Behavior on opacity {
+                NumberAnimation { duration: 150; easing.type: Easing.OutQuad }
+            }
+
+            Canvas {
+                id: ring
+                anchors.centerIn: parent
+                width: 14
+                height: 14
+
+                readonly property color ringColor: Pomodoro.done ? Theme.red
+                    : Pomodoro.paused ? Theme.disabled : Theme.accent
+
+                onRingColorChanged: requestPaint()
+                onPaint: {
+                    const ctx = getContext("2d")
+                    const c = width / 2
+                    const r = c - 1.5
+                    const f = Pomodoro.fraction
+                    ctx.reset()
+                    ctx.lineWidth = 2
+
+                    ctx.strokeStyle = String(Qt.alpha(Theme.fg, 0.15))
+                    ctx.beginPath()
+                    ctx.arc(c, c, r, 0, 2 * Math.PI)
+                    ctx.stroke()
+
+                    ctx.strokeStyle = String(ringColor)
+                    ctx.beginPath()
+                    ctx.arc(c, c, r, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * f)
+                    ctx.stroke()
+                }
+            }
+
+            // repaint on every tick while the arc moves
+            Connections {
+                target: Pomodoro
+                function onFractionChanged() { ring.requestPaint() }
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: Pomodoro.done ? Pomodoro.stop() : Pomodoro.toggle()
             }
         }
 
