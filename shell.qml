@@ -4,10 +4,14 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Io
 import QtQuick
-import "./widgets/player"
+import "./services"
 import "./widgets/app_launcher"
+import "./widgets/bar"
 import "./widgets/network"
+import "./widgets/notifications"
+import "./widgets/osd"
 import "./widgets/power_menu"
+import "./widgets/wallpaper"
 
 ShellRoot {
 

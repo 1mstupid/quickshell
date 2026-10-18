@@ -1,4 +1,3 @@
-singleton Sys Sys.qml
 Bar Bar.qml
 Recorder Recorder.qml
 Workspaces Workspaces.qml
