@@ -2,51 +2,41 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
+// Workspaces for one output, pushed by `umbriel subscribe workspaces`.
+// No polling: one long-lived process, restarted if it exits.
 Item {
     id: root
 
-    // Set by the bar to its screen name, e.g. "HDMI-A-1"
     property string outputName: ""
+    property var workspaces: []
 
-    property string raw: ""
-    readonly property string current: parse(raw)
-
-    implicitWidth: label.implicitWidth
-    implicitHeight: label.implicitHeight
-
-    // Focused lines look like: "* HDMI-A-1: 2 [scrolling] (focused)"
-    function parse(text) {
-        for (const line of text.split("\n")) {
-            const m = line.match(/^\*\s+(\S+?):\s*(\S+)/)
-            if (m && m[1] === outputName)
-                return m[2]
+    function apply(line) {
+        let msg
+        try {
+            msg = JSON.parse(line)
+        } catch (e) {
+            return
         }
-        return ""
+        if (msg.event !== "workspaces")
+            return
+        workspaces = msg.data
+            .filter(w => w.output === outputName)
+            .sort((a, b) => a.index - b.index)
     }
 
     Process {
-        id: proc
-        command: ["umbriel", "workspaces"]
-        stdout: StdioCollector {
-            id: collector
-            onStreamFinished: root.raw = collector.text
-        }
-    }
-
-    // Poll. Skips a tick if the previous call is still running.
-    Timer {
-        interval: 300
+        id: sub
+        command: ["umbriel", "subscribe", "workspaces"]
         running: true
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: if (!proc.running) proc.running = true
+        stdout: SplitParser {
+            onRead: line => root.apply(line)
+        }
+        onExited: restart.restart()
     }
 
-    Text {
-        id: label
-        anchors.centerIn: parent
-        text: root.current
-        color: Theme.fg
-        font.pixelSize: 14
+    Timer {
+        id: restart
+        interval: 1000
+        onTriggered: sub.running = true
     }
 }

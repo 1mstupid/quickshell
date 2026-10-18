@@ -15,7 +15,7 @@ PanelWindow {
     }
 
     implicitWidth: 430
-    implicitHeight: 640
+    implicitHeight: 440
 
     exclusiveZone: 0
     color: Theme.bg

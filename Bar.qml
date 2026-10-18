@@ -43,12 +43,10 @@ PanelWindow {
 
         readonly property int pad: Math.round(12 * Theme.barScale)
         readonly property bool timerShown: Pomodoro.active || Pomodoro.done
-        readonly property int recWidth: recRow.implicitWidth + pad
-        readonly property int timerWidth: timerDot.width + pad
 
-        // both indicators reserve the same width, so the clock stays centered
-        readonly property int side: Math.max(recorder.recording ? recWidth : 0,
-                                             timerShown ? timerWidth : 0)
+        // each side reserves its own content width; the larger one is used on
+        // both sides, so the clock stays centered
+        readonly property int side: Math.max(workspaces.implicitWidth, rightRow.implicitWidth)
 
         y: root.topGap
         anchors.horizontalCenter: parent.horizontalCenter
@@ -64,105 +62,126 @@ PanelWindow {
             NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
         }
 
-        // left: recording, only while wf-recorder runs; click stops it
-        RowLayout {
-            id: recRow
+        // left: workspace dots
+        Workspaces {
+            id: workspaces
             anchors.verticalCenter: parent.verticalCenter
             anchors.left: parent.left
             anchors.leftMargin: pill.pad
-            spacing: 5
-            opacity: recorder.recording ? 1 : 0
-
-            Behavior on opacity {
-                NumberAnimation { duration: 150; easing.type: Easing.OutQuad }
-            }
-
-            Rectangle {
-                Layout.alignment: Qt.AlignVCenter
-                implicitWidth: 6
-                implicitHeight: 6
-                radius: 3
-                color: Theme.red
-
-                SequentialAnimation on opacity {
-                    running: recorder.recording
-                    loops: Animation.Infinite
-                    NumberAnimation { to: 0.2; duration: 600 }
-                    NumberAnimation { to: 1; duration: 600 }
-                }
-            }
-
-            Text {
-                Layout.alignment: Qt.AlignVCenter
-                text: recorder.fmt(recorder.elapsed)
-                font.family: Theme.fontFamilyAlt
-                font.pixelSize: 12
-                font.bold: true
-                color: Theme.red
-            }
-
-            MouseArea {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: recorder.stop()
-            }
+            outputName: root.modelData.name
         }
 
-        // right: pomodoro ring; click pauses or resumes, or dismisses when finished
-        Item {
-            id: timerDot
+        // right: recorder, then pomodoro ring
+        RowLayout {
+            id: rightRow
             anchors.verticalCenter: parent.verticalCenter
             anchors.right: parent.right
             anchors.rightMargin: pill.pad
-            width: 16
-            height: 16
-            opacity: pill.timerShown ? 1 : 0
+            spacing: 8
 
-            Behavior on opacity {
-                NumberAnimation { duration: 150; easing.type: Easing.OutQuad }
-            }
+            // recording indicator; click stops it
+            Item {
+                id: recIndicator
+                Layout.alignment: Qt.AlignVCenter
+                implicitWidth: recRow.implicitWidth
+                implicitHeight: recRow.implicitHeight
+                opacity: recorder.recording ? 1 : 0
+                visible: opacity > 0
 
-            Canvas {
-                id: ring
-                anchors.centerIn: parent
-                width: 14
-                height: 14
+                Behavior on opacity {
+                    NumberAnimation { duration: 150; easing.type: Easing.OutQuad }
+                }
 
-                readonly property color ringColor: Pomodoro.done ? Theme.red
-                    : Pomodoro.paused ? Theme.disabled : Theme.accent
+                RowLayout {
+                    id: recRow
+                    spacing: 5
 
-                onRingColorChanged: requestPaint()
-                onPaint: {
-                    const ctx = getContext("2d")
-                    const c = width / 2
-                    const r = c - 1.5
-                    const f = Pomodoro.fraction
-                    ctx.reset()
-                    ctx.lineWidth = 2
+                    Text {
+                        Layout.alignment: Qt.AlignVCenter
+                        text: recorder.fmt(recorder.elapsed)
+                        font.family: Theme.fontFamilyAlt
+                        font.pixelSize: 12
+                        font.bold: true
+                        color: Theme.red
+                    }
+                    Rectangle {
+                        Layout.alignment: Qt.AlignVCenter
+                        implicitWidth: 6
+                        implicitHeight: 6
+                        radius: 3
+                        color: Theme.red
 
-                    ctx.strokeStyle = String(Qt.alpha(Theme.fg, 0.15))
-                    ctx.beginPath()
-                    ctx.arc(c, c, r, 0, 2 * Math.PI)
-                    ctx.stroke()
+                        SequentialAnimation on opacity {
+                            running: recorder.recording
+                            loops: Animation.Infinite
+                            NumberAnimation { to: 0.2; duration: 600 }
+                            NumberAnimation { to: 1; duration: 600 }
+                        }
+                    }
+                }
 
-                    ctx.strokeStyle = String(ringColor)
-                    ctx.beginPath()
-                    ctx.arc(c, c, r, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * f)
-                    ctx.stroke()
+                MouseArea {
+                    anchors.fill: parent
+                    anchors.margins: -4
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: recorder.stop()
                 }
             }
 
-            // repaint on every tick while the arc moves
-            Connections {
-                target: Pomodoro
-                function onFractionChanged() { ring.requestPaint() }
-            }
+            // pomodoro ring; click pauses or resumes, or dismisses when finished
+            Item {
+                id: timerDot
+                Layout.alignment: Qt.AlignVCenter
+                implicitWidth: 16
+                implicitHeight: 16
+                opacity: pill.timerShown ? 1 : 0
+                visible: opacity > 0
 
-            MouseArea {
-                anchors.fill: parent
-                cursorShape: Qt.PointingHandCursor
-                onClicked: Pomodoro.done ? Pomodoro.stop() : Pomodoro.toggle()
+                Behavior on opacity {
+                    NumberAnimation { duration: 150; easing.type: Easing.OutQuad }
+                }
+
+                Canvas {
+                    id: ring
+                    anchors.centerIn: parent
+                    width: 14
+                    height: 14
+
+                    readonly property color ringColor: Pomodoro.done ? Theme.red
+                        : Pomodoro.paused ? Theme.disabled : Theme.accent
+
+                    onRingColorChanged: requestPaint()
+                    onPaint: {
+                        const ctx = getContext("2d")
+                        const c = width / 2
+                        const r = c - 1.5
+                        const f = Pomodoro.fraction
+                        ctx.reset()
+                        ctx.lineWidth = 2
+
+                        ctx.strokeStyle = String(Qt.alpha(Theme.fg, 0.15))
+                        ctx.beginPath()
+                        ctx.arc(c, c, r, 0, 2 * Math.PI)
+                        ctx.stroke()
+
+                        ctx.strokeStyle = String(ringColor)
+                        ctx.beginPath()
+                        ctx.arc(c, c, r, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * f)
+                        ctx.stroke()
+                    }
+                }
+
+                // repaint on every tick while the arc moves
+                Connections {
+                    target: Pomodoro
+                    function onFractionChanged() { ring.requestPaint() }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: Pomodoro.done ? Pomodoro.stop() : Pomodoro.toggle()
+                }
             }
         }
 

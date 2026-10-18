@@ -1,89 +1,43 @@
 import QtQuick
-import QtQuick.Layouts
-import Quickshell.Wayland
 import Quickshell
+import QtQuick.Layouts
 
-PanelWindow {
+// Row of dots for one output. The focused dot grows and takes the accent.
+RowLayout {
     id: root
 
-    property var modelData
-    screen: modelData
-    WlrLayershell.layer: WlrLayer.Top
+    property string outputName: ""
 
+    spacing: 6
 
-    anchors {
-        top: true
-        left: true
+    Wm {
+        id: wm
+        outputName: root.outputName
     }
 
-    margins {
-        top: 8
-    }
-    readonly property real topGap: 8
-
-    implicitWidth: tag.width
-    implicitHeight: tag.height + topGap
-
-    exclusiveZone: topGap + tag.collapsedHeight
-
-    color: "transparent"
-    visible: Theme.barStateReady
-
-    mask: Region { item: tag }
-
-    Item {
-        id: tag
-
-        readonly property real collapsedWidth: 40
-        readonly property real collapsedHeight: Theme.effectiveBarHeight
-        width: collapsedWidth
-        height: collapsedHeight
-
-        x: 0
-        y: 0
-        z: 0
-        
-        Behavior on height {
-
-        }
-
-        Behavior on width {
-            NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
-        }
+    Repeater {
+        model: wm.workspaces.filter(w => w.focused || w.occupied)
 
         Rectangle {
-            anchors.fill: parent
-            radius: root.expanded ? 18 : Math.min(width, height) / 2 - 5
-            color: Qt.alpha(Theme.bg, 0.92)
-            border.color: Qt.alpha(Theme.accent, 0.6)
-            border.width: 1
+            required property var modelData
+            readonly property bool focused: modelData.focused
 
-            Behavior on radius {
-                NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
-            }
-        }
-        RowLayout {
-            id: tags
+            Layout.alignment: Qt.AlignVCenter
+            implicitWidth: focused ? 16 : 6
+            implicitHeight: 6
+            radius: 3
+            color: focused ? Theme.accent : Qt.alpha(Theme.accent, 0.45)
 
-            anchors {
-                top: parent.top
-                left: parent.left
-                right: parent.right
-                bottom: parent.bottom
-                topMargin: 5
-                leftMargin: 10
-                rightMargin: 10
-                bottomMargin: 5
+            Behavior on implicitWidth {
+                NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
             }
-            height: 10
-            spacing: 10
+            Behavior on color { ColorAnimation { duration: 150 } }
 
-            Wm {
-                outputName: root.screen.name
-                Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-            }
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: Quickshell.execDetached(["umbriel", "msg",
+                    "workspace-switch:" + modelData.name + "/" + root.outputName])            }
         }
     }
 }

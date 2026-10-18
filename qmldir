@@ -1,5 +1,6 @@
 singleton Theme Theme.qml
 singleton Sys Sys.qml
+singleton Notifications Notifications.qml
 Bar Bar.qml
 Recorder Recorder.qml
 Workspaces Workspaces.qml
@@ -9,28 +10,14 @@ Pomodoro Pomodoro.qml
 MediaContent MediaContent.qml
 MediaState MediaState.qml
 BarModule BarModule.qml
-Title Title.qml
 Media Media.qml
 MediaPopup MediaPopup.qml
-Metrics Metrics.qml
-Volume Volume.qml
-Space Space.qml
-Toggle Toggle.qml
-VolumePopup VolumePopup.qml
 Network Network.qml
-Tray Tray.qml
 Clock Clock.qml
-Launcher Launcher.qml
 WallpaperPicker WallpaperPicker.qml
-PowerButton PowerButton.qml
-Screenshot Screenshot.qml
-MicMute MicMute.qml
-Updates Updates.qml
-Bell Bell.qml
 Popout Popout.qml
 TweakSlider TweakSlider.qml
 TogglePill TogglePill.qml
 NotifyPopup NotifyPopup.qml
-singleton Notifications Notifications.qml
 NotificationCard NotificationCard.qml
 NotificationToast NotificationToast.qml
