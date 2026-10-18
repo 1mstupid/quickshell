@@ -1,8 +1,6 @@
 import QtQuick
+import "../services"
 
-// Labeled slider for tweaks popups: applies live while dragging
-// (throttled), persists on release. WM-agnostic — callers supply
-// applyFn/persistFn.
 Item {
     id: ts
 

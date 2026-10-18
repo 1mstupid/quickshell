@@ -1,14 +1,9 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
+import "../services"
 
-// Shared shell for every bar popup — Wayland edition. A full-screen
-// transparent layer-shell overlay (the click catcher) with the styled
-// card anchored under its bar item. Clicking anywhere outside the card
-// closes it; Escape too. The window takes exclusive keyboard focus only
-// while visible (an xdg-popup off a layer-shell panel never gets key
-// events, which is why this is a layer surface and not PopupWindow).
-// The same card chrome and behaviour as the X11 ports' Popout.
+
 PanelWindow {
     id: root
 

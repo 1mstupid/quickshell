@@ -4,10 +4,10 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Io
 import QtQuick
-import "./player"
-import "./app_launcher"
-import "./network"
-import "./power_menu"
+import "./widgets/player"
+import "./widgets/app_launcher"
+import "./widgets/network"
+import "./widgets/power_menu"
 
 ShellRoot {
 
@@ -16,11 +16,6 @@ ShellRoot {
     WallpaperPicker {}
 
     VolumeOsd {}
-    Variants {
-        model: Quickshell.screens
-
-        Player {}
-    }
 
     Variants {
         model: Quickshell.screens

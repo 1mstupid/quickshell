@@ -1,4 +1,6 @@
 singleton Power Power.qml
+singleton Theme Theme.qml
+singleton Notifications Notifications.qml
 singleton Pomodoro Pomodoro.qml
 Recorder Recorder.qml
 

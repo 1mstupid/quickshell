@@ -1,4 +1,5 @@
 import QtQuick
+import "../services"
 
 // Base pill for bar modules: optional nerd-font icon + label, hover feedback,
 // click/scroll signals. Extra content can be added as children.
