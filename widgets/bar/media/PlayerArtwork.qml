@@ -62,13 +62,34 @@ Canvas {
                 ctx.putImageData(pixels, 0, 0, 0, 0, size, size);
             }
         } else {
-            ctx.textAlign = "center";
-            ctx.fillStyle = "#54443c";
-            ctx.font = (size * .31) + "px monospace";
-            ctx.fillText(trackNumber, size / 2, size * .56);
-            ctx.fillStyle = "#b9afa6";
-            ctx.font = (size * .041) + "px monospace";
-            ctx.fillText("NO COVER ART", size / 2, size * .67);
+            const cx = width / 2;
+            const cy = height / 2;
+            const r = Math.min(width, height) / 2;
+
+            // Solid black vinyl, using the full available area
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.fillStyle = "#202020";
+            ctx.fill();
+
+            // One bold groove, visible even at 16x16
+            ctx.beginPath();
+            ctx.arc(cx, cy, r * 0.72, 0, Math.PI * 2);
+            ctx.strokeStyle = "#484848";
+            ctx.lineWidth = Math.max(0.7, r * 0.09);
+            ctx.stroke();
+
+            // Center label
+            ctx.beginPath();
+            ctx.arc(cx, cy, r * 0.36, 0, Math.PI * 2);
+            ctx.fillStyle = "#c65340";
+            ctx.fill();
+
+            // Spindle hole
+            ctx.beginPath();
+            ctx.arc(cx, cy, Math.max(0.7, r * 0.09), 0, Math.PI * 2);
+            ctx.fillStyle = "#101010";
+            ctx.fill();
         }
     }
 }

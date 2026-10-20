@@ -37,7 +37,7 @@ RowLayout {
             MouseArea {
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
-                onClicked: Quickshell.execDetached(["umbriel", "msg",
+                onClicked: Quickshell.execDetached(["/nix/store/yj9f18sd6gj5qyv1q2zwgc97iiab94pf-umbriel-0.1.0/bin/umbriel", "msg",
                     "workspace-switch:" + modelData.name + "/" + root.outputName])            }
         }
     }
