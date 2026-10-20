@@ -6,7 +6,7 @@ import "../../services"
 import "./state"
 
 PanelWindow {
-    id: win
+    id: root
 
     property var screen
 

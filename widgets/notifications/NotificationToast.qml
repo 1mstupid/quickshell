@@ -72,7 +72,7 @@ PanelWindow {
                             color: Theme.fg
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize + 1
-                            elide: Text.ElideRIght
+                            elide: Text.ElideRight
                             wrapMode: Text.WordWrap
                         }
                     }

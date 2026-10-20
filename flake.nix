@@ -31,26 +31,15 @@
             findutils
             util-linux
           ];
-
-          quickshellScript = ''
-            export PATH="/home/waltz/.local/bin:$PATH"
-            exec quickshell -p ${self}/shell.qml "$@"
-          '';
         in {
           default = pkgs.writeShellApplication {
             name = "quickshell";
             runtimeInputs = quickshellRuntime;
-            text = quickshellScript;
           };
 
           qs = pkgs.writeShellApplication {
             name = "qs";
             runtimeInputs = quickshellRuntime;
-            text = ''
-                export XDG_CONFIG_HOME="/home/waltz/.local/xdg/config";
-                export PATH="/home/waltz/.local/bin:$PATH"
-                exec quickshell -p ${self}/shell.qml "$@"
-            '';
           };
         }
       );

@@ -190,14 +190,14 @@ PanelWindow {
             PowerButton {
                 label: "Reboot"
                 icon: "󰜉"
-                hoverColor: Colors.colYellow
+                hoverColor: Colors.primary
                 selected: root.selectedIndex === 2
                 onActivated: root.runAndClose(procReboot)
             }
             PowerButton {
                 label: "Shutdown"
                 icon: "󰐥"
-                hoverColor: Colors.colRed
+                hoverColor: Colors.primary
                 selected: root.selectedIndex === 3
                 onActivated: root.runAndClose(procShutdown)
             }
