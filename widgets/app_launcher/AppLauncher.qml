@@ -4,37 +4,49 @@ import Quickshell.Io
 import QtQuick
 import "../../services"
 
+// Top-anchored launcher. Grows out of the bar pill, the same way the
+// wallpaper picker does.
 PanelWindow {
     id: root
-    property var screen
 
-    IpcHandler {
-        target: "applauncher"
-        function toggle() {
-            AppLauncherState.toggle();
-        }
-    }
-
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: AppLauncherState.launcherVisible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
-    WlrLayershell.namespace: "quickshell-launcher"
+    screen: PillState.originScreen
+    visible: false
 
     anchors {
         top: true
-        bottom: true
         left: true
         right: true
     }
-
-    mask: Region {
-        item: AppLauncherState.launcherVisible ? maskCover : null
-    }
-    Item {
-        id: maskCover
-        anchors.fill: parent
-    }
+    implicitHeight: PillState.pillTop + maxPanelH + 12
 
     color: "transparent"
+    exclusionMode: ExclusionMode.Ignore
+
+    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.keyboardFocus: root.visible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.namespace: "quickshell-launcher"
+
+    IpcHandler {
+        target: "applauncher"
+        function toggle(): void { AppLauncherState.toggle() }
+    }
+
+    // ── Geometry ───────────────────────────────────────────────────────────
+    readonly property int maxVisible: 7
+    readonly property int itemH: 42
+    readonly property int panelW: 440
+    // 12 top + 44 search + 8 gap + 12 bottom, plus the rows
+    readonly property int chromeH: 76
+    readonly property int maxPanelH: chromeH + maxVisible * itemH
+
+    // 0 = the bar pill, 1 = the full panel
+    property real t: 0
+
+    // eases when the number of results changes
+    property real panelH: chromeH + Math.max(1, Math.min(filteredApps.length, maxVisible)) * itemH
+    Behavior on panelH {
+        NumberAnimation { duration: 250; easing.type: Easing.OutCubic }
+    }
 
     // ── State ──────────────────────────────────────────────────────────────
     property string searchQuery: ""
@@ -78,6 +90,63 @@ PanelWindow {
 
     onFilteredAppsChanged: selectedIndex = 0
 
+    // ── Open / close ───────────────────────────────────────────────────────
+    function openLauncher() {
+        PillState.owner = "applauncher";
+        searchInput.text = "";
+        visible = true;
+        morph.stop();
+        morph.from = root.t;
+        morph.to = 1;
+        morph.start();
+    }
+
+    function close() {
+        morph.stop();
+        morph.from = root.t;
+        morph.to = 0;
+        morph.start();
+    }
+
+    NumberAnimation {
+        id: morph
+        target: root
+        property: "t"
+        duration: 480
+        easing.type: Easing.InOutCubic
+        onFinished: {
+            if (root.t < 0.5) {
+                root.visible = false;
+                if (PillState.owner === "applauncher")
+                    PillState.owner = "";
+            }
+        }
+    }
+
+    Connections {
+        target: AppLauncherState
+        function onLauncherVisibleChanged() {
+            if (AppLauncherState.launcherVisible)
+                root.openLauncher();
+            else
+                root.close();
+        }
+    }
+
+    // another panel took the pill, so this one gives way
+    Connections {
+        target: PillState
+        function onOwnerChanged() {
+            if (PillState.owner !== "applauncher" && root.visible)
+                AppLauncherState.launcherVisible = false;
+        }
+    }
+
+    onVisibleChanged: {
+        if (visible)
+            searchInput.forceActiveFocus();
+    }
+
     // ── Launch ─────────────────────────────────────────────────────────────
     function launchEntry(entry) {
         AppLauncherState.recordLaunch(entry.id);
@@ -93,76 +162,33 @@ PanelWindow {
         listView.positionViewAtIndex(selectedIndex, ListView.Contain);
     }
 
-    Connections {
-        target: AppLauncherState
-        function onLauncherVisibleChanged() {
-            if (AppLauncherState.launcherVisible) {
-                searchInput.text = "";
-                root.searchQuery = "";
-                root.selectedIndex = 0;
-                searchInput.forceActiveFocus();
-            }
-        }
-    }
-
     // ── Accent colours ─────────────────────────────────────────────────────
     readonly property color accentFill: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.18)
     readonly property color accentIcon: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.28)
     readonly property color fgDim: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.65)
 
-    // ── Panel geometry ─────────────────────────────────────────────────────
-    readonly property int maxVisible: 7
-    readonly property int itemH: 42
-    readonly property int panelW: 440
-    // 12 top-pad + 4 handle + 8 + 44 search + 8 + list + 12 bot-pad
-    readonly property int panelH: 88 + Math.min(filteredApps.length, maxVisible) * itemH
+    // only the card takes clicks; everything around it passes through
+    mask: Region { item: card }
 
-    // Click outside → close
-    MouseArea {
-        anchors.fill: parent
-        enabled: AppLauncherState.launcherVisible
-        onClicked: AppLauncherState.hide()
-    }
-
-    // ── Panel ──────────────────────────────────────────────────────────────
+    // ── Card ───────────────────────────────────────────────────────────────
     Rectangle {
-        id: panel
-        width: root.panelW
-        // Smooth height shrink/grow when filteredApps count changes
-        height: root.panelH
-        Behavior on height {
-            NumberAnimation {
-                duration: 500
-                easing.type: Easing.OutCubic
-            }
-        }
+        id: card
 
-        clip: true   // keep list items inside during height animation
+        readonly property real fromW: PillState.pillWidth
+        readonly property real fromH: PillState.pillHeight
 
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: parent.bottom
-
-        // Semi-translucent frosted panel
-        color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, 0.8)
-        topLeftRadius: 2
-        topRightRadius: 2
-        bottomLeftRadius: 0
-        bottomRightRadius: 0
-        border.color: Qt.alpha(Theme.fg, 0.10)
+        width: fromW + (root.panelW - fromW) * root.t
+        height: fromH + (root.panelH - fromH) * root.t
+        x: (root.width - width) / 2
+        y: PillState.pillTop
+        radius: fromH / 2 + (12 - fromH / 2) * root.t
+        color: Theme.bg
         border.width: 1
+        border.color: Qt.alpha(Theme.border, 0.6)
+        clip: true
 
-        // Slide up / down
-        transform: Translate {
-            y: AppLauncherState.launcherVisible ? 0 : root.panelH + 6
-            Behavior on y {
-                NumberAnimation {
-                    duration: 500
-                    easing.type: Easing.OutCubic
-                }
-            }
-        } 
-
-        // ── Content ────────────────────────────────────────────────────────
+        // content fades in during the second half of the morph
+                // content fades in during the second half of the morph
         Column {
             anchors {
                 top: parent.top
@@ -173,112 +199,13 @@ PanelWindow {
                 rightMargin: 12
             }
             spacing: 0
-
-            // Drag handle
-            Rectangle {
-                width: 36
-                height: 4
-                radius: 2
-                anchors.horizontalCenter: parent.horizontalCenter
-                color: Qt.rgba(1, 1, 1, 0.22)
-            }
-
-            Item {
-                width: 1
-                height: 8
-            }
-
-            // ── Search box ─────────────────────────────────────────────────
-            Rectangle {
-                width: parent.width
-                height: 44
-                radius: 10
-                color: Qt.rgba(1, 1, 1, 0.07)
-
-                Rectangle {
-                    anchors.fill: parent
-                    radius: 10
-                    color: "transparent"
-                    border.color: Theme.primary
-                    border.width: 1
-                    opacity: searchInput.activeFocus ? 0.55 : 0
-                    Behavior on opacity {
-                        NumberAnimation {
-                            duration: 150
-                        }
-                    }
-                }
-
-                Row {
-                    anchors {
-                        fill: parent
-                        leftMargin: 14
-                        rightMargin: 14
-                    }
-                    spacing: 10 
-
-                    Item {
-                        width: parent.width - 40
-                        height: parent.height
-
-                        Text {
-                            anchors.fill: parent
-                            text: root.isSearching ? "" : "Search apps…"
-                            color: Theme.fg
-                            opacity: 0.28
-                            font {
-                                pixelSize: 13
-                                family: "JetBrainsMono Nerd Font"
-                            }
-                            verticalAlignment: Text.AlignVCenter
-                            visible: searchInput.text === ""
-                        }
-
-                        TextInput {
-                            id: searchInput
-                            anchors.fill: parent
-                            color: Theme.fg
-                            selectionColor: root.accentFill
-                            font {
-                                pixelSize: 13
-                                family: "JetBrainsMono Nerd Font"
-                            }
-                            verticalAlignment: TextInput.AlignVCenter
-                            clip: true
-
-                            onTextChanged: root.searchQuery = text
-
-                            Keys.onPressed: function (event) {
-                                if (event.key === Qt.Key_Up) {
-                                    root.navigate(-1);
-                                    event.accepted = true;
-                                } else if (event.key === Qt.Key_Down) {
-                                    root.navigate(1);
-                                    event.accepted = true;
-                                } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                                    if (root.filteredApps.length > 0)
-                                        root.launchEntry(root.filteredApps[root.selectedIndex]);
-                                    event.accepted = true;
-                                } else if (event.key === Qt.Key_Escape) {
-                                    AppLauncherState.hide();
-                                    event.accepted = true;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            Item {
-                width: 1
-                height: 8
-            }
+            opacity: Math.max(0, (root.t - 0.5) * 2)
 
             // ── App list ───────────────────────────────────────────────────
             ListView {
                 id: listView
                 width: parent.width
-                height: Math.min(root.filteredApps.length, root.maxVisible) * root.itemH
+                height: Math.max(1, Math.min(root.filteredApps.length, root.maxVisible)) * root.itemH
                 model: root.filteredApps
                 clip: true
                 interactive: false
@@ -302,7 +229,7 @@ PanelWindow {
                     opacity: 0.28
                     font {
                         pixelSize: 13
-                        family: "JetBrainsMono Nerd Font"
+                        family: Theme.fontFamily
                     }
                 }
 
@@ -342,7 +269,7 @@ PanelWindow {
                                 height: 36
                                 radius: 9
                                 anchors.verticalCenter: parent.verticalCenter
-                                color: appRow.sel ? root.accentIcon : Qt.rgba(1, 1, 1, 0.08)
+                                color: appRow.sel ? root.accentIcon : Qt.alpha(Theme.fg, 0.08)
                                 Behavior on color {
                                     ColorAnimation {
                                         duration: 100
@@ -365,7 +292,7 @@ PanelWindow {
                                     text: modelData.name.charAt(0).toUpperCase()
                                     font {
                                         pixelSize: 15
-                                        family: "JetBrainsMono Nerd Font"
+                                        family: Theme.fontFamily
                                         weight: Font.Bold
                                     }
                                     color: appRow.sel ? Theme.primary : Theme.fg
@@ -386,7 +313,7 @@ PanelWindow {
                                     text: modelData.name
                                     font {
                                         pixelSize: 13
-                                        family: "JetBrainsMono Nerd Font"
+                                        family: Theme.fontFamily
                                         weight: appRow.sel ? Font.Medium : Font.Normal
                                     }
                                     color: appRow.sel ? Theme.fg : root.fgDim
@@ -416,7 +343,7 @@ PanelWindow {
                                             text: "recent"
                                             font {
                                                 pixelSize: 9
-                                                family: "JetBrainsMono Nerd Font"
+                                                family: Theme.fontFamily
                                             }
                                             color: Theme.primary
                                         }
@@ -427,7 +354,7 @@ PanelWindow {
                                         text: modelData.genericName
                                         font {
                                             pixelSize: 11
-                                            family: "JetBrainsMono Nerd Font"
+                                            family: Theme.fontFamily
                                         }
                                         color: Theme.fg
                                         opacity: 0.35
@@ -455,7 +382,88 @@ PanelWindow {
 
             Item {
                 width: 1
-                height: 4
+                height: 8
+            }
+
+            // ── Search box ─────────────────────────────────────────────────
+            Rectangle {
+                width: parent.width
+                height: 44
+                radius: 10
+                color: Qt.alpha(Theme.fg, 0.07)
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: 10
+                    color: "transparent"
+                    border.color: Theme.primary
+                    border.width: 1
+                    opacity: searchInput.activeFocus ? 0.55 : 0
+                    Behavior on opacity {
+                        NumberAnimation {
+                            duration: 150
+                        }
+                    }
+                }
+
+                Row {
+                    anchors {
+                        fill: parent
+                        leftMargin: 14
+                        rightMargin: 14
+                    }
+                    spacing: 10
+
+                    Item {
+                        width: parent.width - 40
+                        height: parent.height
+
+                        Text {
+                            anchors.fill: parent
+                            text: root.isSearching ? "" : "Search apps…"
+                            color: Theme.fg
+                            opacity: 0.28
+                            font {
+                                pixelSize: 13
+                                family: Theme.fontFamily
+                            }
+                            verticalAlignment: Text.AlignVCenter
+                            visible: searchInput.text === ""
+                        }
+
+                        TextInput {
+                            id: searchInput
+                            anchors.fill: parent
+                            color: Theme.fg
+                            selectionColor: root.accentFill
+                            font {
+                                pixelSize: 13
+                                family: Theme.fontFamily
+                            }
+                            verticalAlignment: TextInput.AlignVCenter
+                            clip: true
+
+                            onTextChanged: root.searchQuery = text
+
+                            Keys.onPressed: function (event) {
+                                if (event.key === Qt.Key_Up) {
+                                    root.navigate(-1);
+                                    event.accepted = true;
+                                } else if (event.key === Qt.Key_Down) {
+                                    root.navigate(1);
+                                    event.accepted = true;
+                                } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                                    if (root.filteredApps.length > 0)
+                                        root.launchEntry(root.filteredApps[root.selectedIndex]);
+                                    event.accepted = true;
+                                } else if (event.key === Qt.Key_Escape) {
+                                    AppLauncherState.hide();
+                                    event.accepted = true;
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }

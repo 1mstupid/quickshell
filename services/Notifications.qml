@@ -17,13 +17,13 @@ Singleton {
         imageSupported: true
 
         onNotification: n => {
-            console.log("GOT:", n.summary, "|", n.body)
             n.tracked = true
         }
     }
 
     function clearAll() {
-        for (const n of server.trackedNotifications)
+        const list = server.trackedNotifications.values.slice()
+        for (const n of list)
             n.dismiss()
     }
 }

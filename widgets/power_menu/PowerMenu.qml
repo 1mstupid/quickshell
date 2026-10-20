@@ -12,7 +12,7 @@ PanelWindow {
     property var screen
 
     // ── Keyboard selection state ─────────────────────────────────────────────
-    property int selectedIndex: -1
+    property int selectedIndex: 0
     readonly property int buttonCount: 3
 
     function activateSelected() {
@@ -30,7 +30,7 @@ PanelWindow {
             if (PowerMenuState.powerVisible)
                 powerCard.forceActiveFocus()
             else
-                root.selectedIndex = -1
+                root.selectedIndex = 0
         }
     }
 
@@ -43,10 +43,10 @@ PanelWindow {
 
     // ── Layer / geometry ─────────────────────────────────────────────────────
     anchors {
-	top: true
-	bottom: true
-	left: true
-	right: true
+    	top: true
+    	bottom: true
+    	left: true
+    	right: true
     }
 
     mask: Region {
@@ -72,16 +72,8 @@ PanelWindow {
 
     // ── Process runners ──────────────────────────────────────────────────────
     Process {
-        id: procLock
-        command: ["loginctl", "lock-session"]
-    }
-    Process {
         id: procSuspend
         command: ["systemctl", "suspend"]
-    }
-    Process {
-        id: procHibernate
-        command: ["systemctl", "hibernate"]
     }
     Process {
         id: procReboot
@@ -184,21 +176,21 @@ PanelWindow {
                 label: "Suspend"
                 icon: "󰒲"
                 hoverColor: Theme.primary
-                selected: root.selectedIndex === 1
+                selected: root.selectedIndex === 0
                 onActivated: root.runAndClose(procSuspend)
             }
             PowerButton {
                 label: "Reboot"
                 icon: "󰜉"
-                hoverColor: Colors.primary
-                selected: root.selectedIndex === 2
+                hoverColor: Theme.primary
+                selected: root.selectedIndex === 1
                 onActivated: root.runAndClose(procReboot)
             }
             PowerButton {
                 label: "Shutdown"
                 icon: "󰐥"
-                hoverColor: Colors.primary
-                selected: root.selectedIndex === 3
+                hoverColor: Theme.primary
+                selected: root.selectedIndex === 2
                 onActivated: root.runAndClose(procShutdown)
             }
 

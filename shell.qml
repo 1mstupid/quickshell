@@ -19,19 +19,14 @@ ShellRoot {
 
     WallpaperPicker {}
 
+    AppLauncher {}
+
     VolumeOsd {}
 
     Variants {
         model: Quickshell.screens
 
         Bar {}
-    }
-    Variants {
-        model: Quickshell.screens
-        AppLauncher {
-            property var modelData
-            screen: modelData
-        }
     }
     Variants {
         model: Quickshell.screens

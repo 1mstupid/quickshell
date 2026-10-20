@@ -33,7 +33,15 @@ PanelWindow {
     color: "transparent"
     visible: Theme.barStateReady && shown
 
-    mask: Region { item: pill }
+    // while the picker is open the pill is non-interactive, so clicks pass through
+    mask: Region { item: PillState.open ? null : pill }
+
+    // the picker card grows out of the origin bar's pill, so publish its geometry
+    readonly property bool isOrigin: root.modelData?.name === PillState.originName
+
+    Binding { target: PillState; property: "pillTop"; value: root.topGap; when: root.isOrigin }
+    Binding { target: PillState; property: "pillWidth"; value: pill.width; when: root.isOrigin }
+    Binding { target: PillState; property: "pillHeight"; value: pill.height; when: root.isOrigin }
 
     Recorder {
         id: recorder
@@ -59,6 +67,12 @@ PanelWindow {
         border.width: 1
         border.color: Qt.alpha(Theme.border, 0.6)
 
+        // non-origin bars fade the whole pill; the origin keeps its background
+        // so the picker card can take over from the same spot
+        opacity: PillState.open ? 0 : 1
+        Behavior on opacity {
+            NumberAnimation { duration: 120; easing.type: Easing.OutQuad }
+        }
         Behavior on width {
             NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
         }
@@ -70,6 +84,9 @@ PanelWindow {
             anchors.left: parent.left
             anchors.leftMargin: pill.pad
             outputName: root.modelData.name
+
+            opacity: PillState.open ? 0 : 1
+            Behavior on opacity { NumberAnimation { duration: 120 } }
         }
 
         // right: recorder, then pomodoro ring
@@ -79,6 +96,9 @@ PanelWindow {
             anchors.right: parent.right
             anchors.rightMargin: pill.pad
             spacing: 8
+
+            opacity: PillState.open ? 0 : 1
+            Behavior on opacity { NumberAnimation { duration: 120 } }
 
             // recording indicator; click stops it
             MediaDisc {
@@ -193,6 +213,9 @@ PanelWindow {
             id: clock
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
+
+            opacity: PillState.open ? 0 : 1
+            Behavior on opacity { NumberAnimation { duration: 120 } }
         }
     }
 }

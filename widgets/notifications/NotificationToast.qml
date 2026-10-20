@@ -1,17 +1,21 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Wayland
 import Quickshell.Services.Notifications
 import "../../services"
 
 
 PanelWindow {
-    anchors { top: true; right: true;}
-    margins { top: 55; right: Theme.edgeInset + 2;}
+    anchors { top: true; right: true; }
+    margins { top: 55; right: Theme.edgeInset + 2; }
     implicitWidth: 350
     implicitHeight: Math.max(1, column.implicitHeight)
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
+
+    // only the cards take clicks; the empty part of the window passes them through
+    mask: Region { item: column }
 
     ColumnLayout {
         id: column
@@ -33,7 +37,8 @@ PanelWindow {
 
 
                 Layout.fillWidth: true
-                Layout.preferredHeight: 80
+                // sized to its content, so long bodies are not clipped
+                implicitHeight: layout.implicitHeight + 20
                 radius: 8
                 color: Theme.bg
                 border.width: 2
@@ -48,9 +53,12 @@ PanelWindow {
                         Layout.preferredHeight: 36
                         Layout.preferredWidth: 36
                         Layout.alignment: Qt.AlignTop
-                        fillMode: Image.PreservedAspectFit
+                        fillMode: Image.PreserveAspectFit
                         visible: source.toString() !== ""
-                        source: card.modelData.image || card.modelData.appIcon || ""
+                        // image is a path or URL; appIcon is a theme name, so it needs image://icon/
+                        source: card.modelData.image !== ""
+                            ? card.modelData.image
+                            : (card.modelData.appIcon !== "" ? "image://icon/" + card.modelData.appIcon : "")
                     }
                     ColumnLayout {
                         Layout.fillWidth: true
@@ -74,6 +82,7 @@ PanelWindow {
                             font.pixelSize: Theme.fontSize + 1
                             elide: Text.ElideRight
                             wrapMode: Text.WordWrap
+                            maximumLineCount: 3
                         }
                     }
                 }
@@ -85,4 +94,3 @@ PanelWindow {
         }
     }
 }
-

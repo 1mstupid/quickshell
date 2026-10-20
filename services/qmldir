@@ -1,4 +1,5 @@
 singleton Power Power.qml
+singleton PillState PillState.qml
 singleton Theme Theme.qml
 singleton Notifications Notifications.qml
 singleton Pomodoro Pomodoro.qml
