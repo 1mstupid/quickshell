@@ -1,7 +1,7 @@
 pragma Singleton
 import QtQuick
-import QtCore
 import Quickshell
+import Quickshell.Io
 
 QtObject {
     id: root
@@ -9,13 +9,28 @@ QtObject {
     property bool launcherVisible: false
     property var recentIds: []
 
-    property var _settings: Settings {
-        category: "AppLauncher"
-        property string recentIdsSerialized: "[]"
+    readonly property string recentsPath:
+        Quickshell.env("HOME") + "/.local/xdg/config/app-launcher-recents"
+
+    // one JSON array of desktop-entry ids, most recent first
+    FileView {
+        id: recentsFile
+        path: root.recentsPath
+        atomicWrites: true
+        onLoaded: {
+            try {
+                root.recentIds = JSON.parse(text())
+            } catch (e) {
+                root.recentIds = []
+            }
+        }
+        onLoadFailed: root.recentIds = []
     }
 
     Component.onCompleted: {
-        recentIds = JSON.parse(_settings.recentIdsSerialized)
+        // FileView won't create the directory on write
+        Quickshell.execDetached(["mkdir", "-p",
+            Quickshell.env("HOME") + "/.local/xdg/config"])
     }
 
     function toggle() { launcherVisible = !launcherVisible }
@@ -29,11 +44,11 @@ QtObject {
         list.unshift(id)
         if (list.length > 12) list = list.slice(0, 12)
         recentIds = list
-        _settings.recentIdsSerialized = JSON.stringify(list)
+        recentsFile.setText(JSON.stringify(list))
     }
 
     function clearRecents() {
         recentIds = []
-        _settings.recentIdsSerialized = "[]"
+        recentsFile.setText("[]")
     }
 }
