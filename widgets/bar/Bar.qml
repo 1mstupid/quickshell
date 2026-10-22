@@ -28,7 +28,8 @@ PanelWindow {
     implicitHeight: topGap + pill.height
 
     // hidden bar gives its space back to windows
-    exclusiveZone: shown ? topGap + Theme.effectiveBarHeight : 0
+    readonly property bool showBar: shown && !Overview.open
+    exclusiveZone: showBar ? topGap + Theme.effectiveBarHeight : 0
 
     color: "transparent"
     visible: Theme.barStateReady && shown
@@ -57,7 +58,10 @@ PanelWindow {
         // both sides, so the clock stays centered
         readonly property int side: Math.max(workspaces.implicitWidth, rightRow.implicitWidth)
 
-        y: root.topGap
+        y: Overview.open ? -(height + root.topGap) : root.topGap
+        Behavior on y {
+            NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+        }
         anchors.horizontalCenter: parent.horizontalCenter
         width: clock.implicitWidth + 2 * (pad + side)
         height: Theme.effectiveBarHeight
