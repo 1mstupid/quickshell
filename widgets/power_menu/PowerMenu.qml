@@ -12,14 +12,14 @@ PanelWindow {
     property var screen
 
     // ── Keyboard selection state ─────────────────────────────────────────────
-    property int selectedIndex: 1
+    property int selectedIndex: 0
     readonly property int buttonCount: 3
 
     function activateSelected() {
         switch (selectedIndex) {
-            case 1: runAndClose(procSuspend); break;
-            case 2: runAndClose(procReboot); break;
-            case 3: runAndClose(procShutdown); break;
+            case 0: runAndClose(procSuspend); break;
+            case 1: runAndClose(procReboot); break;
+            case 2: runAndClose(procShutdown); break;
         }
     }
 
@@ -30,7 +30,7 @@ PanelWindow {
             if (PowerMenuState.powerVisible)
                 powerCard.forceActiveFocus()
             else
-                root.selectedIndex = 1
+                root.selectedIndex = 0
         }
     }
 
@@ -176,21 +176,21 @@ PanelWindow {
                 label: "Suspend"
                 icon: "󰒲"
                 hoverColor: Theme.primary
-                selected: root.selectedIndex === 1
+                selected: root.selectedIndex === 0
                 onActivated: root.runAndClose(procSuspend)
             }
             PowerButton {
                 label: "Reboot"
                 icon: "󰜉"
                 hoverColor: Theme.primary
-                selected: root.selectedIndex === 2
+                selected: root.selectedIndex === 1
                 onActivated: root.runAndClose(procReboot)
             }
             PowerButton {
                 label: "Shutdown"
                 icon: "󰐥"
                 hoverColor: Theme.primary
-                selected: root.selectedIndex === 3
+                selected: root.selectedIndex === 2
                 onActivated: root.runAndClose(procShutdown)
             }
 
