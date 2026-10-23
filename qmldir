@@ -4,15 +4,10 @@ Workspaces Workspaces.qml
 Wm Wm.qml
 VolumeOsd VolumeOsd.qml
 Pomodoro Pomodoro.qml
-MediaContent MediaContent.qml
 MediaState MediaState.qml
-BarModule BarModule.qml
-Media Media.qml
-MediaPopup MediaPopup.qml
 Network Network.qml
 Clock Clock.qml
 WallpaperPicker WallpaperPicker.qml
-Popout Popout.qml
 TweakSlider TweakSlider.qml
 TogglePill TogglePill.qml
 NotifyPopup NotifyPopup.qml

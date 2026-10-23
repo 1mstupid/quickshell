@@ -6,7 +6,7 @@ import "../../../services"
 
 // Media widget. It morphs out of the bar pill, like the launcher and the
 // wallpaper picker. Opened by the wave (or `qs ipc call media toggle`),
-// closed by Escape, and closed automatically when playback stops.
+// closed by Escape, and closed when the track stops (pausing keeps it open).
 PanelWindow {
     id: root
 
@@ -27,8 +27,8 @@ PanelWindow {
     WlrLayershell.keyboardFocus: root.visible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     WlrLayershell.namespace: "quickshell-media"
 
-    readonly property int panelW: 300
-    readonly property int panelH: 124
+    readonly property int panelW: 340
+    readonly property int panelH: 168
 
     // 0 = the bar pill, 1 = the full widget
     property real t: 0
@@ -95,11 +95,11 @@ PanelWindow {
         }
     }
 
-    // stopping playback closes the widget
+    // the track stopping or disappearing closes the widget; pausing does not
     Connections {
         target: media
-        function onPlayingChanged() {
-            if (!media.playing)
+        function onPresentChanged() {
+            if (!media.present)
                 MediaWidgetState.hide()
         }
     }
@@ -123,7 +123,7 @@ PanelWindow {
         height: fromH + (root.panelH - fromH) * root.t
         x: (root.width - width) / 2
         y: PillState.pillTop
-        radius: fromH / 2 + (14 - fromH / 2) * root.t
+        radius: fromH / 2 + (16 - fromH / 2) * root.t
         color: Theme.bg
         border.width: 1
         border.color: Qt.alpha(Theme.border, 0.6)
@@ -137,71 +137,74 @@ PanelWindow {
         }
 
         // content fades in during the second half of the morph
-        Item {
+        Column {
+            id: content
             anchors.fill: parent
-            anchors.margins: 14
+            anchors.margins: 16
             opacity: Math.max(0, (root.t - 0.5) * 2)
+            spacing: 16
 
-            // cover logic as in MediaContent: track art, glyph while missing
-            Rectangle {
-                id: art
-                width: 56
-                height: 56
-                radius: 10
-                color: Qt.alpha(Theme.fg, 0.06)
-                clip: true
+            Row {
+                id: header
+                width: parent.width
+                spacing: 14
 
-                Image {
-                    id: artImage
-                    anchors.fill: parent
-                    source: media.player?.trackArtUrl ?? ""
-                    fillMode: Image.PreserveAspectCrop
-                    visible: status === Image.Ready
+                // track art, with a glyph while none is loaded
+                Rectangle {
+                    id: art
+                    width: 64
+                    height: 64
+                    radius: 10
+                    color: Qt.alpha(Theme.fg, 0.06)
+                    clip: true
+
+                    Image {
+                        id: artImage
+                        anchors.fill: parent
+                        source: media.player?.trackArtUrl ?? ""
+                        fillMode: Image.PreserveAspectCrop
+                        visible: status === Image.Ready
+                    }
+                    Text {
+                        anchors.centerIn: parent
+                        visible: artImage.status !== Image.Ready
+                        text: "󰝚"
+                        color: Qt.alpha(Theme.fg, 0.3)
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 28
+                    }
                 }
-                Text {
-                    anchors.centerIn: parent
-                    visible: artImage.status !== Image.Ready
-                    text: "󰝚"
-                    color: Qt.alpha(Theme.fg, 0.3)
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 26
+
+                Column {
+                    width: header.width - art.width - header.spacing
+                    anchors.verticalCenter: art.verticalCenter
+                    spacing: 4
+
+                    Text {
+                        width: parent.width
+                        text: media.player?.trackTitle ?? ""
+                        color: Theme.fg
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 14
+                        font.bold: true
+                        elide: Text.ElideRight
+                    }
+                    Text {
+                        width: parent.width
+                        text: media.artistText
+                        color: Qt.alpha(Theme.fg, 0.6)
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 12
+                        elide: Text.ElideRight
+                    }
                 }
             }
 
-            Column {
-                anchors.left: art.right
-                anchors.leftMargin: 12
-                anchors.right: parent.right
-                anchors.top: parent.top
-                anchors.topMargin: 2
-                spacing: 3
-
-                Text {
-                    width: parent.width
-                    text: media.player?.trackTitle ?? ""
-                    color: Theme.fg
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 13
-                    font.bold: true
-                    elide: Text.ElideRight
-                }
-                Text {
-                    width: parent.width
-                    text: media.artistText
-                    color: Qt.alpha(Theme.fg, 0.6)
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 11
-                    elide: Text.ElideRight
-                }
-            }
-
-            // progress line; click to seek, hidden in effect for streams without length
+            // progress line; click to seek, the hit area is taller than the line
             Item {
                 id: seek
-                anchors.left: parent.left
-                anchors.right: parent.right
-                y: 82
-                height: 3
+                width: parent.width
+                height: 4
 
                 Rectangle {
                     anchors.fill: parent
@@ -248,9 +251,9 @@ PanelWindow {
             }
 
             Row {
-                anchors.bottom: parent.bottom
+                id: controls
                 anchors.horizontalCenter: parent.horizontalCenter
-                spacing: 30
+                spacing: 36
 
                 Btn {
                     text: "󰒮"

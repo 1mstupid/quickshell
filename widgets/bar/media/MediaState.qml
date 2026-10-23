@@ -28,6 +28,9 @@ Item {
     }
     readonly property bool playing: player !== null
         && player.playbackState === MprisPlaybackState.Playing
+    // a track is loaded, playing or paused; stopped or no player is not
+    readonly property bool present: player !== null
+        && player.playbackState !== MprisPlaybackState.Stopped
 
     // middle-click dismiss; cleared when the track or player changes
     property bool dismissed: false

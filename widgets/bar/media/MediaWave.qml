@@ -1,9 +1,9 @@
 import QtQuick
 import "../../../services"
 
-// Bar indicator for playing media: five bars that move while something plays
-// and vanish otherwise. Left click opens the media widget, right click stops
-// the player.
+// Bar indicator for media: five bars that stay while a track is loaded and
+// freeze when it is paused. Gone once the player is stopped or absent.
+// Left click opens the media widget, right click stops the player.
 Item {
     id: root
 
@@ -12,7 +12,7 @@ Item {
 
     MediaState { id: media }
 
-    opacity: media.playing ? 1 : 0
+    opacity: media.present ? 1 : 0
     visible: opacity > 0
     Behavior on opacity {
         NumberAnimation { duration: 150; easing.type: Easing.OutQuad }
@@ -35,7 +35,8 @@ Item {
                 radius: 1
                 color: Theme.fg
 
-                // each bar gets its own tempo so the wave does not move in step
+                // each bar gets its own tempo so the wave does not move in step;
+                // pausing stops the loop where it is
                 SequentialAnimation on height {
                     running: media.playing
                     loops: Animation.Infinite
