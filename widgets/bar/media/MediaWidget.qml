@@ -28,7 +28,8 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell-media"
 
     readonly property int panelW: 340
-    readonly property int panelH: 168
+    // header 72 + 16 + progress group 22 + 16 + controls 30, plus 16 margins each side
+    readonly property int panelH: 188
 
     // 0 = the bar pill, 1 = the full widget
     property real t: 0
@@ -152,9 +153,9 @@ PanelWindow {
                 // track art, with a glyph while none is loaded
                 Rectangle {
                     id: art
-                    width: 64
-                    height: 64
-                    radius: 10
+                    width: 72
+                    height: 72
+                    radius: 12
                     color: Qt.alpha(Theme.fg, 0.06)
                     clip: true
 
@@ -171,7 +172,7 @@ PanelWindow {
                         text: "󰝚"
                         color: Qt.alpha(Theme.fg, 0.3)
                         font.family: Theme.fontFamily
-                        font.pixelSize: 28
+                        font.pixelSize: 30
                     }
                 }
 
@@ -185,7 +186,7 @@ PanelWindow {
                         text: media.player?.trackTitle ?? ""
                         color: Theme.fg
                         font.family: Theme.fontFamily
-                        font.pixelSize: 14
+                        font.pixelSize: 15
                         font.bold: true
                     }
                     MarqueeText {
@@ -198,33 +199,60 @@ PanelWindow {
                 }
             }
 
-            // progress line; click to seek, the hit area is taller than the line
-            Item {
-                id: seek
+            // progress with elapsed and remaining time under it
+            Column {
                 width: parent.width
-                height: 4
+                spacing: 6
 
-                Rectangle {
-                    anchors.fill: parent
-                    radius: 2
-                    color: Qt.alpha(Theme.fg, 0.12)
+                // progress line; click to seek, the hit area is taller than the line
+                Item {
+                    id: seek
+                    width: parent.width
+                    height: 4
 
                     Rectangle {
-                        width: media.timed ? Math.min(media.pos / media.len, 1) * parent.width : 0
-                        height: parent.height
-                        radius: parent.radius
-                        color: Theme.accent
+                        anchors.fill: parent
+                        radius: 2
+                        color: Qt.alpha(Theme.fg, 0.12)
+
+                        Rectangle {
+                            width: media.timed ? Math.min(media.pos / media.len, 1) * parent.width : 0
+                            height: parent.height
+                            radius: parent.radius
+                            color: Theme.accent
+                        }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        anchors.margins: -6
+                        enabled: media.timed && (media.player?.canSeek ?? false)
+                        onClicked: m => {
+                            // the area reaches 6px past the track on each side
+                            const frac = Math.min(Math.max((m.x - 6) / seek.width, 0), 1)
+                            media.player.position = frac * media.len
+                        }
                     }
                 }
 
-                MouseArea {
-                    anchors.fill: parent
-                    anchors.margins: -6
-                    enabled: media.timed && (media.player?.canSeek ?? false)
-                    onClicked: m => {
-                        // the area reaches 6px past the track on each side
-                        const frac = Math.min(Math.max((m.x - 6) / seek.width, 0), 1)
-                        media.player.position = frac * media.len
+                Item {
+                    width: parent.width
+                    height: 12
+                    visible: media.timed
+
+                    Text {
+                        anchors.left: parent.left
+                        text: media.fmt(media.pos)
+                        color: Qt.alpha(Theme.fg, 0.6)
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 10
+                    }
+                    Text {
+                        anchors.right: parent.right
+                        text: "-" + media.fmt(Math.max(0, media.len - media.pos))
+                        color: Qt.alpha(Theme.fg, 0.6)
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 10
                     }
                 }
             }
@@ -234,7 +262,7 @@ PanelWindow {
                 property bool allowed: true
                 signal tapped()
                 font.family: Theme.fontFamily
-                font.pixelSize: 22
+                font.pixelSize: 26
                 color: !allowed ? Qt.alpha(Theme.fg, 0.25)
                      : ma.containsMouse ? Theme.accent : Theme.fg
                 Behavior on color { ColorAnimation { duration: 120 } }
@@ -251,7 +279,7 @@ PanelWindow {
             Row {
                 id: controls
                 anchors.horizontalCenter: parent.horizontalCenter
-                spacing: 36
+                spacing: 44
 
                 Btn {
                     text: "󰒮"
