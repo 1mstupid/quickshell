@@ -2,6 +2,7 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Io
 import QtQuick
+import QtQuick.Effects
 import "../../../services"
 
 // Media widget. It morphs out of the bar pill, like the launcher and the
@@ -28,8 +29,8 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell-media"
 
     readonly property int panelW: 340
-    // header 72 + 16 + progress group 22 + 16 + controls 30, plus 16 margins each side
-    readonly property int panelH: 188
+    // margins 14 + header 64 + 12 + progress 22 + 12 + controls 36 + margins 14
+    readonly property int panelH: 174
 
     // 0 = the bar pill, 1 = the full widget
     property real t: 0
@@ -141,23 +142,30 @@ PanelWindow {
         Column {
             id: content
             anchors.fill: parent
-            anchors.margins: 16
+            anchors.margins: 14
             opacity: Math.max(0, (root.t - 0.5) * 2)
-            spacing: 16
+            spacing: 12
 
             Row {
                 id: header
                 width: parent.width
                 spacing: 14
 
-                // track art, with a glyph while none is loaded
+                // track art, rounded by masking the image; a glyph while none is loaded
                 Rectangle {
                     id: art
-                    width: 72
-                    height: 72
+                    width: 64
+                    height: 64
                     radius: 12
                     color: Qt.alpha(Theme.fg, 0.06)
-                    clip: true
+
+                    Item {
+                        id: artMask
+                        anchors.fill: parent
+                        visible: false
+                        layer.enabled: true
+                        Rectangle { anchors.fill: parent; radius: art.radius; color: "white" }
+                    }
 
                     Image {
                         id: artImage
@@ -165,6 +173,11 @@ PanelWindow {
                         source: media.player?.trackArtUrl ?? ""
                         fillMode: Image.PreserveAspectCrop
                         visible: status === Image.Ready
+                        layer.enabled: true
+                        layer.effect: MultiEffect {
+                            maskEnabled: true
+                            maskSource: artMask
+                        }
                     }
                     Text {
                         anchors.centerIn: parent
@@ -172,7 +185,7 @@ PanelWindow {
                         text: "󰝚"
                         color: Qt.alpha(Theme.fg, 0.3)
                         font.family: Theme.fontFamily
-                        font.pixelSize: 30
+                        font.pixelSize: 28
                     }
                 }
 
@@ -261,8 +274,9 @@ PanelWindow {
                 id: btn
                 property bool allowed: true
                 signal tapped()
+                y: (parent.height - height) / 2
                 font.family: Theme.fontFamily
-                font.pixelSize: 26
+                font.pixelSize: 32
                 color: !allowed ? Qt.alpha(Theme.fg, 0.25)
                      : ma.containsMouse ? Theme.accent : Theme.fg
                 Behavior on color { ColorAnimation { duration: 120 } }
@@ -270,7 +284,7 @@ PanelWindow {
                 MouseArea {
                     id: ma
                     anchors.fill: parent
-                    anchors.margins: -6
+                    anchors.margins: -8
                     hoverEnabled: true
                     onClicked: if (btn.allowed) btn.tapped()
                 }
@@ -278,8 +292,9 @@ PanelWindow {
 
             Row {
                 id: controls
+                height: 36
                 anchors.horizontalCenter: parent.horizontalCenter
-                spacing: 44
+                spacing: 52
 
                 Btn {
                     text: "󰒮"
