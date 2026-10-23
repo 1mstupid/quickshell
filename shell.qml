@@ -7,6 +7,7 @@ import QtQuick
 import "./services"
 import "./widgets/app_launcher"
 import "./widgets/bar"
+import "./widgets/bar/media"
 import "./widgets/network"
 import "./widgets/notifications"
 import "./widgets/osd"
@@ -20,6 +21,8 @@ ShellRoot {
     WallpaperPicker {}
 
     AppLauncher {}
+
+    MediaWidget {}
 
     VolumeOsd {}
 

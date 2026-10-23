@@ -65,6 +65,12 @@ Item {
         }
     }
 
+    // right click on the wave: stop the player outright
+    function kill() {
+        if (player && player.canStop)
+            player.stop()
+    }
+
     function fmt(s) {
         s = Math.max(0, Math.round(s))
         const m = Math.floor(s / 60), r = s % 60

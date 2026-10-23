@@ -4,6 +4,7 @@ singleton PillState PillState.qml
 singleton Theme Theme.qml
 singleton Notifications Notifications.qml
 singleton Pomodoro Pomodoro.qml
+singleton MediaWidgetState MediaWidgetState.qml
 Recorder Recorder.qml
 
 

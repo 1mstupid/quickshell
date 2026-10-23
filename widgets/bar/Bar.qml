@@ -105,7 +105,7 @@ PanelWindow {
             Behavior on opacity { NumberAnimation { duration: 120 } }
 
             // recording indicator; click stops it
-            MediaDisc {
+            MediaWave {
                 Layout.alignment: Qt.AlignVCenter
             }
             Item {
