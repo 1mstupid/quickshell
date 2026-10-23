@@ -17,6 +17,10 @@ Item {
 
     // popup-pinned player; falls back to auto when it disappears
     property var manual: null
+    // the player that last played; kept while paused or between tracks, so
+    // the choice does not fall back to an unrelated player in the list
+    property var lastPlayer: null
+
     readonly property var player: {
         const ps = Mpris.players.values
         if (manual && ps.indexOf(manual) >= 0)
@@ -24,13 +28,35 @@ Item {
         for (let i = 0; i < ps.length; i++)
             if (ps[i].playbackState === MprisPlaybackState.Playing)
                 return ps[i]
+        if (lastPlayer && ps.indexOf(lastPlayer) >= 0)
+            return lastPlayer
         return ps.length > 0 ? ps[0] : null
     }
     readonly property bool playing: player !== null
         && player.playbackState === MprisPlaybackState.Playing
+    onPlayingChanged: if (playing) lastPlayer = player
+
     // a track is loaded, playing or paused; stopped or no player is not
-    readonly property bool present: player !== null
+    readonly property bool hasTrack: player !== null
         && player.playbackState !== MprisPlaybackState.Stopped
+
+    // a track change can briefly report stopped, so a stop only counts once
+    // it has lasted past the grace period
+    property bool present: false
+    onHasTrackChanged: {
+        if (hasTrack) {
+            endGrace.stop()
+            present = true
+        } else {
+            endGrace.restart()
+        }
+    }
+    Component.onCompleted: present = hasTrack
+    Timer {
+        id: endGrace
+        interval: 1200
+        onTriggered: root.present = root.hasTrack
+    }
 
     // middle-click dismiss; cleared when the track or player changes
     property bool dismissed: false
