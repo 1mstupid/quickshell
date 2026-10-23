@@ -12,6 +12,13 @@ Item {
     // own instance, like the Media pill and dashboard
     MediaState { id: media }
 
+    // right click opens the same popup as the Media pill
+    MediaPopup {
+        id: popup
+        anchorItem: root
+        media: media
+    }
+
     opacity: media.player !== null ? 1 : 0
     visible: opacity > 0
     Behavior on opacity {
@@ -58,7 +65,12 @@ Item {
     MouseArea {
         anchors.fill: parent
         cursorShape: Qt.PointingHandCursor
-        onClicked: {
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        onClicked: m => {
+            if (m.button === Qt.RightButton) {
+                popup.visible = true
+                return
+            }
             if (!media.player || cooldown.running) return
             cooldown.restart()
             media.player.togglePlaying()
