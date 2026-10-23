@@ -180,22 +180,20 @@ PanelWindow {
                     anchors.verticalCenter: art.verticalCenter
                     spacing: 4
 
-                    Text {
+                    MarqueeText {
                         width: parent.width
                         text: media.player?.trackTitle ?? ""
                         color: Theme.fg
                         font.family: Theme.fontFamily
                         font.pixelSize: 14
                         font.bold: true
-                        elide: Text.ElideRight
                     }
-                    Text {
+                    MarqueeText {
                         width: parent.width
                         text: media.artistText
                         color: Qt.alpha(Theme.fg, 0.6)
                         font.family: Theme.fontFamily
                         font.pixelSize: 12
-                        elide: Text.ElideRight
                     }
                 }
             }

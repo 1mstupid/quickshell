@@ -8,8 +8,4 @@ MediaState MediaState.qml
 Network Network.qml
 Clock Clock.qml
 WallpaperPicker WallpaperPicker.qml
-TweakSlider TweakSlider.qml
-TogglePill TogglePill.qml
-NotifyPopup NotifyPopup.qml
-NotificationCard NotificationCard.qml
 NotificationToast NotificationToast.qml

@@ -35,7 +35,7 @@ PanelWindow {
     visible: Theme.barStateReady && shown
 
     // while the picker is open the pill is non-interactive, so clicks pass through
-    mask: Region { item: PillState.open ? null : pill }
+    mask: Region { item: PillState.active ? null : pill }
 
     // the picker card grows out of the origin bar's pill, so publish its geometry
     readonly property bool isOrigin: root.modelData?.name === PillState.originName
@@ -73,7 +73,7 @@ PanelWindow {
 
         // non-origin bars fade the whole pill; the origin keeps its background
         // so the picker card can take over from the same spot
-        opacity: PillState.open ? 0 : 1
+        opacity: PillState.active ? 0 : 1
         Behavior on opacity {
             NumberAnimation { duration: 120; easing.type: Easing.OutQuad }
         }
@@ -89,7 +89,7 @@ PanelWindow {
             anchors.leftMargin: pill.pad
             outputName: root.modelData.name
 
-            opacity: PillState.open ? 0 : 1
+            opacity: PillState.active ? 0 : 1
             Behavior on opacity { NumberAnimation { duration: 120 } }
         }
 
@@ -101,7 +101,7 @@ PanelWindow {
             anchors.rightMargin: pill.pad
             spacing: 8
 
-            opacity: PillState.open ? 0 : 1
+            opacity: PillState.active ? 0 : 1
             Behavior on opacity { NumberAnimation { duration: 120 } }
 
             // recording indicator; click stops it
@@ -218,7 +218,7 @@ PanelWindow {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
 
-            opacity: PillState.open ? 0 : 1
+            opacity: PillState.active ? 0 : 1
             Behavior on opacity { NumberAnimation { duration: 120 } }
         }
     }
