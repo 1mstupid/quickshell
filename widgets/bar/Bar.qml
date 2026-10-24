@@ -6,6 +6,7 @@ import Quickshell.Wayland
 import "../../services"
 import "./media"
 import "../notch"
+import "../../services/menu"
 
 PanelWindow {
     id: root
@@ -23,6 +24,8 @@ PanelWindow {
     anchors { top: true; left: true; right: true }
 
     WlrLayershell.layer: WlrLayer.Top
+    // Escape closes the menu, so the origin bar takes keyboard focus while it's open
+    WlrLayershell.keyboardFocus: MenuState.open && isOrigin ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
     // notch: the bar sits flush with the top edge
     readonly property real topGap: 0
@@ -50,6 +53,12 @@ PanelWindow {
         id: recorder
     }
 
+    Item {
+        anchors.fill: parent
+        focus: root.isOrigin && MenuState.open
+        Keys.onEscapePressed: MenuState.hide()
+    }
+
     Rectangle {
         id: pill
 
@@ -58,8 +67,14 @@ PanelWindow {
 
         // volume readout replaces the contents while it is shown; panels
         // also hide the contents, but they keep the pill's own background
-        readonly property bool volumeOn: Volume.shown && !PillState.active
-        readonly property bool contentHidden: PillState.active || Volume.shown
+        // the bar becomes the menu on the origin screen only
+        readonly property bool menuOn: MenuState.open && root.isOrigin
+        readonly property int barH: Theme.effectiveBarHeight
+        readonly property int panelH: 220
+        readonly property int menuW: 380
+
+        readonly property bool volumeOn: Volume.shown && !PillState.active && !menuOn
+        readonly property bool contentHidden: PillState.active || Volume.shown || menuOn
 
         // each side reserves its own content width; the larger one is used on
         // both sides, so the clock stays centered
@@ -70,9 +85,13 @@ PanelWindow {
             NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
         }
         anchors.horizontalCenter: parent.horizontalCenter
-        width: volumeOn ? volumeRow.implicitWidth + 4 * pad
-                        : clock.implicitWidth + 2 * (pad + side)
-        height: Theme.effectiveBarHeight
+        width: menuOn ? Math.max(menuRow.implicitWidth + 4 * pad, menuW)
+             : volumeOn ? volumeRow.implicitWidth + 4 * pad
+             : clock.implicitWidth + 2 * (pad + side)
+        height: menuOn ? barH + panelH : barH
+        Behavior on height {
+            NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+        }
 
         // the notch is painted by the Canvas below, so the rectangle itself stays clear
         color: "transparent"
@@ -223,6 +242,85 @@ PanelWindow {
                     cursorShape: Qt.PointingHandCursor
                     onClicked: Pomodoro.done ? Pomodoro.stop() : Pomodoro.toggle()
                 }
+            }
+        }
+
+        // clicking the clock opens or closes the menu (origin screen only)
+        MouseArea {
+            anchors.fill: clock
+            enabled: root.isOrigin
+            cursorShape: Qt.PointingHandCursor
+            onClicked: MenuState.toggle()
+        }
+
+        // tabs: the top strip of the expanded bar
+        Row {
+            id: menuRow
+            anchors.top: parent.top
+            anchors.horizontalCenter: parent.horizontalCenter
+            height: pill.barH
+            spacing: Math.round(4 * Theme.barScale)
+
+            opacity: pill.menuOn ? 1 : 0
+            visible: opacity > 0
+            Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
+
+            Repeater {
+                model: MenuState.tabs
+
+                Item {
+                    id: tabButton
+                    required property var modelData
+                    required property int index
+                    readonly property bool selected: MenuState.tab === index
+
+                    width: Math.round(30 * Theme.barScale)
+                    height: menuRow.height
+
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: parent.width
+                        height: pill.barH - 6
+                        radius: height / 2
+                        color: tabButton.selected ? Qt.alpha(Theme.accent, 0.25)
+                             : tabMouse.containsMouse ? Qt.alpha(Theme.fg, 0.1)
+                             : "transparent"
+                        Behavior on color { ColorAnimation { duration: 120 } }
+                    }
+                    Text {
+                        anchors.centerIn: parent
+                        text: tabButton.modelData.icon
+                        color: tabButton.selected ? Theme.accent : Theme.fg
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.iconSize
+                    }
+                    MouseArea {
+                        id: tabMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onClicked: MenuState.select(tabButton.index)
+                    }
+                }
+            }
+        }
+
+        // the body of the expanded bar, under the tabs; each tab's panel goes here
+        Item {
+            id: menuBody
+            x: 0
+            y: pill.barH
+            width: pill.width
+            height: pill.panelH
+            opacity: pill.menuOn ? 1 : 0
+            visible: opacity > 0
+            Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
+
+            Text {
+                anchors.centerIn: parent
+                text: MenuState.tabs[MenuState.tab].name
+                color: Theme.fg
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSize
             }
         }
 
