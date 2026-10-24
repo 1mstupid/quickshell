@@ -1,6 +1,6 @@
 # Menu: plan
 
-Status: plan for review. No code yet.
+Status: approved, open questions resolved. Code starts on this branch after the review.
 
 ## Summary
 
@@ -40,11 +40,12 @@ header, which is the template.
 
 The panel lists items in groups, scrollable:
 
-1. Today
-2. Tomorrow
-3. This week
-4. This month
-5. Later
+1. Overdue
+2. Today
+3. Tomorrow
+4. This week
+5. This month
+6. Later
 
 Within a group, items sort by priority, then by file order. Operations: add,
 tick, delete. Deleting removes the line from its file.
@@ -92,9 +93,8 @@ Split into three tabs, each polling only while its tab is open:
 - `widgets/network/Network.qml`: split into the Wi-Fi, Bluetooth and VPN panels.
 - `shell.qml`: import the menu.
 
-## Open questions
+## Decisions
 
-- Overdue items: show them in Today, or in their own group, or hide them?
-- Priority: is `p1`–`p3` right, or do you want names?
-- Template: is the `# YYYY-MM-DD` header enough, or should the template include
-  anything else?
+- Overdue items go in their own group, at the top.
+- Priority is `p1`–`p3`.
+- The template is the `# YYYY-MM-DD` header and nothing else.
