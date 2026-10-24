@@ -190,9 +190,15 @@ PanelWindow {
                 source: "TodoPanel.qml"
             }
 
+            Loader {
+                anchors.fill: parent
+                active: MenuState.tab === 1
+                source: "HabitsPanel.qml"
+            }
+
             Text {
                 anchors.centerIn: parent
-                visible: MenuState.tab !== 0
+                visible: MenuState.tab > 1
                 text: MenuState.tabs[MenuState.tab].name
                 color: Theme.fg
                 font.family: Theme.fontFamily

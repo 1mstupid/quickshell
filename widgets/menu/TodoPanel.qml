@@ -56,7 +56,7 @@ Item {
             spacing: 6
 
             Rectangle {
-                width: parent.width - dueBox.width - prioBtn.width - addBtn.width - 18
+                width: parent.width - dueBox.width - prioBtn.width - 12
                 height: 26
                 radius: 8
                 color: Qt.alpha(Theme.fg, 0.07)
@@ -138,28 +138,6 @@ Item {
                     anchors.fill: parent
                     hoverEnabled: true
                     onClicked: panel.newPriority = (panel.newPriority + 1) % 4
-                }
-            }
-
-            Rectangle {
-                id: addBtn
-                width: 28
-                height: 26
-                radius: 8
-                color: Qt.alpha(Theme.accent, addMouse.containsMouse ? 0.3 : 0.2)
-
-                Text {
-                    anchors.centerIn: parent
-                    text: "+"
-                    color: Theme.accent
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 16
-                }
-                MouseArea {
-                    id: addMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    onClicked: panel.addFromInput()
                 }
             }
         }
