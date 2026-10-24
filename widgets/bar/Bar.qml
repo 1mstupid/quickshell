@@ -23,7 +23,8 @@ PanelWindow {
 
     WlrLayershell.layer: WlrLayer.Top
 
-    readonly property real topGap: 8
+    // notch: the bar sits flush with the top edge
+    readonly property real topGap: 0
 
     implicitHeight: topGap + pill.height
 
@@ -71,11 +72,9 @@ PanelWindow {
         width: volumeOn ? volumeRow.implicitWidth + 4 * pad
                         : clock.implicitWidth + 2 * (pad + side)
         height: Theme.effectiveBarHeight
-        radius: height / 2
 
-        color: Qt.alpha(Theme.bg, 0.92)
-        border.width: 1
-        border.color: Qt.alpha(Theme.border, 0.6)
+        // the notch is painted by the Canvas below, so the rectangle itself stays clear
+        color: "transparent"
 
         // non-origin bars fade the whole pill; the origin keeps its background
         // so the picker card can take over from the same spot
@@ -85,6 +84,44 @@ PanelWindow {
         }
         Behavior on width {
             NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+        }
+
+        // notch outline: flush top edge, rounded bottom corners, and concave
+        // shoulders that flare out to meet the screen edge. Painted in the
+        // background colour, so it merges with the screen border.
+        Canvas {
+            id: notch
+            readonly property int shoulder: 10
+            readonly property int corner: 12
+
+            x: -shoulder
+            width: pill.width + 2 * shoulder
+            height: pill.height
+            onWidthChanged: requestPaint()
+            onPaint: {
+                const ctx = getContext("2d")
+                const w = pill.width, h = pill.height
+                const s = shoulder, r = corner
+                ctx.reset()
+                ctx.translate(s, 0)
+                ctx.beginPath()
+                ctx.moveTo(-s, 0)
+                ctx.lineTo(w + s, 0)
+                ctx.quadraticCurveTo(w, 0, w, s)
+                ctx.lineTo(w, h - r)
+                ctx.quadraticCurveTo(w, h, w - r, h)
+                ctx.lineTo(r, h)
+                ctx.quadraticCurveTo(0, h, 0, h - r)
+                ctx.lineTo(0, s)
+                ctx.quadraticCurveTo(0, 0, -s, 0)
+                ctx.closePath()
+                ctx.fillStyle = String(Theme.bg)
+                ctx.fill()
+            }
+            Connections {
+                target: Theme
+                function onBgChanged() { notch.requestPaint() }
+            }
         }
 
         // left: workspace dots
@@ -248,15 +285,24 @@ PanelWindow {
                     anchors.left: parent.left
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom
-                    width: parent.width * (Volume.muted ? 0 : Math.min(Volume.volume, 100) / 100)
+                    width: parent.width * (Volume.muted ? 0 : Volume.volume / 100)
                     radius: parent.radius
                     color: Volume.muted ? Qt.alpha(Theme.fg, 0.4) : Theme.accent
                     Behavior on width { NumberAnimation { duration: 90; easing.type: Easing.OutCubic } }
                 }
             }
+            // sizes the number slot to "100" so the readout never overflows
+            Text {
+                id: volumeWidest
+                visible: false
+                text: "100"
+                font.family: Theme.fontFamilyAlt
+                font.pixelSize: Theme.fontSize
+                font.bold: true
+            }
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.round(26 * Theme.barScale)
+                width: volumeWidest.implicitWidth
                 horizontalAlignment: Text.AlignRight
                 text: Volume.muted ? "MU" : Volume.volume.toString()
                 color: Volume.muted ? Qt.alpha(Theme.fg, 0.5) : Theme.fg
