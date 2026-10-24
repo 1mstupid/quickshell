@@ -5,6 +5,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import "../../services"
 import "./media"
+import "../notch"
 
 PanelWindow {
     id: root
@@ -86,42 +87,11 @@ PanelWindow {
             NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
         }
 
-        // notch outline: flush top edge, rounded bottom corners, and concave
-        // shoulders that flare out to meet the screen edge. Painted in the
-        // background colour, so it merges with the screen border.
-        Canvas {
-            id: notch
-            readonly property int shoulder: 10
-            readonly property int corner: 12
-
-            x: -shoulder
-            width: pill.width + 2 * shoulder
-            height: pill.height
-            onWidthChanged: requestPaint()
-            onPaint: {
-                const ctx = getContext("2d")
-                const w = pill.width, h = pill.height
-                const s = shoulder, r = corner
-                ctx.reset()
-                ctx.translate(s, 0)
-                ctx.beginPath()
-                ctx.moveTo(-s, 0)
-                ctx.lineTo(w + s, 0)
-                ctx.quadraticCurveTo(w, 0, w, s)
-                ctx.lineTo(w, h - r)
-                ctx.quadraticCurveTo(w, h, w - r, h)
-                ctx.lineTo(r, h)
-                ctx.quadraticCurveTo(0, h, 0, h - r)
-                ctx.lineTo(0, s)
-                ctx.quadraticCurveTo(0, 0, -s, 0)
-                ctx.closePath()
-                ctx.fillStyle = String(Theme.bg)
-                ctx.fill()
-            }
-            Connections {
-                target: Theme
-                function onBgChanged() { notch.requestPaint() }
-            }
+        // notch outline; the shoulders reach past the pill onto the screen edge
+        Notch {
+            x: -bodyX
+            bodyWidth: pill.width
+            bodyHeight: pill.height
         }
 
         // left: workspace dots
