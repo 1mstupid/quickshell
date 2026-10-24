@@ -42,6 +42,14 @@ Singleton {
             begin(total)
     }
 
+    // the duration only changes while idle, so a running timer keeps its end time
+    function setMinutes(m) {
+        if (active)
+            return
+        minutes = Math.max(1, Math.min(90, m))
+        persist()
+    }
+
     function pause() {
         if (!running)
             return

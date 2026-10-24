@@ -196,9 +196,15 @@ PanelWindow {
                 source: "HabitsPanel.qml"
             }
 
+            Loader {
+                anchors.fill: parent
+                active: MenuState.tab === 2
+                source: "PomodoroPanel.qml"
+            }
+
             Text {
                 anchors.centerIn: parent
-                visible: MenuState.tab > 1
+                visible: MenuState.tab > 2
                 text: MenuState.tabs[MenuState.tab].name
                 color: Theme.fg
                 font.family: Theme.fontFamily
