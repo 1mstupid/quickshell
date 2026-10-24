@@ -4,23 +4,43 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Services.Notifications
 import "../../services"
+import "../notch"
 
-
+// One notch hung from the top-right corner, holding the stacked toasts.
+// Hidden while there are no notifications.
 PanelWindow {
-    anchors { top: true; right: true; }
-    margins { top: 55; right: Theme.edgeInset + 2; }
-    implicitWidth: 350
-    implicitHeight: Math.max(1, column.implicitHeight)
+    id: root
+
+    readonly property int cardWidth: 350
+    readonly property int pad: 10
+
+    anchors { top: true; right: true }
+    implicitWidth: notch.width
+    implicitHeight: notch.height
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
+    visible: Notifications.notifications.values.length > 0
 
-    // only the cards take clicks; the empty part of the window passes them through
-    mask: Region { item: column }
+    // only the notch takes clicks; the rest of the window passes them through
+    mask: Region { item: notch }
+
+    // flush with the top and right screen edges: only the left shoulder shows, and the bottom-right corner is square
+    Notch {
+        id: notch
+        bodyWidth: root.cardWidth + 2 * root.pad
+        bodyHeight: column.implicitHeight + 2 * root.pad
+        leftShoulder: true
+        rightShoulder: false
+        bottomRightSquare: true
+    }
 
     ColumnLayout {
         id: column
-        width: parent.width
-        spacing: 10
+        x: notch.bodyX + root.pad
+        y: root.pad
+        width: root.cardWidth
+        spacing: 8
+
         Repeater {
 
             model: Notifications.notifications
@@ -40,9 +60,9 @@ PanelWindow {
                 // sized to its content, so long bodies are not clipped
                 implicitHeight: layout.implicitHeight + 20
                 radius: 8
-                color: Theme.bg
-                border.width: 2
-                border.color: modelData.urgency === NotificationUrgency.Critical ? Theme.fg : Theme.bg
+                color: Qt.alpha(Theme.fg, 0.06)
+                border.width: modelData.urgency === NotificationUrgency.Critical ? 2 : 0
+                border.color: Theme.fg
                 RowLayout {
                     id: layout
                     anchors.fill: parent

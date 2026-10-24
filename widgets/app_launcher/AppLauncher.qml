@@ -3,6 +3,7 @@ import Quickshell.Wayland
 import Quickshell.Io
 import QtQuick
 import "../../services"
+import "../notch"
 
 // Top-anchored launcher. Grows out of the bar pill, the same way the
 // wallpaper picker does.
@@ -168,9 +169,18 @@ PanelWindow {
     readonly property color fgDim: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.65)
 
     // only the card takes clicks; everything around it passes through
-    mask: Region { item: card }
+    mask: Region { item: outline }
 
     // ── Card ───────────────────────────────────────────────────────────────
+    // the outline is a notch, drawn behind the card and sized to it
+    Notch {
+        id: outline
+        bodyWidth: card.width
+        bodyHeight: card.height
+        x: card.x - bodyX
+        y: card.y
+    }
+
     Rectangle {
         id: card
 
@@ -181,10 +191,7 @@ PanelWindow {
         height: fromH + (root.panelH - fromH) * root.t
         x: (root.width - width) / 2
         y: PillState.pillTop
-        radius: fromH / 2 + (12 - fromH / 2) * root.t
-        color: Theme.bg
-        border.width: 1
-        border.color: Qt.alpha(Theme.border, 0.6)
+        color: "transparent"
         clip: true
 
         // content fades in during the second half of the morph

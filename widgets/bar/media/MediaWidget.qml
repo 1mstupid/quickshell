@@ -4,6 +4,7 @@ import Quickshell.Io
 import QtQuick
 import QtQuick.Effects
 import "../../../services"
+import "../../notch"
 
 // Media widget. It morphs out of the bar pill, like the launcher and the
 // wallpaper picker. Opened by the wave (or `qs ipc call media toggle`),
@@ -49,7 +50,7 @@ PanelWindow {
     }
 
     // only the card takes clicks; everything around it passes through
-    mask: Region { item: card }
+    mask: Region { item: outline }
 
     onVisibleChanged: {
         if (visible)
@@ -115,6 +116,15 @@ PanelWindow {
         }
     }
 
+    // the outline is a notch, drawn behind the card and sized to it
+    Notch {
+        id: outline
+        bodyWidth: card.width
+        bodyHeight: card.height
+        x: card.x - bodyX
+        y: card.y
+    }
+
     Rectangle {
         id: card
 
@@ -125,10 +135,7 @@ PanelWindow {
         height: fromH + (root.panelH - fromH) * root.t
         x: (root.width - width) / 2
         y: PillState.pillTop
-        radius: fromH / 2 + (16 - fromH / 2) * root.t
-        color: Theme.bg
-        border.width: 1
-        border.color: Qt.alpha(Theme.border, 0.6)
+        color: "transparent"
         clip: true
 
         Item {
