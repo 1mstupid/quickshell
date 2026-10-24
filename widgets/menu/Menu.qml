@@ -175,8 +175,7 @@ PanelWindow {
             }
         }
 
-        // the active tab's panel, below the tab row. Tabs without a panel yet
-        // show their name.
+        // the active tab's panel, below the tab row
         Item {
             x: 0
             y: root.barH
@@ -202,13 +201,22 @@ PanelWindow {
                 source: "PomodoroPanel.qml"
             }
 
-            Text {
-                anchors.centerIn: parent
-                visible: MenuState.tab > 2
-                text: MenuState.tabs[MenuState.tab].name
-                color: Theme.fg
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSize
+            Loader {
+                anchors.fill: parent
+                active: MenuState.tab === 3
+                source: "WifiPanel.qml"
+            }
+
+            Loader {
+                anchors.fill: parent
+                active: MenuState.tab === 4
+                source: "BluetoothPanel.qml"
+            }
+
+            Loader {
+                anchors.fill: parent
+                active: MenuState.tab === 5
+                source: "VpnPanel.qml"
             }
         }
     }

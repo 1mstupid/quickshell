@@ -69,8 +69,9 @@ close out a day even if the shell wasn't running at midnight.
 
 - At midnight, each habit's `status` resets to `pending`, and the previous day's
   completed ids are written to `history`.
-- The panel shows a card per habit: name, a 5-week grid from `history`, a check
-  button that toggles today, and a streak count.
+- The panel shows a row per habit: a check button that toggles today, the name,
+  one cell per day of the current week (Monday first, from `history` and
+  `status`), and a streak count.
 - Streak: consecutive days ending today, or ending yesterday if today is still
   pending.
 - Writes go through `FileView` with `atomicWrites`, like the launcher's recents.
@@ -82,11 +83,16 @@ close out a day even if the shell wasn't running at midnight.
 
 ## Network
 
-Split into three tabs, each polling only while its tab is open:
+Split into three tabs. Each tab's panel polls only while it is open, and
+throughput is sampled only while a tab that shows it is open.
 
 - Wi-Fi: scan list, connect, password prompt, radio toggle.
-- Bluetooth: power toggle, paired devices, pair new. Hidden if there's no adapter.
+- Bluetooth: power toggle, paired devices, pair new. Without an adapter the tab
+  says so instead of showing controls.
 - VPN: saved profiles (including WireGuard) and external tunnels.
+
+Shared command runner and throughput live in `services/menu/Net.qml`. The old
+standalone network window and its `NetworkState` are gone.
 
 ## Files
 
@@ -95,7 +101,7 @@ Split into three tabs, each polling only while its tab is open:
   `services/menu/` folder has its own `qmldir`.
 - `widgets/menu/Menu.qml` (new): drop-down notch and tab panels.
 - `widgets/bar/Bar.qml`: morph into the tab row, and hide contents while open.
-- `widgets/network/Network.qml`: split into the Wi-Fi, Bluetooth and VPN panels.
+- `widgets/menu/WifiPanel.qml`, `BluetoothPanel.qml`, `VpnPanel.qml`: the network tabs.
 - `shell.qml`: import the menu.
 
 ## Decisions

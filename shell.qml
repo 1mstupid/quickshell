@@ -10,7 +10,6 @@ import "./widgets/bar"
 import "./widgets/bar/media"
 import "./widgets/menu"
 import "./widgets/border"
-import "./widgets/network"
 import "./widgets/notifications"
 import "./widgets/power_menu"
 import "./widgets/wallpaper"
@@ -40,14 +39,6 @@ ShellRoot {
     Variants {
         model: Quickshell.screens
         PowerMenu {
-            property var modelData
-            screen: modelData
-        }
-    }
-    Variants {
-        model: Quickshell.screens
-
-        Network {
             property var modelData
             screen: modelData
         }
