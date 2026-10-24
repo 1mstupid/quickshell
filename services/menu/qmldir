@@ -1,0 +1,2 @@
+singleton Todo Todo.qml
+singleton Habits Habits.qml

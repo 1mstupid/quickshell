@@ -90,8 +90,9 @@ Split into three tabs, each polling only while its tab is open:
 
 ## Files
 
-- `services/MenuState.qml` (new): open state, active tab, owns `PillState`.
-- `services/Todo.qml`, `services/Habits.qml` (new): storage and logic.
+- `services/menu/MenuState.qml` (new): open state, active tab, owns `PillState`.
+- `services/menu/Todo.qml`, `services/menu/Habits.qml`: storage and logic. The
+  `services/menu/` folder has its own `qmldir`.
 - `widgets/menu/Menu.qml` (new): drop-down notch and tab panels.
 - `widgets/bar/Bar.qml`: morph into the tab row, and hide contents while open.
 - `widgets/network/Network.qml`: split into the Wi-Fi, Bluetooth and VPN panels.
