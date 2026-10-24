@@ -5,6 +5,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import "../../services"
 import "../../services/WallpaperPalette.js" as Palette
+import "../notch"
 
 
 PanelWindow {
@@ -194,6 +195,16 @@ PanelWindow {
     }
 
     // the card: starts exactly over the bar pill, then widens into the band
+    // the outline is a notch, drawn behind the card and sized to it
+    Notch {
+        id: outline
+        bodyWidth: card.width
+        bodyHeight: card.height
+        x: card.x - bodyX
+        y: card.y
+    }
+
+    // the card gives the carousel its geometry; the notch above is what's drawn
     Rectangle {
         id: card
 
@@ -204,14 +215,11 @@ PanelWindow {
         height: fromH + (root.bandHeight - fromH) * root.t
         x: (root.width - width) / 2
         y: PillState.pillTop
-        radius: fromH / 2 + (12 - fromH / 2) * root.t
-        color: Qt.alpha(Theme.bg, 0.92)
-        border.width: 1
-        border.color: Qt.alpha(Theme.border, 0.6)
+        color: "transparent"
     }
 
     // only the band takes clicks; everything around it passes through
-    mask: Region { item: card }
+    mask: Region { item: outline }
 
     Canvas {
         id: canvas
