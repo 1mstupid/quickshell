@@ -68,7 +68,7 @@ Item {
                     clip: true
                     color: Theme.fg
                     font.family: Theme.fontFamily
-                    font.pixelSize: 12
+                    font.pixelSize: 11
                     verticalAlignment: TextInput.AlignVCenter
                     Keys.onReturnPressed: panel.addFromInput()
                     Keys.onEnterPressed: panel.addFromInput()
@@ -81,7 +81,7 @@ Item {
                     text: "add a task"
                     color: Theme.disabled
                     font.family: Theme.fontFamily
-                    font.pixelSize: 12
+                    font.pixelSize: 11
                     verticalAlignment: Text.AlignVCenter
                 }
             }
@@ -101,7 +101,7 @@ Item {
                     text: Todo.today
                     color: Theme.fg
                     font.family: Theme.fontFamily
-                    font.pixelSize: 12
+                    font.pixelSize: 11
                     verticalAlignment: TextInput.AlignVCenter
                     Keys.onReturnPressed: panel.addFromInput()
                     Keys.onEnterPressed: panel.addFromInput()
@@ -163,6 +163,7 @@ Item {
             boundsBehavior: Flickable.StopAtBounds
 
             delegate: Item {
+                id: row
                 required property var modelData
                 readonly property bool isHeader: "header" in modelData
                 readonly property var task: modelData.task
@@ -171,17 +172,17 @@ Item {
                 height: isHeader ? 22 : 24
 
                 Text {
-                    visible: parent.isHeader
+                    visible: row.isHeader
                     anchors.verticalCenter: parent.verticalCenter
-                    text: parent.modelData.header ?? ""
-                    color: parent.modelData.header === "Overdue" ? Theme.alert : Theme.accent
+                    text: row.modelData.header ?? ""
+                    color: row.modelData.header === "Overdue" ? Theme.alert : Theme.accent
                     font.family: Theme.fontFamily
                     font.pixelSize: 11
                     font.bold: true
                 }
 
                 Row {
-                    visible: !parent.isHeader
+                    visible: !row.isHeader
                     anchors.verticalCenter: parent.verticalCenter
                     width: parent.width
                     spacing: 8
@@ -190,35 +191,35 @@ Item {
                         id: tick
                         width: 14
                         horizontalAlignment: Text.AlignHCenter
-                        text: parent.parent.task && parent.parent.task.done ? "●" : "○"
-                        color: parent.parent.task && parent.parent.task.done ? Theme.accent : Theme.fg
+                        text: row.task && row.task.done ? "●" : "○"
+                        color: row.task && row.task.done ? Theme.accent : Theme.fg
                         font.family: Theme.fontFamily
                         font.pixelSize: 13
                         MouseArea {
                             anchors.fill: parent
-                            onClicked: Todo.toggle(parent.parent.parent.task)
+                            onClicked: Todo.toggle(row.task)
                         }
                     }
                     Text {
                         width: parent.width - tick.width - dueText.width - prioText.width - delText.width - 4 * parent.spacing
-                        text: parent.parent.task ? parent.parent.task.title : ""
+                        text: row.task ? row.task.title : ""
                         elide: Text.ElideRight
-                        color: parent.parent.task && parent.parent.task.done ? Qt.alpha(Theme.fg, 0.4) : Theme.fg
+                        color: row.task && row.task.done ? Qt.alpha(Theme.fg, 0.4) : Theme.fg
                         font.family: Theme.fontFamily
                         font.pixelSize: 12
-                        font.strikeout: parent.parent.task ? parent.parent.task.done : false
+                        font.strikeout: row.task ? row.task.done : false
                     }
                     Text {
                         id: dueText
-                        text: parent.parent.task ? parent.parent.task.due.slice(5) : ""
-                        color: parent.parent.task && parent.parent.task.due < Todo.today && !parent.parent.task.done
+                        text: row.task ? row.task.due.slice(5) : ""
+                        color: row.task && row.task.due < Todo.today && !row.task.done
                             ? Theme.alert : Qt.alpha(Theme.fg, 0.5)
                         font.family: Theme.fontFamilyAlt
                         font.pixelSize: 11
                     }
                     Text {
                         id: prioText
-                        text: parent.parent.task && parent.parent.task.priority ? "p" + parent.parent.task.priority : ""
+                        text: row.task && row.task.priority ? "p" + row.task.priority : ""
                         color: Theme.accent
                         font.family: Theme.fontFamily
                         font.pixelSize: 11
@@ -233,7 +234,7 @@ Item {
                             id: delMouse
                             anchors.fill: parent
                             hoverEnabled: true
-                            onClicked: Todo.remove(parent.parent.parent.task)
+                            onClicked: Todo.remove(row.task)
                         }
                     }
                 }

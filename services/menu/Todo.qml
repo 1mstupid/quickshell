@@ -6,14 +6,15 @@ import Quickshell.Io
 // Todo data layer. One file per due date: todo-YYYY-MM-DD.txt, in the config
 // directory. A file starts with a "# YYYY-MM-DD" header (the template) and
 // holds lines like:
-//   - [ ] Send the weekly update | due 2026-10-26 | p1
+//   - [ ] Send the weekly update | due 2026-10-26 | p1 | id k3j9x
+// The id makes each line addressable, so tasks with the same title are fine.
 // Items are grouped for the panel by how far their due date is from today.
 Singleton {
     id: root
 
     readonly property string dir: Quickshell.env("HOME") + "/.local/xdg/config"
     readonly property var groupLabels: ["Overdue", "Today", "Tomorrow", "This week", "This month", "Later"]
-    readonly property var lineRe: /^- \[( |x)\] (.+?) \| due (\d{4}-\d{2}-\d{2})(?: \| p([1-3]))?$/
+    readonly property var lineRe: /^- \[( |x)\] (.+?) \| due (\d{4}-\d{2}-\d{2})(?: \| p([1-3]))?(?: \| id ([a-z0-9]+))?$/
 
     property string today: ""
     // parsed items from every loaded file, in file then line order
@@ -46,11 +47,21 @@ Singleton {
         return 5
     }
 
+    function newId() {
+        return Date.now().toString(36).slice(-4) + Math.floor(Math.random() * 1296).toString(36).padStart(2, "0")
+    }
+
     function parseLine(line) {
         const m = line.match(lineRe)
         if (!m)
             return null
-        return { done: m[1] === "x", title: m[2], due: m[3], priority: m[4] ? parseInt(m[4]) : 0 }
+        return {
+            done: m[1] === "x",
+            title: m[2],
+            due: m[3],
+            priority: m[4] ? parseInt(m[4]) : 0,
+            id: m[5] ?? ""
+        }
     }
 
     function refreshToday() {
@@ -85,6 +96,12 @@ Singleton {
     // finds todo files on disk; starts tracking new ones and drops removed ones
     function scan() {
         lister.running = true
+    }
+
+    function reloadFile(path) {
+        const f = files[path]
+        if (f)
+            f.reload()
     }
 
     Component {
@@ -129,18 +146,24 @@ Singleton {
         onExited: root.scan()
     }
 
-    // rewrites one file through its FileView. `fn` edits the array of lines
-    // in place. Aborts if the item's line has changed on disk since the scan.
-    function edit(item, fn) {
-        const f = files[item.path]
-        if (!f)
+    // edits one line, found by its id, in a file. The change is made by awk
+    // in the shell, so it's written straight to disk and doesn't depend on a
+    // FileView's copy of the file. TO empty deletes the line.
+    Process {
+        id: editor
+        property string path: ""
+        command: ["sh", "-c", "true"]
+        onExited: root.reloadFile(path)
+    }
+
+    function edit(item, to) {
+        if (item.id === "" || editor.running)
             return
-        const lines = f.text().split("\n")
-        const cur = parseLine(lines[item.line] ?? "")
-        if (!cur || cur.title !== item.title)
-            return
-        fn(lines)
-        f.setText(lines.join("\n"))
+        editor.path = item.path
+        editor.command = ["env", "TAG= | id " + item.id, "TO=" + to, "sh", "-c",
+            "awk 'substr($0, length($0) - length(ENVIRON[\"TAG\"]) + 1) == ENVIRON[\"TAG\"] { if (ENVIRON[\"TO\"] != \"\") print ENVIRON[\"TO\"] substr($0, 6); next } { print }' \"$1\" > \"$1.tmp\" && mv \"$1.tmp\" \"$1\"",
+            "sh", item.path]
+        editor.running = true
     }
 
     function add(title, due, priority) {
@@ -150,23 +173,21 @@ Singleton {
         const path = dir + "/todo-" + due + ".txt"
         appender.path = path
         appender.due = due
-        appender.line = "- [ ] " + clean + " | due " + due + (priority ? " | p" + priority : "")
+        appender.line = "- [ ] " + clean + " | due " + due
+            + (priority ? " | p" + priority : "") + " | id " + newId()
         appender.running = true
     }
 
     function toggle(item) {
-        edit(item, lines => {
-            lines[item.line] = item.done
-                ? lines[item.line].replace("- [x]", "- [ ]")
-                : lines[item.line].replace("- [ ]", "- [x]")
-        })
+        edit(item, item.done ? "- [ ]" : "- [x]")
     }
 
     function remove(item) {
-        edit(item, lines => { lines.splice(item.line, 1) })
+        edit(item, "")
     }
 
-    // re-checks the date and the file list once a minute, so the groups roll over at midnight
+    // a minute tick catches a new day and new files; edits to known files arrive
+    // through the FileView watch. Opening the menu rescans straight away.
     Timer {
         interval: 60000
         repeat: true
@@ -175,6 +196,14 @@ Singleton {
             root.refreshToday()
             root.rebuild()
             root.scan()
+        }
+    }
+
+    Connections {
+        target: MenuState
+        function onOpenChanged() {
+            if (MenuState.open)
+                root.scan()
         }
     }
 
