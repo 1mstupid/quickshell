@@ -14,7 +14,8 @@ Singleton {
 
     readonly property var audio: Pipewire.defaultAudioSink?.audio ?? null
     readonly property bool muted: audio?.muted ?? false
-    readonly property int volume: audio ? Math.round(audio.volume * 100) : 0
+    // PipeWire allows boosting past 100%; the readout caps at 100
+    readonly property int volume: audio ? Math.min(100, Math.round(audio.volume * 100)) : 0
 
     property bool shown: false
     property bool armed: false   // ignore the initial values at startup

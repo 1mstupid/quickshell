@@ -8,6 +8,7 @@ import "./services"
 import "./widgets/app_launcher"
 import "./widgets/bar"
 import "./widgets/bar/media"
+import "./widgets/border"
 import "./widgets/network"
 import "./widgets/notifications"
 import "./widgets/power_menu"
@@ -27,6 +28,11 @@ ShellRoot {
         model: Quickshell.screens
 
         Bar {}
+    }
+    Variants {
+        model: Quickshell.screens
+
+        ScreenBorder {}
     }
     Variants {
         model: Quickshell.screens
