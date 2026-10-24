@@ -55,13 +55,17 @@ tick, delete. Deleting removes the line from its file.
 `habits.json`:
 
     {
+      "day": "2026-10-24",
       "habits": [
         {"id": "0", "name": "Read", "status": "completed"}
       ],
       "history": {
-        "2026-10-24": ["0"]
+        "2026-10-23": ["0"]
       }
     }
+
+`day` is added so the shell knows which date `status` refers to. That lets it
+close out a day even if the shell wasn't running at midnight.
 
 - At midnight, each habit's `status` resets to `pending`, and the previous day's
   completed ids are written to `history`.
