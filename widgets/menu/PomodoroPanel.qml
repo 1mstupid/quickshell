@@ -119,11 +119,14 @@ Item {
         // duration: − and + while idle, otherwise just the value
         Row {
             anchors.horizontalCenter: parent.horizontalCenter
+            height: 20
             spacing: 10
 
             Text {
                 id: minus
                 readonly property bool allowed: !Pomodoro.active && Pomodoro.minutes > 1
+                height: parent.height
+                verticalAlignment: Text.AlignVCenter
                 text: "−"
                 color: !allowed ? Qt.alpha(Theme.fg, 0.2)
                      : minusMouse.containsMouse ? Theme.accent : Theme.fg
@@ -141,6 +144,8 @@ Item {
                 }
             }
             Text {
+                height: parent.height
+                verticalAlignment: Text.AlignVCenter
                 text: Pomodoro.minutes + " min"
                 color: Qt.alpha(Theme.fg, 0.6)
                 font.family: Theme.fontFamilyAlt
@@ -149,6 +154,8 @@ Item {
             Text {
                 id: plus
                 readonly property bool allowed: !Pomodoro.active && Pomodoro.minutes < 90
+                height: parent.height
+                verticalAlignment: Text.AlignVCenter
                 text: "+"
                 color: !allowed ? Qt.alpha(Theme.fg, 0.2)
                      : plusMouse.containsMouse ? Theme.accent : Theme.fg
