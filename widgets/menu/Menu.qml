@@ -175,7 +175,8 @@ PanelWindow {
             }
         }
 
-        // the active tab's panel goes here; a placeholder until the panels exist
+        // the active tab's panel, below the tab row. Tabs without a panel yet
+        // show their name.
         Item {
             x: 0
             y: root.barH
@@ -183,8 +184,15 @@ PanelWindow {
             height: parent.height - root.barH
             opacity: Math.max(0, (root.t - 0.5) * 2)
 
+            Loader {
+                anchors.fill: parent
+                active: MenuState.tab === 0
+                source: "TodoPanel.qml"
+            }
+
             Text {
                 anchors.centerIn: parent
+                visible: MenuState.tab !== 0
                 text: MenuState.tabs[MenuState.tab].name
                 color: Theme.fg
                 font.family: Theme.fontFamily
