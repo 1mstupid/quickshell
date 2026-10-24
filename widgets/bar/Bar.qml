@@ -24,13 +24,16 @@ PanelWindow {
     anchors { top: true; left: true; right: true }
 
     WlrLayershell.layer: WlrLayer.Top
-    // Escape closes the menu, so the origin bar takes keyboard focus while it's open
-    WlrLayershell.keyboardFocus: MenuState.open && isOrigin ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+    // while the menu is open the origin bar takes the keyboard, so Escape works
+    // without a click first (same as the launcher)
+    WlrLayershell.keyboardFocus: MenuState.open && isOrigin ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     // notch: the bar sits flush with the top edge
     readonly property real topGap: 0
 
-    implicitHeight: topGap + pill.height
+    // the window keeps the menu's full height, so the pill grows inside it
+    // instead of the surface resizing every frame
+    implicitHeight: topGap + pill.barH + pill.panelH
 
     // hidden bar gives its space back to windows
     readonly property bool showBar: shown && !Overview.open
