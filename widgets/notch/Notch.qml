@@ -14,6 +14,8 @@ Canvas {
     property real corner: 12
     property bool leftShoulder: true
     property bool rightShoulder: true
+    // square bottom-right corner, for a notch flush with the right screen edge
+    property bool bottomRightSquare: false
     property color fillColor: Theme.bg
 
     readonly property real bodyX: leftShoulder ? shoulder : 0
@@ -37,7 +39,10 @@ Canvas {
         if (rightShoulder)
             ctx.quadraticCurveTo(w, 0, w, s)
         ctx.lineTo(w, h - r)
-        ctx.quadraticCurveTo(w, h, w - r, h)
+        if (bottomRightSquare)
+            ctx.lineTo(w, h)
+        else
+            ctx.quadraticCurveTo(w, h, w - r, h)
         ctx.lineTo(r, h)
         ctx.quadraticCurveTo(0, h, 0, h - r)
         if (leftShoulder) {

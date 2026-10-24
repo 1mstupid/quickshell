@@ -24,13 +24,14 @@ PanelWindow {
     // only the notch takes clicks; the rest of the window passes them through
     mask: Region { item: notch }
 
-    // flush with the top and right screen edges, so only the left shoulder shows
+    // flush with the top and right screen edges: only the left shoulder shows, and the bottom-right corner is square
     Notch {
         id: notch
         bodyWidth: root.cardWidth + 2 * root.pad
         bodyHeight: column.implicitHeight + 2 * root.pad
         leftShoulder: true
         rightShoulder: false
+        bottomRightSquare: true
     }
 
     ColumnLayout {
