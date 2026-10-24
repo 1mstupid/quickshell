@@ -54,6 +54,11 @@ PanelWindow {
         readonly property int pad: Math.round(12 * Theme.barScale)
         readonly property bool timerShown: Pomodoro.active || Pomodoro.done
 
+        // volume readout replaces the contents while it is shown; panels
+        // also hide the contents, but they keep the pill's own background
+        readonly property bool volumeOn: Volume.shown && !PillState.active
+        readonly property bool contentHidden: PillState.active || Volume.shown
+
         // each side reserves its own content width; the larger one is used on
         // both sides, so the clock stays centered
         readonly property int side: Math.max(workspaces.implicitWidth, rightRow.implicitWidth)
@@ -63,7 +68,8 @@ PanelWindow {
             NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
         }
         anchors.horizontalCenter: parent.horizontalCenter
-        width: clock.implicitWidth + 2 * (pad + side)
+        width: volumeOn ? volumeRow.implicitWidth + 4 * pad
+                        : clock.implicitWidth + 2 * (pad + side)
         height: Theme.effectiveBarHeight
         radius: height / 2
 
@@ -89,7 +95,7 @@ PanelWindow {
             anchors.leftMargin: pill.pad
             outputName: root.modelData.name
 
-            opacity: PillState.active ? 0 : 1
+            opacity: pill.contentHidden ? 0 : 1
             Behavior on opacity { NumberAnimation { duration: 120 } }
         }
 
@@ -101,7 +107,7 @@ PanelWindow {
             anchors.rightMargin: pill.pad
             spacing: 8
 
-            opacity: PillState.active ? 0 : 1
+            opacity: pill.contentHidden ? 0 : 1
             Behavior on opacity { NumberAnimation { duration: 120 } }
 
             // recording indicator; click stops it
@@ -213,12 +219,59 @@ PanelWindow {
             }
         }
 
+        // volume readout: icon, track, number; "MU" when muted
+        Row {
+            id: volumeRow
+            anchors.centerIn: parent
+            spacing: Math.round(8 * Theme.barScale)
+
+            opacity: pill.volumeOn ? 1 : 0
+            visible: opacity > 0
+            Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
+
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                // nf-md-volume_high / nf-md-volume_off
+                text: Volume.muted ? "󰝟" : "󰕾"
+                color: Volume.muted ? Qt.alpha(Theme.fg, 0.5) : Theme.accent
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.iconSize
+            }
+            Rectangle {
+                anchors.verticalCenter: parent.verticalCenter
+                width: Math.round(72 * Theme.barScale)
+                height: 4
+                radius: 2
+                color: Qt.alpha(Theme.fg, 0.12)
+
+                Rectangle {
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    width: parent.width * (Volume.muted ? 0 : Math.min(Volume.volume, 100) / 100)
+                    radius: parent.radius
+                    color: Volume.muted ? Qt.alpha(Theme.fg, 0.4) : Theme.accent
+                    Behavior on width { NumberAnimation { duration: 90; easing.type: Easing.OutCubic } }
+                }
+            }
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                width: Math.round(26 * Theme.barScale)
+                horizontalAlignment: Text.AlignRight
+                text: Volume.muted ? "MU" : Volume.volume.toString()
+                color: Volume.muted ? Qt.alpha(Theme.fg, 0.5) : Theme.fg
+                font.family: Theme.fontFamilyAlt
+                font.pixelSize: Theme.fontSize
+                font.bold: true
+            }
+        }
+
         Clock {
             id: clock
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
 
-            opacity: PillState.active ? 0 : 1
+            opacity: pill.contentHidden ? 0 : 1
             Behavior on opacity { NumberAnimation { duration: 120 } }
         }
     }

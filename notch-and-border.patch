@@ -1,0 +1,426 @@
+diff --git a/services/Volume.qml b/services/Volume.qml
+new file mode 100644
+index 0000000..a16aa6e
+--- /dev/null
++++ b/services/Volume.qml
+@@ -0,0 +1,43 @@
++pragma Singleton
++import QtQuick
++import Quickshell
++import Quickshell.Services.Pipewire
++
++// Default sink volume and a 1.2 s "shown" flag, read by every bar's pill
++// so the readout appears inside each bar when the volume changes.
++Singleton {
++    id: root
++
++    PwObjectTracker {
++        objects: [Pipewire.defaultAudioSink]
++    }
++
++    readonly property var audio: Pipewire.defaultAudioSink?.audio ?? null
++    readonly property bool muted: audio?.muted ?? false
++    // PipeWire allows boosting past 100%; the readout caps at 100
++    readonly property int volume: audio ? Math.min(100, Math.round(audio.volume * 100)) : 0
++
++    property bool shown: false
++    property bool armed: false   // ignore the initial values at startup
++
++    Timer {
++        interval: 1000
++        running: true
++        onTriggered: root.armed = true
++    }
++
++    Timer {
++        id: hideTimer
++        interval: 1200
++        onTriggered: root.shown = false
++    }
++
++    function poke() {
++        if (!armed) return
++        shown = true
++        hideTimer.restart()
++    }
++
++    onVolumeChanged: poke()
++    onMutedChanged: poke()
++}
+diff --git a/services/qmldir b/services/qmldir
+index 4b26f2d..a852f1b 100644
+--- a/services/qmldir
++++ b/services/qmldir
+@@ -4,6 +4,7 @@ singleton PillState PillState.qml
+ singleton Theme Theme.qml
+ singleton Notifications Notifications.qml
+ singleton Pomodoro Pomodoro.qml
++singleton Volume Volume.qml
+ singleton MediaWidgetState MediaWidgetState.qml
+ Recorder Recorder.qml
+ 
+diff --git a/shell.qml b/shell.qml
+index def0f65..358651e 100644
+--- a/shell.qml
++++ b/shell.qml
+@@ -8,9 +8,9 @@ import "./services"
+ import "./widgets/app_launcher"
+ import "./widgets/bar"
+ import "./widgets/bar/media"
++import "./widgets/border"
+ import "./widgets/network"
+ import "./widgets/notifications"
+-import "./widgets/osd"
+ import "./widgets/power_menu"
+ import "./widgets/wallpaper"
+ 
+@@ -24,13 +24,16 @@ ShellRoot {
+ 
+     MediaWidget {}
+ 
+-    VolumeOsd {}
+-
+     Variants {
+         model: Quickshell.screens
+ 
+         Bar {}
+     }
++    Variants {
++        model: Quickshell.screens
++
++        ScreenBorder {}
++    }
+     Variants {
+         model: Quickshell.screens
+         PowerMenu {
+diff --git a/widgets/bar/Bar.qml b/widgets/bar/Bar.qml
+index 008c2af..30c0705 100644
+--- a/widgets/bar/Bar.qml
++++ b/widgets/bar/Bar.qml
+@@ -23,7 +23,8 @@ PanelWindow {
+ 
+     WlrLayershell.layer: WlrLayer.Top
+ 
+-    readonly property real topGap: 8
++    // notch: the bar sits flush with the top edge
++    readonly property real topGap: 0
+ 
+     implicitHeight: topGap + pill.height
+ 
+@@ -54,6 +55,11 @@ PanelWindow {
+         readonly property int pad: Math.round(12 * Theme.barScale)
+         readonly property bool timerShown: Pomodoro.active || Pomodoro.done
+ 
++        // volume readout replaces the contents while it is shown; panels
++        // also hide the contents, but they keep the pill's own background
++        readonly property bool volumeOn: Volume.shown && !PillState.active
++        readonly property bool contentHidden: PillState.active || Volume.shown
++
+         // each side reserves its own content width; the larger one is used on
+         // both sides, so the clock stays centered
+         readonly property int side: Math.max(workspaces.implicitWidth, rightRow.implicitWidth)
+@@ -63,13 +69,12 @@ PanelWindow {
+             NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+         }
+         anchors.horizontalCenter: parent.horizontalCenter
+-        width: clock.implicitWidth + 2 * (pad + side)
++        width: volumeOn ? volumeRow.implicitWidth + 4 * pad
++                        : clock.implicitWidth + 2 * (pad + side)
+         height: Theme.effectiveBarHeight
+-        radius: height / 2
+ 
+-        color: Qt.alpha(Theme.bg, 0.92)
+-        border.width: 1
+-        border.color: Qt.alpha(Theme.border, 0.6)
++        // the notch is painted by the Canvas below, so the rectangle itself stays clear
++        color: "transparent"
+ 
+         // non-origin bars fade the whole pill; the origin keeps its background
+         // so the picker card can take over from the same spot
+@@ -81,6 +86,44 @@ PanelWindow {
+             NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+         }
+ 
++        // notch outline: flush top edge, rounded bottom corners, and concave
++        // shoulders that flare out to meet the screen edge. Painted in the
++        // background colour, so it merges with the screen border.
++        Canvas {
++            id: notch
++            readonly property int shoulder: 10
++            readonly property int corner: 12
++
++            x: -shoulder
++            width: pill.width + 2 * shoulder
++            height: pill.height
++            onWidthChanged: requestPaint()
++            onPaint: {
++                const ctx = getContext("2d")
++                const w = pill.width, h = pill.height
++                const s = shoulder, r = corner
++                ctx.reset()
++                ctx.translate(s, 0)
++                ctx.beginPath()
++                ctx.moveTo(-s, 0)
++                ctx.lineTo(w + s, 0)
++                ctx.quadraticCurveTo(w, 0, w, s)
++                ctx.lineTo(w, h - r)
++                ctx.quadraticCurveTo(w, h, w - r, h)
++                ctx.lineTo(r, h)
++                ctx.quadraticCurveTo(0, h, 0, h - r)
++                ctx.lineTo(0, s)
++                ctx.quadraticCurveTo(0, 0, -s, 0)
++                ctx.closePath()
++                ctx.fillStyle = String(Theme.bg)
++                ctx.fill()
++            }
++            Connections {
++                target: Theme
++                function onBgChanged() { notch.requestPaint() }
++            }
++        }
++
+         // left: workspace dots
+         Workspaces {
+             id: workspaces
+@@ -89,7 +132,7 @@ PanelWindow {
+             anchors.leftMargin: pill.pad
+             outputName: root.modelData.name
+ 
+-            opacity: PillState.active ? 0 : 1
++            opacity: pill.contentHidden ? 0 : 1
+             Behavior on opacity { NumberAnimation { duration: 120 } }
+         }
+ 
+@@ -101,7 +144,7 @@ PanelWindow {
+             anchors.rightMargin: pill.pad
+             spacing: 8
+ 
+-            opacity: PillState.active ? 0 : 1
++            opacity: pill.contentHidden ? 0 : 1
+             Behavior on opacity { NumberAnimation { duration: 120 } }
+ 
+             // recording indicator; click stops it
+@@ -213,12 +256,68 @@ PanelWindow {
+             }
+         }
+ 
++        // volume readout: icon, track, number; "MU" when muted
++        Row {
++            id: volumeRow
++            anchors.centerIn: parent
++            spacing: Math.round(8 * Theme.barScale)
++
++            opacity: pill.volumeOn ? 1 : 0
++            visible: opacity > 0
++            Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
++
++            Text {
++                anchors.verticalCenter: parent.verticalCenter
++                // nf-md-volume_high / nf-md-volume_off
++                text: Volume.muted ? "󰝟" : "󰕾"
++                color: Volume.muted ? Qt.alpha(Theme.fg, 0.5) : Theme.accent
++                font.family: Theme.fontFamily
++                font.pixelSize: Theme.iconSize
++            }
++            Rectangle {
++                anchors.verticalCenter: parent.verticalCenter
++                width: Math.round(72 * Theme.barScale)
++                height: 4
++                radius: 2
++                color: Qt.alpha(Theme.fg, 0.12)
++
++                Rectangle {
++                    anchors.left: parent.left
++                    anchors.top: parent.top
++                    anchors.bottom: parent.bottom
++                    width: parent.width * (Volume.muted ? 0 : Volume.volume / 100)
++                    radius: parent.radius
++                    color: Volume.muted ? Qt.alpha(Theme.fg, 0.4) : Theme.accent
++                    Behavior on width { NumberAnimation { duration: 90; easing.type: Easing.OutCubic } }
++                }
++            }
++            // sizes the number slot to "100" so the readout never overflows
++            Text {
++                id: volumeWidest
++                visible: false
++                text: "100"
++                font.family: Theme.fontFamilyAlt
++                font.pixelSize: Theme.fontSize
++                font.bold: true
++            }
++            Text {
++                anchors.verticalCenter: parent.verticalCenter
++                width: volumeWidest.implicitWidth
++                horizontalAlignment: Text.AlignRight
++                text: Volume.muted ? "MU" : Volume.volume.toString()
++                color: Volume.muted ? Qt.alpha(Theme.fg, 0.5) : Theme.fg
++                font.family: Theme.fontFamilyAlt
++                font.pixelSize: Theme.fontSize
++                font.bold: true
++            }
++        }
++
+         Clock {
+             id: clock
+             anchors.horizontalCenter: parent.horizontalCenter
+             anchors.verticalCenter: parent.verticalCenter
+ 
+-            opacity: PillState.active ? 0 : 1
++            opacity: pill.contentHidden ? 0 : 1
+             Behavior on opacity { NumberAnimation { duration: 120 } }
+         }
+     }
+diff --git a/widgets/border/ScreenBorder.qml b/widgets/border/ScreenBorder.qml
+new file mode 100644
+index 0000000..e71b790
+--- /dev/null
++++ b/widgets/border/ScreenBorder.qml
+@@ -0,0 +1,34 @@
++import QtQuick
++import Quickshell
++import Quickshell.Wayland
++import "../../services"
++
++// Thin rounded frame around one screen, in the bar's background colour.
++// Hidden while the overview is open. Clicks pass through.
++PanelWindow {
++    id: root
++
++    property var modelData
++    screen: modelData
++
++    anchors {
++        top: true
++        bottom: true
++        left: true
++        right: true
++    }
++    exclusionMode: ExclusionMode.Ignore
++    color: "transparent"
++    WlrLayershell.layer: WlrLayer.Top
++    WlrLayershell.namespace: "quickshell-border"
++    visible: !Overview.open
++    mask: Region {}
++
++    Rectangle {
++        anchors.fill: parent
++        color: "transparent"
++        border.width: 2
++        border.color: Theme.bg
++        radius: 12
++    }
++}
+diff --git a/widgets/osd/VolumeOsd.qml b/widgets/osd/VolumeOsd.qml
+deleted file mode 100644
+index 7cd4113..0000000
+--- a/widgets/osd/VolumeOsd.qml
++++ /dev/null
+@@ -1,108 +0,0 @@
+-import QtQuick
+-import Quickshell
+-import Quickshell.Wayland
+-import Quickshell.Services.Pipewire
+-import "../../services"
+-
+-
+-PanelWindow {
+-    id: osd
+-
+-    PwObjectTracker {
+-        objects: [Pipewire.defaultAudioSink]
+-    }
+-
+-    readonly property var audio: Pipewire.defaultAudioSink?.audio ?? null
+-    readonly property bool muted: audio?.muted ?? false
+-    readonly property int volume: audio ? Math.round(audio.volume * 100) : 0
+-
+-    property bool shown: false
+-    property bool armed: false   // ignore the initial values at startup
+-
+-    Timer {
+-        interval: 1000
+-        running: true
+-        onTriggered: osd.armed = true
+-    }
+-
+-    Timer {
+-        id: hideTimer
+-        interval: 1200
+-        onTriggered: osd.shown = false
+-    }
+-
+-    function poke() {
+-        if (!armed) return
+-        shown = true
+-        hideTimer.restart()
+-    }
+-
+-    onVolumeChanged: poke()
+-    onMutedChanged: poke()
+-
+-    anchors {
+-        right: true
+-        top: true
+-        bottom: true
+-    }
+-    implicitWidth: 56
+-    exclusiveZone: 0
+-    color: "transparent"
+-    mask: Region {}   // empty mask: clicks pass through the window
+-
+-    Rectangle {
+-        id: panel
+-        anchors.right: parent.right
+-        anchors.rightMargin: 14
+-        anchors.verticalCenter: parent.verticalCenter
+-        width: 22
+-        height: 200
+-        radius: 6
+-        color: Qt.alpha(Theme.bg, 0.6)
+-        border.width: 1
+-        border.color: Qt.alpha(osd.muted ? Theme.fg : Theme.accent, 0.35)
+-
+-        opacity: osd.shown ? 1 : 0
+-        x: osd.shown ? 0 : 12
+-        Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
+-        Behavior on x { NumberAnimation { duration: 180; easing.type: Easing.OutExpo } }
+-
+-        Rectangle {
+-            id: track
+-            anchors.horizontalCenter: parent.horizontalCenter
+-            anchors.top: parent.top
+-            anchors.bottom: label.top
+-            anchors.topMargin: 12
+-            anchors.bottomMargin: 8
+-            width: 4
+-            radius: 2
+-            color: Qt.alpha(Theme.fg, 0.08)
+-
+-            Rectangle {
+-                anchors.left: parent.left
+-                anchors.right: parent.right
+-                anchors.bottom: parent.bottom
+-                height: parent.height * (osd.muted ? 0 : osd.volume / 100)
+-                radius: parent.radius
+-                color: osd.muted ? Qt.alpha(Theme.fg, 0.4) : Theme.accent
+-
+-                Behavior on height { NumberAnimation { duration: 90; easing.type: Easing.OutCubic } }
+-            }
+-        }
+-
+-        Text {
+-            id: label
+-            anchors.left: parent.left
+-            anchors.right: parent.right
+-            anchors.bottom: parent.bottom
+-            anchors.bottomMargin: 8
+-            horizontalAlignment: Text.AlignHCenter
+-            text: osd.muted ? "MU" : osd.volume.toString()
+-            color: osd.muted ? Qt.alpha(Theme.fg, 0.5) : Theme.fg
+-            font.family: "monospace"
+-            font.pixelSize: 9
+-            font.bold: true
+-            elide: Text.ElideNone
+-        }
+-    }
+-}

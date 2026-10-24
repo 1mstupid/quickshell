@@ -10,7 +10,6 @@ import "./widgets/bar"
 import "./widgets/bar/media"
 import "./widgets/network"
 import "./widgets/notifications"
-import "./widgets/osd"
 import "./widgets/power_menu"
 import "./widgets/wallpaper"
 
@@ -23,8 +22,6 @@ ShellRoot {
     AppLauncher {}
 
     MediaWidget {}
-
-    VolumeOsd {}
 
     Variants {
         model: Quickshell.screens
