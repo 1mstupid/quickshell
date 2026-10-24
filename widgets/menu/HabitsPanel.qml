@@ -2,17 +2,33 @@ import QtQuick
 import "../../services"
 import "../../services/menu"
 
-// Habits tab: one row per habit with a check-in circle, the name, a five-week
-// garden (one column per week, Sunday at the top) and the current streak.
-// Habits are listed in habits.json; adding or removing them is done in that file.
+// Habits tab: a header of faded weekday abbreviations, then one row per habit
+// with a check-in circle, the name, one cell per day of the current week
+// (Monday first) and the current streak. Habits are listed in habits.json;
+// adding or removing them is done in that file.
 Item {
     id: panel
 
     // the Loader in the menu sizes this panel
     anchors.fill: parent
 
-    // 35 day strings, oldest first; days after today stay empty in the garden
-    readonly property var dates: Habits.gridDates()
+    readonly property var dayLabels: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
+    readonly property int cellSize: 20
+    readonly property int cellGap: 4
+    // room for the streak and the gap before it, shared by header and rows
+    readonly property int streakSpace: 36
+
+    // the seven date strings of this week, Monday first; empty until the file loads
+    readonly property var week: {
+        const today = Habits.data.day
+        if (today === "")
+            return []
+        const offset = (Habits.toDate(today).getDay() + 6) % 7
+        const out = []
+        for (let i = 0; i < 7; i++)
+            out.push(Habits.addDays(today, i - offset))
+        return out
+    }
 
     Text {
         anchors.centerIn: parent
@@ -24,9 +40,40 @@ Item {
         font.pixelSize: 11
     }
 
+    // weekday header, aligned with the cells in each row below
+    Row {
+        id: header
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.topMargin: 10
+        anchors.rightMargin: 10 + panel.streakSpace
+        spacing: panel.cellGap
+
+        Repeater {
+            model: panel.dayLabels
+
+            Text {
+                required property string modelData
+                width: panel.cellSize
+                horizontalAlignment: Text.AlignHCenter
+                text: modelData
+                color: Qt.alpha(Theme.fg, 0.35)
+                font.family: Theme.fontFamilyAlt
+                font.pixelSize: 9
+                font.bold: true
+            }
+        }
+    }
+
     ListView {
-        anchors.fill: parent
-        anchors.margins: 10
+        anchors.top: header.bottom
+        anchors.topMargin: 4
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 10
+        anchors.left: parent.left
+        anchors.leftMargin: 10
+        anchors.right: parent.right
+        anchors.rightMargin: 10
         clip: true
         spacing: 4
         boundsBehavior: Flickable.StopAtBounds
@@ -36,7 +83,7 @@ Item {
             id: row
             required property var modelData
             width: ListView.view.width
-            height: 28
+            height: panel.cellSize
 
             readonly property bool doneToday: modelData.status === "completed"
 
@@ -61,10 +108,9 @@ Item {
             }
 
             Text {
-                id: nameText
                 anchors.left: tickBox.right
                 anchors.leftMargin: 8
-                anchors.right: garden.left
+                anchors.right: cells.left
                 anchors.rightMargin: 8
                 anchors.verticalCenter: parent.verticalCenter
                 text: row.modelData.name
@@ -74,32 +120,32 @@ Item {
                 font.pixelSize: 12
             }
 
-            // garden: columns are weeks, rows are weekdays from Sunday
-            Grid {
-                id: garden
+            // one cell per day of this week; the streak sits at the right edge
+            Row {
+                id: cells
                 anchors.right: streakText.left
                 anchors.rightMargin: 8
                 anchors.verticalCenter: parent.verticalCenter
-                rows: 7
-                columns: 5
-                flow: Grid.TopToBottom
-                spacing: 1
+                spacing: panel.cellGap
 
                 Repeater {
-                    model: panel.dates
+                    model: panel.week
 
                     Rectangle {
                         id: cell
                         required property string modelData
                         readonly property bool future: modelData > Habits.data.day
+                        readonly property bool today: modelData === Habits.data.day
                         readonly property bool completed: Habits.doneOn(row.modelData.id, modelData)
 
-                        width: 3
-                        height: 3
-                        radius: 1
-                        color: future ? "transparent"
-                             : completed ? Theme.accent
+                        width: panel.cellSize
+                        height: panel.cellSize
+                        radius: 5
+                        color: completed ? Theme.accent
+                             : future ? Qt.alpha(Theme.fg, 0.04)
                              : Qt.alpha(Theme.fg, 0.1)
+                        border.width: today && !completed ? 1 : 0
+                        border.color: Qt.alpha(Theme.fg, 0.35)
                     }
                 }
             }
