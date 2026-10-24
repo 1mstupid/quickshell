@@ -1,6 +1,5 @@
 import QtQuick
 import Quickshell.Services.Mpris
-import "../../../components"
 
 
 // Shared now-playing state (MPRIS), no visuals. The bar's Media pill and

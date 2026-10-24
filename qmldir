@@ -2,7 +2,6 @@ Bar Bar.qml
 Recorder Recorder.qml
 Workspaces Workspaces.qml
 Wm Wm.qml
-VolumeOsd VolumeOsd.qml
 Pomodoro Pomodoro.qml
 MediaState MediaState.qml
 Network Network.qml
