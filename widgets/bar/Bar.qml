@@ -6,6 +6,7 @@ import Quickshell.Wayland
 import "../../services"
 import "./media"
 import "../notch"
+import "../../services/menu"
 
 PanelWindow {
     id: root
@@ -224,6 +225,14 @@ PanelWindow {
                     onClicked: Pomodoro.done ? Pomodoro.stop() : Pomodoro.toggle()
                 }
             }
+        }
+
+        // clicking the clock opens or closes the menu (origin screen only)
+        MouseArea {
+            anchors.fill: clock
+            enabled: root.isOrigin
+            cursorShape: Qt.PointingHandCursor
+            onClicked: MenuState.toggle()
         }
 
         // volume readout: icon, track, number; "MU" when muted

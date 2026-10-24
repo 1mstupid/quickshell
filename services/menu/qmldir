@@ -1,0 +1,4 @@
+singleton Todo Todo.qml
+singleton Habits Habits.qml
+singleton MenuState MenuState.qml
+singleton Net Net.qml
