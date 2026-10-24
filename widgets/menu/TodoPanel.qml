@@ -63,8 +63,12 @@ Item {
 
                 TextInput {
                     id: titleField
-                    anchors.fill: parent
-                    anchors.margins: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.leftMargin: 8
+                    anchors.rightMargin: 8
+                    height: parent.height
                     clip: true
                     color: Theme.fg
                     font.family: Theme.fontFamily
@@ -75,8 +79,10 @@ Item {
                     Keys.onEscapePressed: MenuState.hide()
                 }
                 Text {
-                    anchors.fill: parent
-                    anchors.margins: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.left: parent.left
+                    anchors.leftMargin: 8
+                    height: parent.height
                     visible: titleField.text === ""
                     text: "add a task"
                     color: Theme.disabled
@@ -95,8 +101,12 @@ Item {
 
                 TextInput {
                     id: dueField
-                    anchors.fill: parent
-                    anchors.margins: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.leftMargin: 8
+                    anchors.rightMargin: 8
+                    height: parent.height
                     clip: true
                     text: Todo.today
                     color: Theme.fg
@@ -185,12 +195,15 @@ Item {
                     visible: !row.isHeader
                     anchors.verticalCenter: parent.verticalCenter
                     width: parent.width
+                    height: 20
                     spacing: 8
 
                     Text {
                         id: tick
                         width: 14
+                        height: parent.height
                         horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
                         text: row.task && row.task.done ? "●" : "○"
                         color: row.task && row.task.done ? Theme.accent : Theme.fg
                         font.family: Theme.fontFamily
@@ -203,6 +216,8 @@ Item {
                     Text {
                         width: parent.width - tick.width - dueText.width - prioText.width - delText.width - 4 * parent.spacing
                         text: row.task ? row.task.title : ""
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
                         elide: Text.ElideRight
                         color: row.task && row.task.done ? Qt.alpha(Theme.fg, 0.4) : Theme.fg
                         font.family: Theme.fontFamily
@@ -211,6 +226,8 @@ Item {
                     }
                     Text {
                         id: dueText
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
                         text: row.task ? row.task.due.slice(5) : ""
                         color: row.task && row.task.due < Todo.today && !row.task.done
                             ? Theme.alert : Qt.alpha(Theme.fg, 0.5)
@@ -219,6 +236,8 @@ Item {
                     }
                     Text {
                         id: prioText
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
                         text: row.task && row.task.priority ? "p" + row.task.priority : ""
                         color: Theme.accent
                         font.family: Theme.fontFamily
@@ -226,6 +245,10 @@ Item {
                     }
                     Text {
                         id: delText
+                        width: 14
+                        height: parent.height
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
                         text: "×"
                         color: delMouse.containsMouse ? Theme.alert : Qt.alpha(Theme.fg, 0.4)
                         font.family: Theme.fontFamily
