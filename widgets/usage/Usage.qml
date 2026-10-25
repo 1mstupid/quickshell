@@ -4,7 +4,8 @@ import Quickshell.Wayland
 import "../../services"
 
 // Today's app time on the wallpaper layer: above the wallpaper, below every
-// window. Shows the total and the three most used apps. Clicks pass through.
+// window. Drawn as the bar pill's card, so it reads as part of the bar.
+// Shows the total and the three most used apps. Clicks pass through.
 PanelWindow {
     id: root
 
@@ -17,8 +18,8 @@ PanelWindow {
         right: Theme.edgeInset
         bottom: Theme.edgeInset
     }
-    implicitWidth: 200
-    implicitHeight: col.implicitHeight
+    implicitWidth: 240
+    implicitHeight: card.height
 
     exclusionMode: ExclusionMode.Ignore
     color: "transparent"
@@ -34,54 +35,83 @@ PanelWindow {
 
     visible: allRows.length > 0
 
-    Column {
-        id: col
-        width: parent.width
-        spacing: 6
+    Rectangle {
+        id: card
 
-        Text {
-            text: "today  " + AppUsage.fmt(root.totalSec)
-            color: Qt.alpha(Theme.fg, 0.6)
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSize
-        }
+        readonly property int pad: 14
 
-        Repeater {
-            model: root.rows
+        width: root.width
+        height: col.implicitHeight + 2 * pad
+        radius: 12
+        color: Qt.alpha(Theme.bg, 0.92)
+        border.width: 1
+        border.color: Qt.alpha(Theme.border, 0.6)
 
-            Item {
-                id: line
-                required property var modelData
-                width: col.width
-                height: 18
+        Column {
+            id: col
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.margins: card.pad
+            spacing: 10
+
+            Row {
+                spacing: 8
 
                 Text {
-                    anchors.left: parent.left
-                    anchors.right: time.left
-                    anchors.rightMargin: 8
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: line.modelData.app
-                    color: Qt.alpha(Theme.fg, 0.8)
+                    text: "today"
+                    color: Theme.accent
                     font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize - 1
-                    elide: Text.ElideRight
+                    font.pixelSize: Theme.fontSize + 1
+                    font.bold: true
                 }
                 Text {
-                    id: time
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: AppUsage.fmt(line.modelData.sec)
-                    color: Qt.alpha(Theme.fg, 0.5)
+                    text: AppUsage.fmt(root.totalSec)
+                    color: Theme.fg
                     font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize - 1
+                    font.pixelSize: Theme.fontSize + 1
+                    font.bold: true
                 }
-                Rectangle {
-                    anchors.left: parent.left
-                    anchors.bottom: parent.bottom
-                    height: 2
-                    radius: 1
-                    color: Qt.alpha(Theme.accent, 0.7)
-                    width: parent.width * (line.modelData.sec / root.topSec)
+            }
+
+            Repeater {
+                model: root.rows
+
+                Item {
+                    id: line
+                    required property var modelData
+                    width: col.width
+                    height: 36
+
+                    Text {
+                        id: name
+                        anchors.left: parent.left
+                        anchors.right: time.left
+                        anchors.rightMargin: 10
+                        anchors.top: parent.top
+                        text: line.modelData.app
+                        color: Theme.fg
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSize + 1
+                        elide: Text.ElideRight
+                    }
+                    Text {
+                        id: time
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        text: AppUsage.fmt(line.modelData.sec)
+                        color: Theme.fg
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSize + 1
+                    }
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.bottom: parent.bottom
+                        height: 3
+                        radius: 2
+                        color: Theme.accent
+                        width: parent.width * (line.modelData.sec / root.topSec)
+                    }
                 }
             }
         }

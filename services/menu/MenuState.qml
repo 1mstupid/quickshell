@@ -16,7 +16,7 @@ Singleton {
         { name: "Wi-Fi", icon: "\uDB81\uDDA9" },
         { name: "Bluetooth", icon: "\uDB80\uDCAF" },
         { name: "VPN", icon: "\uDB82\uDD9D" },
-        { name: "Usage", icon: "\uDB80\uDF1F" }
+        { name: "Usage", icon: "\uDB81\uDEAD" }
     ]
 
     // the menu's size; its height is the bar's height plus the panel
