@@ -218,6 +218,12 @@ PanelWindow {
                 active: MenuState.tab === 5
                 source: "VpnPanel.qml"
             }
+
+            Loader {
+                anchors.fill: parent
+                active: MenuState.tab === 6
+                source: "UsagePanel.qml"
+            }
         }
     }
 }

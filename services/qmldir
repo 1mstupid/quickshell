@@ -5,6 +5,7 @@ singleton Theme Theme.qml
 singleton Notifications Notifications.qml
 singleton Pomodoro Pomodoro.qml
 singleton Volume Volume.qml
+singleton AppUsage AppUsage.qml
 singleton MediaWidgetState MediaWidgetState.qml
 Recorder Recorder.qml
 
