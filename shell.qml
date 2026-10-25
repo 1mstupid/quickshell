@@ -12,6 +12,7 @@ import "./widgets/menu"
 import "./widgets/border"
 import "./widgets/notifications"
 import "./widgets/power_menu"
+import "./widgets/usage"
 import "./widgets/wallpaper"
 
 ShellRoot {
@@ -25,6 +26,8 @@ ShellRoot {
     Menu {}
 
     MediaWidget {}
+
+    Usage {}
 
     Variants {
         model: Quickshell.screens
