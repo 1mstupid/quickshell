@@ -1,7 +1,8 @@
 import QtQuick
 import "../../services"
 
-// Usage tab: today's focus time per app, most used first. An app with a limit
+// Usage tab: today's focus time per app, most used first, scrollable. The
+// switch in the header shows or hides the desktop widget. An app with a limit
 // shows its limit, and its line fills toward that limit.
 Item {
     id: panel
@@ -23,69 +24,86 @@ Item {
         font.pixelSize: 11
     }
 
-    Text {
-        id: heading
+    Item {
+        id: header
         anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.margins: 12
-        visible: panel.rows.length > 0
-        text: "today  " + AppUsage.fmt(panel.totalSec)
-        color: Qt.alpha(Theme.fg, 0.6)
-        font.family: Theme.fontFamily
-        font.pixelSize: 11
-    }
-
-    Column {
-        anchors.top: heading.bottom
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.margins: 12
+        height: 18
+
+        Text {
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            visible: panel.rows.length > 0
+            text: "today  " + AppUsage.fmt(panel.totalSec)
+            color: Qt.alpha(Theme.fg, 0.6)
+            font.family: Theme.fontFamily
+            font.pixelSize: 11
+        }
+
+        WidgetSwitch {
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            label: "desktop"
+            checked: AppUsage.widgetShown
+            onToggled: AppUsage.toggleWidget()
+        }
+    }
+
+    ListView {
+        id: list
+        anchors.top: header.bottom
         anchors.topMargin: 10
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.leftMargin: 12
+        anchors.rightMargin: 12
+        anchors.bottomMargin: 12
+        clip: true
         spacing: 8
+        model: panel.rows
 
-        Repeater {
-            model: panel.rows.slice(0, 6)
+        delegate: Item {
+            id: row
+            required property var modelData
+            readonly property int limit: AppUsage.limits[modelData.app] ?? 0
+            readonly property real fill: limit > 0
+                ? Math.min(modelData.sec / (limit * 60), 1)
+                : modelData.sec / panel.topSec
 
-            Item {
-                id: row
-                required property var modelData
-                readonly property int limit: AppUsage.limits[modelData.app] ?? 0
-                readonly property real fill: limit > 0
-                    ? Math.min(modelData.sec / (limit * 60), 1)
-                    : modelData.sec / panel.topSec
+            width: list.width
+            height: 24
 
-                width: parent.width
-                height: 24
-
-                Text {
-                    anchors.left: parent.left
-                    anchors.right: amount.left
-                    anchors.rightMargin: 8
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: row.modelData.app
-                    color: Theme.fg
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 12
-                    elide: Text.ElideRight
-                }
-                Text {
-                    id: amount
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: AppUsage.fmt(row.modelData.sec) + (row.limit > 0 ? " / " + row.limit + "m" : "")
-                    color: row.limit > 0 && row.modelData.sec >= row.limit * 60
-                        ? Theme.alert : Qt.alpha(Theme.fg, 0.5)
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 11
-                }
-                Rectangle {
-                    anchors.left: parent.left
-                    anchors.bottom: parent.bottom
-                    height: 2
-                    radius: 1
-                    color: row.limit > 0 && row.fill >= 1 ? Theme.alert : Theme.accent
-                    width: parent.width * row.fill
-                }
+            Text {
+                anchors.left: parent.left
+                anchors.right: amount.left
+                anchors.rightMargin: 8
+                anchors.verticalCenter: parent.verticalCenter
+                text: row.modelData.app
+                color: Theme.fg
+                font.family: Theme.fontFamily
+                font.pixelSize: 12
+                elide: Text.ElideRight
+            }
+            Text {
+                id: amount
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                text: AppUsage.fmt(row.modelData.sec) + (row.limit > 0 ? " / " + row.limit + "m" : "")
+                color: row.limit > 0 && row.modelData.sec >= row.limit * 60
+                    ? Theme.alert : Qt.alpha(Theme.fg, 0.5)
+                font.family: Theme.fontFamily
+                font.pixelSize: 11
+            }
+            Rectangle {
+                anchors.left: parent.left
+                anchors.bottom: parent.bottom
+                height: 2
+                radius: 1
+                color: row.limit > 0 && row.fill >= 1 ? Theme.alert : Theme.accent
+                width: parent.width * row.fill
             }
         }
     }

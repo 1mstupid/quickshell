@@ -6,6 +6,7 @@ singleton Notifications Notifications.qml
 singleton Pomodoro Pomodoro.qml
 singleton Volume Volume.qml
 singleton AppUsage AppUsage.qml
+singleton SleepReminder SleepReminder.qml
 singleton MediaWidgetState MediaWidgetState.qml
 Recorder Recorder.qml
 
