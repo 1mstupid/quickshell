@@ -276,7 +276,15 @@ PanelWindow {
                     width: listView.width
                     height: root.itemH - 4
                     radius: 8
-                    color: root.selectedIndex === index ? Qt.alpha(Theme.fg, 0.12) : Theme.bg
+                    color: Theme.bg
+
+                    // selection highlight, a separate layer so the row base stays solid
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 8
+                        visible: root.selectedIndex === index
+                        color: Qt.alpha(Theme.fg, 0.12)
+                    }
 
                     Text {
                         id: preview
