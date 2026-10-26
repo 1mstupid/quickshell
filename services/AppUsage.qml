@@ -26,6 +26,10 @@ Singleton {
     property double lastMs: Date.now()
     property bool ready: false
     property bool dirty: false
+    // the desktop widget; toggled from the Usage tab or `qs ipc call usage toggle`
+    property bool widgetShown: true
+
+    function toggleWidget() { widgetShown = !widgetShown }
 
     function dayKey() { return Qt.formatDate(new Date(), "yyyy-MM-dd") }
 
@@ -116,6 +120,11 @@ Singleton {
     }
 
     Component.onCompleted: revision++
+
+    IpcHandler {
+        target: "usage"
+        function toggle(): void { root.toggleWidget() }
+    }
 
     Process {
         id: sub

@@ -33,7 +33,8 @@ PanelWindow {
     readonly property real topSec: rows.length > 0 ? rows[0].sec : 1
     readonly property real totalSec: allRows.reduce((s, r) => s + r.sec, 0)
 
-    visible: allRows.length > 0
+    // hidden while the overview is open, or when switched off
+    visible: AppUsage.widgetShown && !Overview.open && allRows.length > 0
 
     Rectangle {
         id: card
