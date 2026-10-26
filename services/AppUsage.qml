@@ -36,11 +36,23 @@ Singleton {
     // window id -> ms of its last close request, kept only for open windows
     property var closeSent: ({})
 
-    // an app is blocked once today's total reaches its limit
+    // an app is blocked from the moment its total reaches its limit, until
+    // midnight. The app id goes into the day's "blocked" list, so raising the
+    // limit later does not lift it, and reopened windows (new ids) are caught.
     function blocked(app) {
+        const rec = days[dayKey()]
+        if (!rec)
+            return false
+        rec.blocked = rec.blocked ?? []
+        if (rec.blocked.indexOf(app) >= 0)
+            return true
         const lim = limits[app]
-        const r = days[dayKey()]
-        return !!lim && !!r && (r.seconds[app] ?? 0) / 60 >= lim
+        if (lim && (rec.seconds[app] ?? 0) / 60 >= lim) {
+            rec.blocked.push(app)
+            dirty = true
+            return true
+        }
+        return false
     }
 
     // ask each open window of a blocked app to close, retrying every 10 s
@@ -106,7 +118,7 @@ Singleton {
             return
         const key = dayKey()
         if (!days[key])
-            days[key] = { seconds: {}, alerted: [] }
+            days[key] = { seconds: {}, alerted: [], blocked: [] }
         const rec = days[key]
         rec.seconds[currentApp] = (rec.seconds[currentApp] ?? 0) + dt / 1000
         dirty = true
