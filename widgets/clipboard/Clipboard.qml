@@ -279,6 +279,7 @@ PanelWindow {
                 delegate: Rectangle {
                     id: row
                     required property var modelData
+                    required property int index
                     width: listView.width
                     height: root.itemH - 4
                     radius: 8
