@@ -42,41 +42,12 @@ Item {
             font.pixelSize: 11
         }
 
-        Rectangle {
-            id: pill
+        WidgetSwitch {
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            width: 34
-            height: 18
-            radius: 9
-            color: AppUsage.widgetShown ? Theme.accent : Qt.alpha(Theme.fg, 0.15)
-            Behavior on color { ColorAnimation { duration: 150 } }
-
-            Rectangle {
-                x: AppUsage.widgetShown ? pill.width - width - 2 : 2
-                anchors.verticalCenter: parent.verticalCenter
-                width: 14
-                height: 14
-                radius: 7
-                color: AppUsage.widgetShown ? Theme.bg : Qt.alpha(Theme.fg, 0.7)
-                Behavior on x { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
-            }
-
-            MouseArea {
-                anchors.fill: parent
-                cursorShape: Qt.PointingHandCursor
-                onClicked: AppUsage.toggleWidget()
-            }
-        }
-
-        Text {
-            anchors.right: pill.left
-            anchors.rightMargin: 8
-            anchors.verticalCenter: parent.verticalCenter
-            text: "desktop"
-            color: Qt.alpha(Theme.fg, 0.6)
-            font.family: Theme.fontFamily
-            font.pixelSize: 11
+            label: "desktop"
+            checked: AppUsage.widgetShown
+            onToggled: AppUsage.toggleWidget()
         }
     }
 

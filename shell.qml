@@ -29,6 +29,8 @@ ShellRoot {
 
     Usage {}
 
+    FocusWidget {}
+
     Variants {
         model: Quickshell.screens
 

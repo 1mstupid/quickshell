@@ -5,8 +5,10 @@ import Quickshell.Io
 
 // App focus time, from `umbriel subscribe windows`. The window with
 // active: true holds keyboard focus, and its elapsed time goes to its app_id.
-// Totals per day live in app-usage.json; limits in app-limits, one
-// "app_id minutes" line each. A limit notifies at 80% and at 100%, once each.
+// Focus time is any time a window has focus or a pomodoro runs; it is also
+// kept in 5-minute slots for the Pomodoro page. Totals per day live in
+// app-usage.json; limits in app-limits, one "app_id minutes" line each. A limit
+// notifies at 80% and at 100%, once each.
 Singleton {
     id: root
 
@@ -15,7 +17,8 @@ Singleton {
     // longer gaps (suspend, a stalled shell) are not counted as use
     readonly property int maxGapMs: 90000
 
-    // { "2026-10-25": { "seconds": { "helium": 1234.5 }, "alerted": ["helium:80"] } }
+    // { "2026-10-25": { "seconds": { "helium": 1234.5 }, "alerted": ["helium:80"],
+    //   "focus": { "132": 240 } } }   focus: seconds per 5-minute slot from midnight
     property var days: ({})
     // { "helium": 60 } in minutes
     property var limits: ({})
@@ -28,8 +31,11 @@ Singleton {
     property bool dirty: false
     // the desktop widget; toggled from the Usage tab or `qs ipc call usage toggle`
     property bool widgetShown: true
+    // the focus widget on the wallpaper; toggled from the Pomodoro page
+    property bool focusWidgetShown: true
 
     function toggleWidget() { widgetShown = !widgetShown }
+    function toggleFocusWidget() { focusWidgetShown = !focusWidgetShown }
 
     // the window list from the last event, re-checked on each tick
     property var lastWindows: []
@@ -80,6 +86,31 @@ Singleton {
         return h > 0 ? h + "h " + (m % 60) + "m" : m + "m"
     }
 
+    // h:mm:ss, as the Pomodoro page shows the day's focus time
+    function fmtHms(sec) {
+        const s = Math.floor(sec)
+        const h = Math.floor(s / 3600)
+        const m = Math.floor((s % 3600) / 60)
+        return h + ":" + String(m).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0")
+    }
+
+    // 5-minute slot of the day for a time: 0 = 00:00, 287 = 23:55
+    function slotOf(ms) {
+        const d = new Date(ms)
+        return d.getHours() * 12 + Math.floor(d.getMinutes() / 5)
+    }
+
+    // seconds of focus per slot for a day, keyed by slot index
+    function focusSlots(key, rev) {
+        const r = days[key]
+        return (r && r.focus) ? r.focus : {}
+    }
+
+    function focusTotal(key, rev) {
+        const f = focusSlots(key, rev)
+        return Object.keys(f).reduce((s, k) => s + f[k], 0)
+    }
+
     // one row per app for a day, most used first
     function totals(key, rev) {
         const r = days[key]
@@ -109,20 +140,28 @@ Singleton {
         }
     }
 
-    // credit the time since the last tick to the app that had focus
+    // credit the time since the last tick. It is focus time when a window has
+    // focus or a pomodoro runs; the app with focus also gets it.
     function credit() {
         const now = Date.now()
         const dt = now - lastMs
         lastMs = now
-        if (!ready || currentApp === "" || dt <= 0 || dt > maxGapMs)
+        if (!ready || dt <= 0 || dt > maxGapMs)
+            return
+        if (currentApp === "" && !Pomodoro.running)
             return
         const key = dayKey()
         if (!days[key])
-            days[key] = { seconds: {}, alerted: [], blocked: [] }
+            days[key] = { seconds: {}, alerted: [], blocked: [], focus: {} }
         const rec = days[key]
-        rec.seconds[currentApp] = (rec.seconds[currentApp] ?? 0) + dt / 1000
+        rec.focus = rec.focus ?? {}
+        const slot = slotOf(now)
+        rec.focus[slot] = (rec.focus[slot] ?? 0) + dt / 1000
+        if (currentApp !== "") {
+            rec.seconds[currentApp] = (rec.seconds[currentApp] ?? 0) + dt / 1000
+            check(key, currentApp)
+        }
         dirty = true
-        check(key, currentApp)
     }
 
     function onWindows(line) {
@@ -167,6 +206,7 @@ Singleton {
     IpcHandler {
         target: "usage"
         function toggle(): void { root.toggleWidget() }
+        function toggleFocus(): void { root.toggleFocusWidget() }
     }
 
     Process {
