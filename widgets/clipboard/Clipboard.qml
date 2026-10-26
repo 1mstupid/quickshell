@@ -224,6 +224,12 @@ PanelWindow {
                         } else if (event.key === Qt.Key_Down) {
                             root.navigate(1)
                             event.accepted = true
+                        } else if (event.key === Qt.Key_Tab) {
+                            root.navigate(1)
+                            event.accepted = true
+                        } else if (event.key === Qt.Key_Backtab) {
+                            root.navigate(-1)
+                            event.accepted = true
                         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                             root.copyEntry(root.shown[root.selectedIndex])
                             event.accepted = true
@@ -283,7 +289,7 @@ PanelWindow {
                         anchors.fill: parent
                         radius: 8
                         visible: root.selectedIndex === index
-                        color: Qt.alpha(Theme.fg, 0.12)
+                        color: Qt.alpha(Theme.fg, 0.2)
                     }
 
                     Text {
