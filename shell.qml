@@ -8,6 +8,7 @@ import "./services"
 import "./widgets/app_launcher"
 import "./widgets/bar"
 import "./widgets/bar/media"
+import "./widgets/clipboard"
 import "./widgets/menu"
 import "./widgets/border"
 import "./widgets/notifications"
@@ -22,6 +23,8 @@ ShellRoot {
     WallpaperPicker {}
 
     AppLauncher {}
+
+    Clipboard {}
 
     Menu {}
 
