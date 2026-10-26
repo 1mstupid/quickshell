@@ -6,7 +6,7 @@ import "../../services"
 import "../notch"
 
 // Top-anchored launcher. Grows out of the bar pill, the same way the
-// wallpaper picker does.
+// wallpaper picker and clipboard do.
 PanelWindow {
     id: root
 
@@ -34,10 +34,10 @@ PanelWindow {
 
     // ── Geometry ───────────────────────────────────────────────────────────
     readonly property int maxVisible: 7
-    readonly property int itemH: 42
-    readonly property int panelW: 440
-    // 12 top + 44 search + 8 gap + 12 bottom, plus the rows
-    readonly property int chromeH: 76
+    readonly property int itemH: 44
+    readonly property int panelW: 400
+    // 12 top + 34 search + 8 gap + 8 gap + 16 footer + 12 bottom, plus the rows
+    readonly property int chromeH: 90
     readonly property int maxPanelH: chromeH + maxVisible * itemH
 
     // 0 = the bar pill, 1 = the full panel
@@ -90,6 +90,15 @@ PanelWindow {
     }
 
     onFilteredAppsChanged: selectedIndex = 0
+
+    // one line of secondary text per app: its generic name, else its category
+    function subtitleOf(entry) {
+        if (entry.genericName && entry.genericName !== "")
+            return entry.genericName;
+        if (entry.categories && entry.categories.length > 0)
+            return entry.categories[0];
+        return "";
+    }
 
     // ── Open / close ───────────────────────────────────────────────────────
     function openLauncher() {
@@ -163,10 +172,8 @@ PanelWindow {
         listView.positionViewAtIndex(selectedIndex, ListView.Contain);
     }
 
-    // ── Accent colours ─────────────────────────────────────────────────────
+    // ── Colours ────────────────────────────────────────────────────────────
     readonly property color accentFill: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.18)
-    readonly property color accentIcon: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.28)
-    readonly property color fgDim: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.65)
 
     // only the card takes clicks; everything around it passes through
     mask: Region { item: outline }
@@ -195,7 +202,6 @@ PanelWindow {
         clip: true
 
         // content fades in during the second half of the morph
-                // content fades in during the second half of the morph
         Column {
             anchors {
                 top: parent.top
@@ -205,8 +211,85 @@ PanelWindow {
                 right: parent.right
                 rightMargin: 12
             }
-            spacing: 0
+            spacing: 8
             opacity: Math.max(0, (root.t - 0.5) * 2)
+
+            // ── Search line, with the match count on the right ─────────────
+            Item {
+                width: parent.width
+                height: 34
+
+                Text {
+                    id: searchGlyph
+                    anchors.left: parent.left
+                    anchors.leftMargin: 14
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "󰍉"
+                    color: Qt.alpha(Theme.fg, 0.45)
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 15
+                }
+
+                Text {
+                    anchors.left: searchGlyph.right
+                    anchors.leftMargin: 10
+                    anchors.right: countText.left
+                    anchors.rightMargin: 10
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "Search apps"
+                    color: Theme.fg
+                    opacity: 0.28
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 13
+                    elide: Text.ElideRight
+                    visible: searchInput.text === ""
+                }
+
+                TextInput {
+                    id: searchInput
+                    anchors.left: searchGlyph.right
+                    anchors.leftMargin: 10
+                    anchors.right: countText.left
+                    anchors.rightMargin: 10
+                    anchors.verticalCenter: parent.verticalCenter
+                    color: Theme.fg
+                    selectionColor: root.accentFill
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 13
+                    clip: true
+
+                    onTextChanged: root.searchQuery = text
+
+                    Keys.onPressed: function (event) {
+                        if (event.key === Qt.Key_Up) {
+                            root.navigate(-1);
+                            event.accepted = true;
+                        } else if (event.key === Qt.Key_Down) {
+                            root.navigate(1);
+                            event.accepted = true;
+                        } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                            if (root.filteredApps.length > 0)
+                                root.launchEntry(root.filteredApps[root.selectedIndex]);
+                            event.accepted = true;
+                        } else if (event.key === Qt.Key_Escape) {
+                            AppLauncherState.hide();
+                            event.accepted = true;
+                        }
+                    }
+                }
+
+                Text {
+                    id: countText
+                    anchors.right: parent.right
+                    anchors.rightMargin: 14
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root.filteredApps.length + " / " + DesktopEntries.applications.values.length
+                    color: Theme.fg
+                    opacity: 0.35
+                    font.family: Theme.fontFamilyAlt
+                    font.pixelSize: 11
+                }
+            }
 
             // ── App list ───────────────────────────────────────────────────
             ListView {
@@ -217,7 +300,18 @@ PanelWindow {
                 clip: true
                 interactive: false
 
-                // Wheel on list (belt-and-suspenders alongside panel MouseArea)
+                // "No apps found" when the search matches nothing
+                Text {
+                    anchors.centerIn: parent
+                    visible: root.filteredApps.length === 0
+                    text: "No apps found"
+                    color: Theme.fg
+                    opacity: 0.28
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 13
+                }
+
+                // wheel scrolls the selection, as before
                 MouseArea {
                     anchors.fill: parent
                     onWheel: function (wheel) {
@@ -228,249 +322,116 @@ PanelWindow {
                     }
                 }
 
-                Text {
-                    anchors.centerIn: parent
-                    visible: root.filteredApps.length === 0
-                    text: "No apps found"
-                    color: Theme.fg
-                    opacity: 0.28
-                    font {
-                        pixelSize: 13
-                        family: Theme.fontFamily
-                    }
-                }
-
-                delegate: Item {
+                delegate: Rectangle {
                     id: appRow
+                    required property var modelData
+                    required property int index
+
                     width: listView.width
                     height: root.itemH
+                    radius: 10
+                    color: root.selectedIndex === index ? root.accentFill : "transparent"
+                    Behavior on color { ColorAnimation { duration: 100 } }
 
                     readonly property bool sel: root.selectedIndex === index
-                    readonly property bool isRecent: !root.isSearching && AppLauncherState.recentIds.indexOf(modelData.id) !== -1 && AppLauncherState.recentIds.indexOf(modelData.id) < 5
 
-                    Rectangle {
+                    // icon, name and category
+                    Row {
                         anchors {
-                            fill: parent
-                            topMargin: 2
-                            bottomMargin: 2
+                            left: parent.left
+                            right: returnHint.left
+                            verticalCenter: parent.verticalCenter
+                            leftMargin: 10
+                            rightMargin: 8
                         }
-                        radius: 10
-                        color: appRow.sel ? root.accentFill : "transparent"
-                        Behavior on color {
-                            ColorAnimation {
-                                duration: 100
-                            }
-                        }
+                        spacing: 12
 
-                        Row {
-                            anchors {
-                                fill: parent
-                                leftMargin: 8
-                                rightMargin: 8
-                            }
-                            spacing: 12
+                        Item {
+                            width: 26
+                            height: 26
+                            anchors.verticalCenter: parent.verticalCenter
 
-                            // Icon bubble
-                            Rectangle {
-                                width: 36
-                                height: 36
-                                radius: 9
-                                anchors.verticalCenter: parent.verticalCenter
-                                color: appRow.sel ? root.accentIcon : Qt.alpha(Theme.fg, 0.08)
-                                Behavior on color {
-                                    ColorAnimation {
-                                        duration: 100
-                                    }
-                                }
-
-                                Image {
-                                    id: appIcon
-                                    anchors.centerIn: parent
-                                    source: modelData.icon !== "" ? "image://icon/" + modelData.icon : ""
-                                    width: 22
-                                    height: 22
-                                    smooth: true
-                                    mipmap: true
-                                }
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    visible: appIcon.status !== Image.Ready
-                                    text: modelData.name.charAt(0).toUpperCase()
-                                    font {
-                                        pixelSize: 15
-                                        family: Theme.fontFamily
-                                        weight: Font.Bold
-                                    }
-                                    color: appRow.sel ? Theme.primary : Theme.fg
-                                    Behavior on color {
-                                        ColorAnimation {
-                                            duration: 100
-                                        }
-                                    }
-                                }
+                            Image {
+                                id: appIcon
+                                anchors.fill: parent
+                                source: appRow.modelData.icon !== "" ? "image://icon/" + appRow.modelData.icon : ""
+                                smooth: true
+                                mipmap: true
                             }
 
-                            // Name + subtitle
-                            Column {
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: 2
-
-                                Text {
-                                    text: modelData.name
-                                    font {
-                                        pixelSize: 13
-                                        family: Theme.fontFamily
-                                        weight: appRow.sel ? Font.Medium : Font.Normal
-                                    }
-                                    color: appRow.sel ? Theme.fg : root.fgDim
-                                    Behavior on color {
-                                        ColorAnimation {
-                                            duration: 100
-                                        }
-                                    }
-                                }
-
-                                // "Recently used" pill OR generic name
-                                Row {
-                                    spacing: 6
-                                    visible: appRow.isRecent || modelData.genericName !== ""
-
-                                    Rectangle {
-                                        visible: appRow.isRecent
-                                        width: recentLabel.width + 8
-                                        height: 14
-                                        radius: 4
-                                        color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.22)
-                                        anchors.verticalCenter: parent.verticalCenter
-
-                                        Text {
-                                            id: recentLabel
-                                            anchors.centerIn: parent
-                                            text: "recent"
-                                            font {
-                                                pixelSize: 9
-                                                family: Theme.fontFamily
-                                            }
-                                            color: Theme.primary
-                                        }
-                                    }
-
-                                    Text {
-                                        visible: modelData.genericName !== ""
-                                        text: modelData.genericName
-                                        font {
-                                            pixelSize: 11
-                                            family: Theme.fontFamily
-                                        }
-                                        color: Theme.fg
-                                        opacity: 0.35
-                                        anchors.verticalCenter: parent.verticalCenter
-                                    }
-                                }
+                            // letter fallback while there is no icon
+                            Text {
+                                anchors.centerIn: parent
+                                visible: appIcon.status !== Image.Ready
+                                text: appRow.modelData.name.charAt(0).toUpperCase()
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 14
+                                font.weight: Font.Bold
+                                color: appRow.sel ? Theme.primary : Theme.fg
                             }
                         }
 
-                        MouseArea {
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onEntered: root.selectedIndex = index
-                            onClicked: root.launchEntry(modelData)
-                            onWheel: function (wheel) {
-                                if (wheel.angleDelta.y < 0)
-                                    root.navigate(1);
-                                else
-                                    root.navigate(-1);
+                        Column {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: parent.width - 26 - parent.spacing
+                            spacing: 2
+
+                            Text {
+                                width: parent.width
+                                text: appRow.modelData.name
+                                elide: Text.ElideRight
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 13
+                                font.weight: appRow.sel ? Font.Medium : Font.Normal
+                                color: Theme.fg
+                                opacity: appRow.sel ? 1 : 0.8
+                            }
+
+                            Text {
+                                width: parent.width
+                                visible: text !== ""
+                                text: root.subtitleOf(appRow.modelData)
+                                elide: Text.ElideRight
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 10
+                                color: Theme.fg
+                                opacity: 0.35
                             }
                         }
+                    }
+
+                    // return hint on the selected row
+                    Text {
+                        id: returnHint
+                        anchors.right: parent.right
+                        anchors.rightMargin: 12
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "↵"
+                        visible: appRow.sel
+                        color: Theme.fg
+                        opacity: 0.5
+                        font.family: Theme.fontFamilyAlt
+                        font.pixelSize: 12
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onEntered: root.selectedIndex = appRow.index
+                        onClicked: root.launchEntry(appRow.modelData)
                     }
                 }
             }
 
-            Item {
-                width: 1
-                height: 8
-            }
-
-            // ── Search box ─────────────────────────────────────────────────
-            Rectangle {
+            // ── Keybind footer ─────────────────────────────────────────────
+            Text {
                 width: parent.width
-                height: 44
-                radius: 10
-                color: Qt.alpha(Theme.fg, 0.07)
-
-                Rectangle {
-                    anchors.fill: parent
-                    radius: 10
-                    color: "transparent"
-                    border.color: Theme.primary
-                    border.width: 1
-                    opacity: searchInput.activeFocus ? 0.55 : 0
-                    Behavior on opacity {
-                        NumberAnimation {
-                            duration: 150
-                        }
-                    }
-                }
-
-                Row {
-                    anchors {
-                        fill: parent
-                        leftMargin: 14
-                        rightMargin: 14
-                    }
-                    spacing: 10
-
-                    Item {
-                        width: parent.width - 40
-                        height: parent.height
-
-                        Text {
-                            anchors.fill: parent
-                            text: root.isSearching ? "" : "Search apps…"
-                            color: Theme.fg
-                            opacity: 0.28
-                            font {
-                                pixelSize: 13
-                                family: Theme.fontFamily
-                            }
-                            verticalAlignment: Text.AlignVCenter
-                            visible: searchInput.text === ""
-                        }
-
-                        TextInput {
-                            id: searchInput
-                            anchors.fill: parent
-                            color: Theme.fg
-                            selectionColor: root.accentFill
-                            font {
-                                pixelSize: 13
-                                family: Theme.fontFamily
-                            }
-                            verticalAlignment: TextInput.AlignVCenter
-                            clip: true
-
-                            onTextChanged: root.searchQuery = text
-
-                            Keys.onPressed: function (event) {
-                                if (event.key === Qt.Key_Up) {
-                                    root.navigate(-1);
-                                    event.accepted = true;
-                                } else if (event.key === Qt.Key_Down) {
-                                    root.navigate(1);
-                                    event.accepted = true;
-                                } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                                    if (root.filteredApps.length > 0)
-                                        root.launchEntry(root.filteredApps[root.selectedIndex]);
-                                    event.accepted = true;
-                                } else if (event.key === Qt.Key_Escape) {
-                                    AppLauncherState.hide();
-                                    event.accepted = true;
-                                }
-                            }
-                        }
-                    }
-                }
+                horizontalAlignment: Text.AlignHCenter
+                text: "↑↓ move   ↵ launch   esc close"
+                color: Theme.fg
+                opacity: 0.25
+                font.family: Theme.fontFamilyAlt
+                font.pixelSize: 10
             }
         }
     }
