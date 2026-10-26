@@ -49,9 +49,12 @@ PanelWindow {
                 id: card
                 required property var modelData
 
+                // how long a toast stays; the timer and the ring both use it
+                readonly property int lifetime: 5000
+
                 Timer {
                     running: card.modelData.urgency !== NotificationUrgency.Critical
-                    interval: 5000
+                    interval: card.lifetime
                     onTriggered: card.modelData.dismiss()
                 }
 
@@ -106,6 +109,55 @@ PanelWindow {
                         }
                     }
                 }
+                // an outline that drains around the toast as it times out,
+                // like the Pomodoro ring; critical toasts never time out, so no ring
+                Canvas {
+                    id: ring
+                    anchors.fill: parent
+                    visible: card.modelData.urgency !== NotificationUrgency.Critical
+
+                    // 1 = full outline, 0 = gone
+                    property real frac: 1
+                    onFracChanged: requestPaint()
+                    onWidthChanged: requestPaint()
+                    onHeightChanged: requestPaint()
+
+                    NumberAnimation {
+                        target: ring
+                        property: "frac"
+                        from: 1
+                        to: 0
+                        duration: card.lifetime
+                        running: ring.visible
+                    }
+
+                    onPaint: {
+                        const ctx = getContext("2d")
+                        ctx.reset()
+                        const inset = 1
+                        const r = card.radius - inset
+                        const x = inset, y = inset
+                        const w = width - 2 * inset, h = height - 2 * inset
+                        ctx.beginPath()
+                        ctx.moveTo(x + r, y)
+                        ctx.lineTo(x + w - r, y)
+                        ctx.arcTo(x + w, y, x + w, y + r, r)
+                        ctx.lineTo(x + w, y + h - r)
+                        ctx.arcTo(x + w, y + h, x + w - r, y + h, r)
+                        ctx.lineTo(x + r, y + h)
+                        ctx.arcTo(x, y + h, x, y + h - r, r)
+                        ctx.lineTo(x, y + r)
+                        ctx.arcTo(x, y, x + r, y, r)
+                        ctx.closePath()
+                        // one dash as long as the perimeter fraction left, then a gap
+                        const per = 2 * (w + h) - 8 * r + 2 * Math.PI * r
+                        ctx.setLineDash([Math.max(0, frac) * per, per + 1])
+                        ctx.lineWidth = 2
+                        ctx.strokeStyle = String(Theme.accent)
+                        ctx.stroke()
+                    }
+                }
+
                 MouseArea {
                     anchors.fill: parent
                     onClicked: card.modelData.dismiss()
