@@ -8,6 +8,7 @@ singleton Volume Volume.qml
 singleton AppUsage AppUsage.qml
 singleton SleepReminder SleepReminder.qml
 singleton MediaWidgetState MediaWidgetState.qml
+singleton ClipboardHistory ClipboardHistory.qml
 Recorder Recorder.qml
 
 
