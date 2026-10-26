@@ -48,4 +48,6 @@ ShellRoot {
     }
 
     property var notifications: Notifications.notifications
+    // referenced so the singleton starts with the shell
+    property var sleepReminder: SleepReminder
 }
