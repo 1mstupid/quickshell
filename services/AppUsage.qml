@@ -31,6 +31,35 @@ Singleton {
 
     function toggleWidget() { widgetShown = !widgetShown }
 
+    // the window list from the last event, re-checked on each tick
+    property var lastWindows: []
+    // window id -> ms of its last close request, kept only for open windows
+    property var closeSent: ({})
+
+    // an app is blocked once today's total reaches its limit
+    function blocked(app) {
+        const lim = limits[app]
+        const r = days[dayKey()]
+        return !!lim && !!r && (r.seconds[app] ?? 0) / 60 >= lim
+    }
+
+    // ask each open window of a blocked app to close, retrying every 10 s
+    // while it stays open (an app may show a save prompt first)
+    function enforce(list) {
+        const now = Date.now()
+        const next = {}
+        for (const w of list) {
+            const last = closeSent[w.id] ?? 0
+            if (blocked(w.app_id) && now - last >= 10000) {
+                Quickshell.execDetached(["umbriel", "msg", "window-close:" + w.id])
+                next[w.id] = now
+            } else if (last) {
+                next[w.id] = last
+            }
+        }
+        closeSent = next
+    }
+
     function dayKey() { return Qt.formatDate(new Date(), "yyyy-MM-dd") }
 
     function fmt(sec) {
@@ -96,6 +125,8 @@ Singleton {
         credit()
         const w = msg.data.find(x => x.active === true)
         currentApp = w ? w.app_id : ""
+        lastWindows = msg.data
+        enforce(lastWindows)
         revision++
     }
 
@@ -150,6 +181,7 @@ Singleton {
         running: true
         onTriggered: {
             root.credit()
+            root.enforce(root.lastWindows)
             root.flush()
             root.revision++
         }
