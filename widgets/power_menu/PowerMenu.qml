@@ -1,17 +1,39 @@
 import Quickshell
 import Quickshell.Wayland
-import Quickshell.Hyprland
 import Quickshell.Io
 import QtQuick
-import QtQuick.Layouts
 import "../../services"
+import "../notch"
 
+// Power menu. A row of glyph buttons that morphs out of the bar pill like the
+// other panels. Toggled by `qs ipc call powermenu toggle`.
 PanelWindow {
     id: root
 
-    property var screen
+    screen: PillState.originScreen
+    visible: false
 
-    // ── Keyboard selection state ─────────────────────────────────────────────
+    // full screen, so a click anywhere outside the notch can close the menu
+    anchors {
+        top: true
+        bottom: true
+        left: true
+        right: true
+    }
+    color: "transparent"
+    exclusionMode: ExclusionMode.Ignore
+    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.keyboardFocus: root.visible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.namespace: "qs-powermenu-noanim"
+
+    // 3 × 36 buttons, 2 gaps of 6, 12 side margins; 10 top and bottom
+    readonly property int panelW: 144
+    readonly property int panelH: 56
+
+    // 0 = the bar pill, 1 = the full menu
+    property real t: 0
+
+    // ── Selection state ──────────────────────────────────────────────────────
     property int selectedIndex: 0
     readonly property int buttonCount: 3
 
@@ -23,51 +45,66 @@ PanelWindow {
         }
     }
 
-    // Reset selection / grab focus on visibility change
+    IpcHandler {
+        target: "powermenu"
+        function toggle(): void { PowerMenuState.toggle() }
+    }
+
+    // ── Open / close ─────────────────────────────────────────────────────────
+    function openMenu() {
+        PillState.owner = "powermenu"
+        visible = true
+        morph.stop()
+        morph.from = root.t
+        morph.to = 1
+        morph.start()
+    }
+
+    function closeMenu() {
+        selectedIndex = 0
+        morph.stop()
+        morph.from = root.t
+        morph.to = 0
+        morph.start()
+    }
+
+    NumberAnimation {
+        id: morph
+        target: root
+        property: "t"
+        duration: 480
+        easing.type: Easing.InOutCubic
+        onFinished: {
+            if (root.t < 0.5) {
+                root.visible = false
+                if (PillState.owner === "powermenu")
+                    PillState.owner = ""
+            }
+        }
+    }
+
     Connections {
         target: PowerMenuState
         function onPowerVisibleChanged() {
             if (PowerMenuState.powerVisible)
-                powerCard.forceActiveFocus()
+                root.openMenu()
             else
-                root.selectedIndex = 0
+                root.closeMenu()
         }
     }
 
-    IpcHandler {
-        target: "powermenu"
-        function toggle() {
-            PowerMenuState.toggle();
+    // another panel took the pill, so the menu gives way
+    Connections {
+        target: PillState
+        function onOwnerChanged() {
+            if (PillState.owner !== "powermenu" && root.visible)
+                PowerMenuState.hide()
         }
     }
 
-    // ── Layer / geometry ─────────────────────────────────────────────────────
-    anchors {
-    	top: true
-    	bottom: true
-    	left: true
-    	right: true
-    }
-
-    mask: Region {
-	item: PowerMenuState.powerVisible ? maskCover : null
-    }
-
-    Item {
-	id: maskCover
-	anchors.fill: parent
-    }
-
-    color: "transparent"
-    exclusionMode: ExclusionMode.Ignore
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: PowerMenuState.powerVisible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
-    WlrLayershell.namespace: "qs-powermenu-noanim"
-
-    // ── Slide offset ─────────────────────────────────────────────────────────
-    property real slideOffset: PowerMenuState.powerVisible ? 0 : powerCard.width + 8
-    Behavior on slideOffset {
-        NumberAnimation { duration: 500; easing.type: Easing.OutCubic }
+    onVisibleChanged: {
+        if (visible)
+            keyHost.forceActiveFocus()
     }
 
     // ── Process runners ──────────────────────────────────────────────────────
@@ -85,173 +122,125 @@ PanelWindow {
     }
 
     function runAndClose(proc) {
-        PowerMenuState.hide();
-        proc.running = true;
+        PowerMenuState.hide()
+        proc.running = true
     }
 
+    // a click outside the notch closes the menu
     MouseArea {
-	anchors.fill: parent
-	enabled: PowerMenuState.powerVisible
-	onClicked: PowerMenuState.hide()
+        anchors.fill: parent
+        onClicked: PowerMenuState.hide()
     }
 
-    // ── Menu card ────────────────────────────────────────────────────────────
+    Notch {
+        id: outline
+        bodyWidth: card.width
+        bodyHeight: card.height
+        x: card.x - bodyX
+        y: card.y
+    }
+
     Rectangle {
-        id: powerCard
+        id: card
 
-        focus: true
+        readonly property real fromW: PillState.pillWidth
+        readonly property real fromH: PillState.pillHeight
 
-        // ── Key handling ──
-        Keys.onPressed: function(event) {
-            if (!PowerMenuState.powerVisible) return;
-            if (event.key === Qt.Key_Up) {
-                root.selectedIndex = (root.selectedIndex - 1 + root.buttonCount) % root.buttonCount;
-                event.accepted = true;
-            } else if (event.key === Qt.Key_Down) {
-                root.selectedIndex = (root.selectedIndex + 1) % root.buttonCount;
-                event.accepted = true;
-            } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                if (root.selectedIndex >= 0) root.activateSelected();
-                event.accepted = true;
-            }
-        }
-        Keys.onEscapePressed: PowerMenuState.hide()
+        width: fromW + (root.panelW - fromW) * root.t
+        height: fromH + (root.panelH - fromH) * root.t
+        x: (root.width - width) / 2
+        y: PillState.pillTop
+        color: "transparent"
+        clip: true
 
-        anchors.verticalCenter: parent.verticalCenter
+        // clicks on the notch stay on the notch, not the catcher behind it
+        MouseArea { anchors.fill: parent }
 
-        x: -root.slideOffset
-
-        width: 200
-        height: menuCol.implicitHeight + 32
-
-        topLeftRadius: 0
-        bottomLeftRadius: 0
-        topRightRadius: 18
-        bottomRightRadius: 18
-
-        color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, 1.0) 
-
-        // Border overlay
-        Rectangle {
+        Item {
+            id: keyHost
             anchors.fill: parent
-            z: 1
-            color: "transparent"
-            topLeftRadius: 0
-            bottomLeftRadius: 0
-            topRightRadius: parent.topRightRadius
-            bottomRightRadius: parent.bottomRightRadius
-            border.color: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.08)
-            border.width: 1
-        }
+            focus: true
 
-        // Eat clicks so background doesn't dismiss on card clicks
-        MouseArea {
-            anchors.fill: parent
-            onClicked: {}
-        }
-
-        ColumnLayout {
-            id: menuCol
-            anchors {
-                top: parent.top
-                left: parent.left
-                right: parent.right
-                margins: 16
-                topMargin: 16
+            Keys.onPressed: function (event) {
+                if (event.key === Qt.Key_Left) {
+                    root.selectedIndex = (root.selectedIndex - 1 + root.buttonCount) % root.buttonCount
+                    event.accepted = true
+                } else if (event.key === Qt.Key_Right) {
+                    root.selectedIndex = (root.selectedIndex + 1) % root.buttonCount
+                    event.accepted = true
+                } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                    root.activateSelected()
+                    event.accepted = true
+                }
             }
+            Keys.onEscapePressed: PowerMenuState.hide()
+        }
+
+        // content fades in during the second half of the morph
+        Row {
+            anchors.centerIn: parent
             spacing: 6
-
-            Text {
-                Layout.fillWidth: true
-                text: "POWER"
-                color: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.35)
-                font.pixelSize: 10
-                font.letterSpacing: 3
-                horizontalAlignment: Text.AlignHCenter
-            }
-
-            Item { Layout.preferredHeight: 4 }
+            opacity: Math.max(0, (root.t - 0.5) * 2)
 
             PowerButton {
                 label: "Suspend"
                 icon: "󰒲"
-                hoverColor: Theme.primary
                 selected: root.selectedIndex === 0
                 onActivated: root.runAndClose(procSuspend)
             }
             PowerButton {
                 label: "Reboot"
                 icon: "󰜉"
-                hoverColor: Theme.primary
                 selected: root.selectedIndex === 1
                 onActivated: root.runAndClose(procReboot)
             }
             PowerButton {
                 label: "Shutdown"
                 icon: "󰐥"
-                hoverColor: Theme.primary
                 selected: root.selectedIndex === 2
                 onActivated: root.runAndClose(procShutdown)
             }
-
-            Item { Layout.preferredHeight: 2 }
         }
     }
 
-    // ── Inner component: one menu row ────────────────────────────────────────
+    // ── Inner component: one glyph button ────────────────────────────────────
     component PowerButton: Rectangle {
         id: btn
         required property string label
         required property string icon
-        required property color hoverColor
         property bool selected: false
         signal activated
 
-        Layout.fillWidth: true
-        height: 44
+        width: 36
+        height: 36
         radius: 10
 
         color: (ma.containsMouse || selected)
-               ? Qt.rgba(hoverColor.r, hoverColor.g, hoverColor.b, 0.15)
+               ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.15)
                : "transparent"
-
         Behavior on color { ColorAnimation { duration: 140 } }
 
-        Rectangle {
-            anchors {
-                left: parent.left
-                verticalCenter: parent.verticalCenter
-            }
-            width: (ma.containsMouse || btn.selected) ? 3 : 0
-            height: 22
-            radius: 2
-            color: btn.hoverColor
-            Behavior on width {
-                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
-            }
+        Accessible.role: Accessible.Button
+        Accessible.name: btn.label
+
+        Text {
+            anchors.centerIn: parent
+            text: btn.icon
+            color: Theme.primary
+            font.pixelSize: 18
         }
 
-        Row {
-            anchors {
-                left: parent.left
-                verticalCenter: parent.verticalCenter
-                leftMargin: 14
-            }
-            spacing: 12
-
-            Text {
-                text: btn.icon
-                color: Theme.primary
-                font.pixelSize: 18
-                verticalAlignment: Text.AlignVCenter
-                anchors.verticalCenter: parent.verticalCenter
-            }
-            Text {
-                text: btn.label
-                color: Theme.primary
-                font.pixelSize: 14
-                font.weight: Font.Medium
-                anchors.verticalCenter: parent.verticalCenter
+        // short underline under the selected or hovered glyph
+        Rectangle {
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 3
+            width: (ma.containsMouse || btn.selected) ? 16 : 0
+            height: 2
+            radius: 1
+            color: Theme.primary
+            Behavior on width {
+                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
             }
         }
 

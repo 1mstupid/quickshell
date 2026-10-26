@@ -24,6 +24,8 @@ ShellRoot {
 
     AppLauncher {}
 
+    PowerMenu {}
+
     Clipboard {}
 
     Menu {}
@@ -43,13 +45,6 @@ ShellRoot {
         model: Quickshell.screens
 
         ScreenBorder {}
-    }
-    Variants {
-        model: Quickshell.screens
-        PowerMenu {
-            property var modelData
-            screen: modelData
-        }
     }
 
     property var notifications: Notifications.notifications

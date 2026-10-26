@@ -34,7 +34,7 @@ Singleton {
     readonly property color cyan: secondary
     readonly property color magenta: secondary
 
-    readonly property string fontFamily: "Maple Mono NL NF"
+    readonly property string fontFamily: "Berkeley Mono"
     readonly property string fontFamilyAlt: "UAV OSD Sans Mono"
     readonly property real autoScale: {
         const s = Quickshell.screens.length > 0 ? Quickshell.screens[0] : null

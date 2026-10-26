@@ -57,7 +57,7 @@ Singleton {
     function setNightLight(on) {
         nightLight = on
         Quickshell.execDetached(["sh", "-c", on
-            ? "command -v wlsunset >/dev/null && (wlsunset -t 4500 -T 6500 >/dev/null 2>&1 &) || notify-send -a quickshell 'Night light' 'Install wlsunset: sudo apt install wlsunset'"
+            ? "command -v wlsunset >/dev/null && (wlsunset -t 4500 -T 6500 >/dev/null 2>&1 &)"
             : "pkill -x wlsunset"])
     }
 
