@@ -38,8 +38,8 @@ PanelWindow {
     // one row slot is a row plus the gap under it
     readonly property int itemH: 38
     readonly property int panelW: 380
-    // 12 top + 38 search + 10 gap + 12 bottom, plus the rows
-    readonly property int chromeH: 72
+    // 12 top + 34 search + 8 gap + 12 bottom, plus the rows
+    readonly property int chromeH: 66
     readonly property int maxPanelH: chromeH + maxVisible * itemH
 
     // 0 = the bar pill, 1 = the full panel
@@ -179,15 +179,13 @@ PanelWindow {
                 right: parent.right
                 rightMargin: 12
             }
-            spacing: 10
+            spacing: 8
             opacity: Math.max(0, (root.t - 0.5) * 2)
 
-            // ── Search box, with the match count on the right ──────────────
-            Rectangle {
+            // ── Search line, with the match count on the right ─────────────
+            Item {
                 width: parent.width
-                height: 38
-                radius: 10
-                color: Qt.alpha(Theme.fg, 0.07)
+                height: 34
 
                 Text {
                     anchors.left: parent.left
@@ -278,21 +276,36 @@ PanelWindow {
                     width: listView.width
                     height: root.itemH - 4
                     radius: 8
-                    color: root.selectedIndex === index ? root.accentFill : "transparent"
+                    color: root.selectedIndex === index ? Qt.alpha(Theme.fg, 0.12) : "transparent"
 
                     Text {
+                        id: preview
                         anchors.left: parent.left
-                        anchors.right: parent.right
+                        anchors.right: hint.left
                         anchors.leftMargin: 12
-                        anchors.rightMargin: 12
+                        anchors.rightMargin: 8
                         anchors.verticalCenter: parent.verticalCenter
                         text: row.modelData.preview
                         elide: Text.ElideRight
                         color: Theme.fg
                         // unselected entries are faded so the highlighted one reads first
-                        opacity: root.selectedIndex === index ? 1 : 0.4
+                        opacity: root.selectedIndex === index ? 1 : 0.5
                         Behavior on opacity { NumberAnimation { duration: 120 } }
                         font.family: Theme.fontFamily
+                        font.pixelSize: 12
+                    }
+
+                    // return hint on the selected row
+                    Text {
+                        id: hint
+                        anchors.right: parent.right
+                        anchors.rightMargin: 12
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "↵"
+                        visible: root.selectedIndex === index
+                        color: Theme.fg
+                        opacity: 0.5
+                        font.family: Theme.fontFamilyAlt
                         font.pixelSize: 12
                     }
 
