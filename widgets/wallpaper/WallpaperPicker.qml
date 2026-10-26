@@ -29,11 +29,17 @@ PanelWindow {
     WlrLayershell.keyboardFocus: root.visible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     WlrLayershell.namespace: "quickshell-wallpapers"
 
-    // the band the pill grows into, and the size of the centre card inside it
+    // the panel, and the layout inside it: pad, header, gap, carousel, gap, name, pad
     property int bandWidth: 900
-    property int bandHeight: 220
-    property int cardWidth: 360
-    property int cardHeight: 200
+    property int bandHeight: 260
+    property int pad: 14
+    property int headerH: 22
+    property int carouselH: 170
+    property int cardWidth: 300
+    property int cardHeight: 170
+    property int nameH: 18
+
+    readonly property string dirPath: Quickshell.env("HOME") + "/.local/share/wallpapers"
 
     // carousel spacing: gap between neighbouring cards, and how fast they shrink
     property real gap: 24
@@ -66,6 +72,11 @@ PanelWindow {
         for (let j = 0; j < whole; j++)
             total += pitch(j)
         return Math.sign(u) * (total + (a - whole) * pitch(whole))
+    }
+
+    // "/x/y/name.png" -> "name"
+    function nameOf(path) {
+        return path.split("/").pop().replace(/\.[^.]+$/, "")
     }
 
     onVisibleChanged: {
@@ -148,7 +159,7 @@ PanelWindow {
     Process {
         id: lister
         command: ["sh", "-c",
-            "find -L \"" + Theme.configDir + "/../.local/share/wallpapers\" -maxdepth 1 -type f " +
+            "find -L \"" + root.dirPath + "\" -maxdepth 1 -type f " +
             "\\( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' \\) | sort"]
         stdout: SplitParser {
             onRead: line => { if (line.trim() !== "") root._found.push(line.trim()) }
@@ -158,6 +169,7 @@ PanelWindow {
                 root._found = []
             } else {
                 root.wallpapers = root._found
+                root.currentIndex = Math.min(root.currentIndex, Math.max(0, root.wallpapers.length - 1))
                 if (root.randomPending) {
                     root.randomPending = false
                     if (root.wallpapers.length > 0)
@@ -204,7 +216,7 @@ PanelWindow {
         y: card.y
     }
 
-    // the card gives the carousel its geometry; the notch above is what's drawn
+    // the card gives the layout its geometry; the notch above is what's drawn
     Rectangle {
         id: card
 
@@ -221,6 +233,185 @@ PanelWindow {
     // only the band takes clicks; everything around it passes through
     mask: Region { item: outline }
 
+    // header: folder path on the left, refresh and shuffle on the right.
+    // Fades in during the second half of the morph, like the carousel.
+    Item {
+        id: header
+        x: card.x + root.pad
+        y: card.y + root.pad
+        width: Math.max(0, card.width - 2 * root.pad)
+        height: root.headerH
+        opacity: Math.max(0, (root.t - 0.5) * 2)
+
+        Text {
+            anchors.left: parent.left
+            anchors.right: actions.left
+            anchors.rightMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+            text: root.dirPath
+            elide: Text.ElideLeft
+            color: Qt.alpha(Theme.fg, 0.5)
+            font.family: Theme.fontFamilyAlt
+            font.pixelSize: 11
+        }
+
+        Row {
+            id: actions
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 14
+
+            Text {
+                text: "󰑐"
+                color: refreshMa.containsMouse ? Theme.accent : Qt.alpha(Theme.fg, 0.6)
+                font.family: Theme.fontFamily
+                font.pixelSize: 16
+                Behavior on color { ColorAnimation { duration: 120 } }
+
+                MouseArea {
+                    id: refreshMa
+                    anchors.fill: parent
+                    anchors.margins: -6
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: lister.running = true
+                }
+            }
+            Text {
+                text: "󰒝"
+                color: shuffleMa.containsMouse ? Theme.accent : Qt.alpha(Theme.fg, 0.6)
+                font.family: Theme.fontFamily
+                font.pixelSize: 16
+                Behavior on color { ColorAnimation { duration: 120 } }
+
+                MouseArea {
+                    id: shuffleMa
+                    anchors.fill: parent
+                    anchors.margins: -6
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.applyRandom()
+                }
+            }
+        }
+    }
+
+    // carousel: cards are placed from their scaled widths, so neighbours
+    // take only the space they show. Fades in during the second half of the morph.
+    Item {
+        id: carousel
+        x: card.x + root.pad
+        y: card.y + root.pad + root.headerH + 12
+        width: Math.max(0, card.width - 2 * root.pad)
+        height: root.carouselH
+        clip: true
+        opacity: Math.max(0, (root.t - 0.5) * 2)
+
+        // animated centre position, so moving between cards glides
+        property real pos: root.currentIndex
+        Behavior on pos {
+            NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+        }
+
+        Repeater {
+            model: root.wallpapers
+
+            Item {
+                id: cell
+                required property int index
+                required property string modelData
+
+                // slots from the centre; fractional while the carousel is moving
+                readonly property real d: cell.index - carousel.pos
+                readonly property bool busy: root.applyingPath === modelData
+                readonly property bool current: root.currentIndex === cell.index
+
+                width: root.cardWidth
+                height: root.cardHeight
+                x: carousel.width / 2 - width / 2 + root.offsetFor(d)
+                y: (carousel.height - height) / 2
+                scale: root.scaleAt(d)
+                opacity: Math.abs(d) > 3 ? 0 : Math.max(0.35, 1 - 0.25 * Math.abs(d))
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: 10
+                    color: Qt.alpha(Theme.fg, 0.06)
+
+                    // hidden rounded shape, used only to mask the thumbnail
+                    Item {
+                        id: thumbMask
+                        anchors.fill: parent
+                        visible: false
+                        layer.enabled: true
+
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: 10
+                            color: "white"
+                        }
+                    }
+
+                    Image {
+                        anchors.fill: parent
+                        source: "file://" + cell.modelData
+                        sourceSize.width: root.cardWidth * 2
+                        fillMode: Image.PreserveAspectCrop
+                        asynchronous: true
+                        layer.enabled: true
+                        layer.effect: MultiEffect {
+                            maskEnabled: true
+                            maskSource: thumbMask
+                        }
+                    }
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 10
+                        color: "transparent"
+                        border.width: cell.busy ? 3 : cell.current ? 1 : 0
+                        border.color: cell.busy ? Theme.accent : Qt.alpha(Theme.fg, 0.5)
+
+                        SequentialAnimation on opacity {
+                            running: cell.busy
+                            loops: Animation.Infinite
+                            alwaysRunToEnd: true
+                            NumberAnimation { to: 0.4; duration: 120 }
+                            NumberAnimation { to: 1.0; duration: 120 }
+                        }
+                    }
+
+                    MouseArea {
+                        id: mouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onClicked: {
+                            root.currentIndex = cell.index
+                            root.apply(cell.modelData)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // name of the centred wallpaper, under the carousel
+    Text {
+        x: card.x + root.pad
+        y: carousel.y + root.carouselH + 10
+        width: Math.max(0, card.width - 2 * root.pad)
+        height: root.nameH
+        horizontalAlignment: Text.AlignHCenter
+        elide: Text.ElideRight
+        text: root.wallpapers.length > 0 ? root.nameOf(root.wallpapers[root.currentIndex]) : ""
+        color: Qt.alpha(Theme.fg, 0.7)
+        font.family: Theme.fontFamilyAlt
+        font.pixelSize: 12
+        opacity: Math.max(0, (root.t - 0.5) * 2)
+    }
+
+    // Palette math lives in services/WallpaperPalette.js. This widget samples
+    // the image, applies the result, and closes the picker.
     Canvas {
         id: canvas
         x: 0
@@ -252,108 +443,6 @@ PanelWindow {
         }
     }
 
-    // carousel: cards are placed from their scaled widths, so neighbours
-    // take only the space they show. Fades in during the second half of the morph.
-    Item {
-        id: carousel
-        x: card.x + 8
-        y: card.y + 8
-        width: card.width - 16
-        height: card.height - 16
-        clip: true
-        opacity: Math.max(0, (root.t - 0.5) * 2)
-
-        // animated centre position, so moving between cards glides
-        property real pos: root.currentIndex
-        Behavior on pos {
-            NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
-        }
-
-        Repeater {
-            model: root.wallpapers
-
-            Item {
-                id: cell
-                required property int index
-                required property string modelData
-
-                // slots from the centre; fractional while the carousel is moving
-                readonly property real d: cell.index - carousel.pos
-                readonly property bool busy: root.applyingPath === modelData
-
-                width: root.cardWidth
-                height: root.cardHeight
-                x: carousel.width / 2 - width / 2 + root.offsetFor(d)
-                y: (carousel.height - height) / 2
-                scale: root.scaleAt(d)
-                opacity: Math.abs(d) > 3 ? 0 : Math.max(0.4, 1 - 0.2 * Math.abs(d))
-
-                Rectangle {
-                    anchors.fill: parent
-                    radius: 12
-                    color: Qt.alpha(Theme.fg, 0.06)
-
-                    // hidden rounded shape, used only to mask the thumbnail
-                    Item {
-                        id: thumbMask
-                        anchors.fill: parent
-                        anchors.margins: 2
-                        visible: false
-                        layer.enabled: true
-
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: 10
-                            color: "white"
-                        }
-                    }
-
-                    Image {
-                        anchors.fill: parent
-                        anchors.margins: 2
-                        source: "file://" + cell.modelData
-                        sourceSize.width: root.cardWidth * 2
-                        fillMode: Image.PreserveAspectCrop
-                        asynchronous: true
-                        layer.enabled: true
-                        layer.effect: MultiEffect {
-                            maskEnabled: true
-                            maskSource: thumbMask
-                        }
-                    }
-
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: 12
-                        color: "transparent"
-                        border.width: cell.busy ? 3 : (mouse.containsMouse || root.currentIndex === cell.index) ? 2 : 0
-                        border.color: cell.busy ? Theme.accent : Qt.alpha(Theme.accent, 0.8)
-
-                        SequentialAnimation on opacity {
-                            running: cell.busy
-                            loops: Animation.Infinite
-                            alwaysRunToEnd: true
-                            NumberAnimation { to: 0.4; duration: 120 }
-                            NumberAnimation { to: 1.0; duration: 120 }
-                        }
-                    }
-
-                    MouseArea {
-                        id: mouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        onClicked: {
-                            root.currentIndex = cell.index
-                            root.apply(cell.modelData)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Palette math lives in services/WallpaperPalette.js. This widget samples
-    // the image, applies the result, and closes the picker.
     function finish(d) {
         const result = Palette.derive(d)
         if (!result)
