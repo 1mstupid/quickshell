@@ -284,12 +284,14 @@ PanelWindow {
                     radius: 8
                     color: Theme.bg
 
-                    // selection highlight, a separate layer so the row base stays solid
+                    // selection border, a separate layer so the row base stays solid
                     Rectangle {
                         anchors.fill: parent
                         radius: 8
                         visible: root.selectedIndex === index
-                        color: Qt.alpha(Theme.fg, 0.2)
+                        color: "transparent"
+                        border.color: Theme.fg
+                        border.width: 1
                     }
 
                     Text {
