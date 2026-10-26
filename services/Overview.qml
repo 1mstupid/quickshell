@@ -12,7 +12,7 @@ Singleton {
 
     Process {
         id: sub
-        command: ["umbriel", "subscribe", "overview"]
+        command: ["/nix/store/yj9f18sd6gj5qyv1q2zwgc97iiab94pf-umbriel-0.1.0/bin/umbriel", "subscribe", "overview"]
         running: true
         stdout: SplitParser {
             onRead: line => {

@@ -119,7 +119,7 @@ Singleton {
 
     Process {
         id: sub
-        command: ["umbriel", "subscribe", "windows"]
+        command: ["/nix/store/yj9f18sd6gj5qyv1q2zwgc97iiab94pf-umbriel-0.1.0/bin/umbriel", "subscribe", "windows"]
         running: true
         stdout: SplitParser {
             onRead: line => root.onWindows(line)
