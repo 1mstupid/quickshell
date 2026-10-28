@@ -139,7 +139,8 @@ PanelWindow {
                         const x = inset, y = inset
                         const w = width - 2 * inset, h = height - 2 * inset
                         ctx.beginPath()
-                        ctx.moveTo(x + r, y)
+                        // the outline starts at the top centre and runs clockwise
+                        ctx.moveTo(x + w / 2, y)
                         ctx.lineTo(x + w - r, y)
                         ctx.arcTo(x + w, y, x + w, y + r, r)
                         ctx.lineTo(x + w, y + h - r)
@@ -148,6 +149,7 @@ PanelWindow {
                         ctx.arcTo(x, y + h, x, y + h - r, r)
                         ctx.lineTo(x, y + r)
                         ctx.arcTo(x, y, x + r, y, r)
+                        ctx.lineTo(x + w / 2, y)
                         ctx.closePath()
                         // one dash as long as the perimeter fraction left, then a gap
                         const per = 2 * (w + h) - 8 * r + 2 * Math.PI * r
