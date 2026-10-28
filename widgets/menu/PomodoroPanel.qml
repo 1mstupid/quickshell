@@ -2,21 +2,45 @@ import QtQuick
 import "../../services"
 import "../../services/menu"
 
-// Pomodoro tab, as today's focus log: the day's focus time, then a grid with
-// one row per hour and one cell per 5 minutes (darker = more focus). Pomodoro
-// work time counts as focus even when no window has focus. The timer runs in
-// a compact strip at the bottom. The switch shows or hides the focus widget.
+// Pomodoro tab, in two views. Day: the day's focus time and a grid with one row
+// per hour and one cell per 5 minutes (darker = more focus). Week: the last
+// seven days as rows, each with its focus time and finished work sessions.
+// Pomodoro work time counts as focus even when no window has focus. The timer
+// runs in a compact strip at the bottom. The switch shows or hides the focus
+// widget.
 Item {
     id: panel
 
     // the Loader in the menu sizes this panel
     anchors.fill: parent
 
+    // false: the day grid; true: the seven-day list
+    property bool weekView: false
+
     // work sessions finished today, and the dots they fill: four per cycle
     readonly property int pomos: AppUsage.pomodoros(AppUsage.dayKey(), AppUsage.revision)
     readonly property int setFilled: Pomodoro.phase === "long" ? 4 : pomos % 4
     readonly property var slots: AppUsage.focusSlots(AppUsage.dayKey(), AppUsage.revision)
     readonly property real totalSec: AppUsage.focusTotal(AppUsage.dayKey(), AppUsage.revision)
+
+    // the last seven days, oldest first, ending today; share is the bar length
+    readonly property var weekDays: {
+        const now = new Date()
+        const out = []
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i)
+            const key = Qt.formatDate(d, "yyyy-MM-dd")
+            out.push({
+                label: Qt.formatDate(d, "ddd"),
+                sec: AppUsage.focusTotal(key, AppUsage.revision),
+                pomos: AppUsage.pomodoros(key, AppUsage.revision)
+            })
+        }
+        const peak = Math.max(1, ...out.map(d => d.sec))
+        out.forEach(d => d.share = d.sec / peak)
+        return out
+    }
+    readonly property real weekSec: weekDays.reduce((s, d) => s + d.sec, 0)
 
     function fmt(secs) {
         const m = Math.floor(secs / 60)
@@ -38,7 +62,9 @@ Item {
         Text {
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
-            text: "focus  " + AppUsage.fmtHms(panel.totalSec)
+            text: panel.weekView
+                ? "week  " + AppUsage.fmtHms(panel.weekSec)
+                : "focus  " + AppUsage.fmtHms(panel.totalSec)
             color: Theme.fg
             font.family: Theme.fontFamilyAlt
             font.pixelSize: 13
@@ -46,17 +72,48 @@ Item {
         }
 
         WidgetSwitch {
+            id: desktopSwitch
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             label: "desktop"
             checked: AppUsage.focusWidgetShown
             onToggled: AppUsage.toggleFocusWidget()
         }
+
+        // day | week, the selected view in the accent colour
+        Row {
+            anchors.right: desktopSwitch.left
+            anchors.rightMargin: 14
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 10
+
+            Repeater {
+                model: ["day", "week"]
+
+                Text {
+                    required property string modelData
+                    readonly property bool selected: (panel.weekView ? "week" : "day") === modelData
+                    text: modelData
+                    color: selected ? Theme.accent : Qt.alpha(Theme.fg, 0.5)
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 11
+                    Behavior on color { ColorAnimation { duration: 120 } }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        anchors.margins: -4
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: panel.weekView = modelData === "week"
+                    }
+                }
+            }
+        }
     }
 
-    // 24 hour rows of twelve 5-minute cells; the label marks every sixth hour
+    // day view: 24 hour rows of twelve 5-minute cells; the label marks every sixth hour
     Column {
         id: grid
+        visible: !panel.weekView
         anchors.top: header.bottom
         anchors.topMargin: 10
         anchors.left: parent.left
@@ -104,7 +161,75 @@ Item {
         }
     }
 
-    // the pomodoro: readout, play or pause, stop, and duration while idle
+    // week view: one row per day, oldest first; the bar is that day's focus against the busiest day
+    Column {
+        id: weekList
+        visible: panel.weekView
+        anchors.top: header.bottom
+        anchors.topMargin: 10
+        anchors.left: parent.left
+        anchors.leftMargin: 12
+        width: parent.width - 24
+        spacing: 4
+
+        Repeater {
+            model: panel.weekDays
+
+            Row {
+                id: dayRow
+                required property var modelData
+                width: weekList.width
+                height: 12
+                spacing: 8
+
+                Text {
+                    width: 24
+                    height: parent.height
+                    verticalAlignment: Text.AlignVCenter
+                    text: dayRow.modelData.label
+                    color: Qt.alpha(Theme.fg, 0.6)
+                    font.family: Theme.fontFamilyAlt
+                    font.pixelSize: 11
+                }
+                Rectangle {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: parent.width - 24 - 44 - 34 - 3 * parent.spacing
+                    height: 4
+                    radius: 2
+                    color: Qt.alpha(Theme.fg, 0.07)
+
+                    Rectangle {
+                        width: parent.width * dayRow.modelData.share
+                        height: parent.height
+                        radius: parent.radius
+                        color: Theme.accent
+                    }
+                }
+                Text {
+                    width: 44
+                    height: parent.height
+                    horizontalAlignment: Text.AlignRight
+                    verticalAlignment: Text.AlignVCenter
+                    text: AppUsage.fmt(dayRow.modelData.sec)
+                    color: Theme.fg
+                    font.family: Theme.fontFamilyAlt
+                    font.pixelSize: 11
+                }
+                Text {
+                    width: 34
+                    height: parent.height
+                    horizontalAlignment: Text.AlignRight
+                    verticalAlignment: Text.AlignVCenter
+                    text: dayRow.modelData.pomos > 0 ? dayRow.modelData.pomos + "×" : ""
+                    color: Theme.accent
+                    font.family: Theme.fontFamilyAlt
+                    font.pixelSize: 11
+                }
+            }
+        }
+    }
+
+    // the pomodoro: readout, play or pause, stop, the phase, and the cycle dots
     Row {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
