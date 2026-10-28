@@ -6,9 +6,9 @@ import "../../services/menu"
 import "../notch"
 
 // The menu. It morphs out of the bar pill like the launcher, the wallpaper
-// picker and the media widget: a notch with a row of icon tabs on top and the
-// active tab's panel below. A click outside the notch closes it, and Escape
-// does too.
+// picker and the media widget: a notch with a row of group icons on top, a
+// row of page names under it for the chosen group, and the page below. A click
+// outside the notch closes it, and Escape does too.
 PanelWindow {
     id: root
 
@@ -29,6 +29,8 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell-menu"
 
     readonly property int barH: Theme.effectiveBarHeight
+    // the row of page names under the group icons
+    readonly property int subH: 22
     readonly property int targetW: MenuState.menuW
     readonly property int targetH: barH + MenuState.panelH
 
@@ -175,54 +177,96 @@ PanelWindow {
             }
         }
 
-        // the active tab's panel, below the tab row
-        Item {
-            x: 0
+        // the pages of the chosen group, under the group icons
+        Row {
+            id: pageRow
+            x: (parent.width - width) / 2
             y: root.barH
-            width: parent.width
-            height: parent.height - root.barH
+            height: root.subH
+            spacing: 14
             opacity: Math.max(0, (root.t - 0.5) * 2)
 
+            Repeater {
+                model: MenuState.tabs[MenuState.tab].pages
+
+                Text {
+                    id: pageLabel
+                    required property string modelData
+                    required property int index
+                    readonly property bool selected: MenuState.page[MenuState.tab] === index
+
+                    height: root.subH
+                    verticalAlignment: Text.AlignVCenter
+                    text: modelData
+                    color: selected ? Theme.accent : pageMouse.containsMouse ? Theme.fg : Qt.alpha(Theme.fg, 0.5)
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 11
+                    font.bold: selected
+                    Behavior on color { ColorAnimation { duration: 120 } }
+
+                    MouseArea {
+                        id: pageMouse
+                        anchors.fill: parent
+                        anchors.margins: -4
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: MenuState.selectPage(MenuState.tab, pageLabel.index)
+                    }
+                }
+            }
+        }
+
+        // the chosen page, below the group's page names
+        Item {
+            x: 0
+            y: root.barH + root.subH
+            width: parent.width
+            height: parent.height - root.barH - root.subH
+            opacity: Math.max(0, (root.t - 0.5) * 2)
+
+            // group 0: tasks
             Loader {
                 anchors.fill: parent
-                active: MenuState.tab === 0
+                active: MenuState.tab === 0 && MenuState.page[0] === 0
                 source: "TodoPanel.qml"
             }
 
             Loader {
                 anchors.fill: parent
-                active: MenuState.tab === 1
+                active: MenuState.tab === 0 && MenuState.page[0] === 1
                 source: "HabitsPanel.qml"
             }
 
+            // group 1: focus
             Loader {
                 anchors.fill: parent
-                active: MenuState.tab === 2
+                active: MenuState.tab === 1 && MenuState.page[1] === 0
                 source: "PomodoroPanel.qml"
             }
 
             Loader {
                 anchors.fill: parent
-                active: MenuState.tab === 3
+                active: MenuState.tab === 1 && MenuState.page[1] === 1
+                source: "UsagePanel.qml"
+            }
+
+            // group 2: network
+            Loader {
+                anchors.fill: parent
+                active: MenuState.tab === 2 && MenuState.page[2] === 0
                 source: "WifiPanel.qml"
             }
 
             Loader {
                 anchors.fill: parent
-                active: MenuState.tab === 4
+                active: MenuState.tab === 2 && MenuState.page[2] === 1
                 source: "BluetoothPanel.qml"
             }
 
             Loader {
                 anchors.fill: parent
-                active: MenuState.tab === 5
+                active: MenuState.tab === 2 && MenuState.page[2] === 2
                 source: "VpnPanel.qml"
-            }
-
-            Loader {
-                anchors.fill: parent
-                active: MenuState.tab === 6
-                source: "UsagePanel.qml"
             }
         }
     }
