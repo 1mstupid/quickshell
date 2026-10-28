@@ -111,7 +111,8 @@ Item {
         }
     }
 
-    // day view: 24 hour rows of twelve 5-minute cells; the label marks every sixth hour
+    // day view: 24 hour rows of six 10-minute cells; the label marks every sixth hour.
+    // A cell adds two of the 5-minute slots, and a full 10 minutes is the darkest.
     Column {
         id: grid
         visible: !panel.weekView
@@ -129,32 +130,33 @@ Item {
                 id: hourRow
                 required property int index
                 width: grid.width
-                height: 4
-                spacing: 1
+                height: 5
+                spacing: 4
 
                 Text {
-                    width: 16
+                    width: 20
                     height: parent.height
                     verticalAlignment: Text.AlignVCenter
                     text: hourRow.index % 6 === 0 ? String(hourRow.index).padStart(2, "0") : ""
                     color: Qt.alpha(Theme.fg, 0.4)
                     font.family: Theme.fontFamily
-                    font.pixelSize: 7
+                    font.pixelSize: 9
                 }
 
                 Repeater {
-                    model: 12
+                    model: 6
 
                     Rectangle {
                         required property int index
-                        readonly property real sec: panel.slots[hourRow.index * 12 + index] ?? 0
+                        readonly property real sec: (panel.slots[hourRow.index * 12 + index * 2] ?? 0)
+                            + (panel.slots[hourRow.index * 12 + index * 2 + 1] ?? 0)
 
-                        width: (hourRow.width - 16 - 12) / 12
+                        // the row's spacing is 4 between each of its seven items
+                        width: (hourRow.width - 20 - 6 * hourRow.spacing) / 6
                         height: hourRow.height
                         radius: 1
-                        // a full 5 minutes is the darkest cell
                         color: sec > 0
-                            ? Qt.alpha(Theme.accent, 0.3 + 0.7 * Math.min(sec / 300, 1))
+                            ? Qt.alpha(Theme.accent, 0.3 + 0.7 * Math.min(sec / 600, 1))
                             : Qt.alpha(Theme.fg, 0.07)
                     }
                 }
