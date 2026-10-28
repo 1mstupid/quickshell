@@ -153,7 +153,7 @@ PanelWindow {
                         readonly property real start: present ? root.startOf(index) : 0
                         readonly property real share: present ? root.shareOf(index) : 0
                         // 1 while this section is pulled out, 0 at rest
-                        readonly property real pull: root.hovered === index ? 1 : 0
+                        property real pull: root.hovered === index ? 1 : 0
 
                         Behavior on pull { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
