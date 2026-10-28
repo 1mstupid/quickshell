@@ -232,8 +232,19 @@ Singleton {
         onTriggered: sub.running = true
     }
 
-    // steady ticks keep time flowing while focus does not change; a tick
-    // also saves and refreshes the day, so the widget rolls over at midnight
+    // once a second, so the focus counter ticks live; credit() only adds time
+    // that has really passed, so a slow tick never over-counts
+    Timer {
+        interval: 1000
+        repeat: true
+        running: true
+        onTriggered: {
+            root.credit()
+            root.revision++
+        }
+    }
+
+    // every 30 s: enforce limits, save to disk, and roll the day over at midnight
     Timer {
         interval: 30000
         repeat: true
