@@ -91,7 +91,7 @@ Item {
                 id: amount
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-                text: AppUsage.fmt(row.modelData.sec) + (row.limit > 0 ? " / " + row.limit + "m" : "")
+                text: AppUsage.fmt(row.modelData.sec) + (row.limit > 0 ? " / " + AppUsage.fmt(row.limit * 60) : "")
                 color: row.limit > 0 && row.modelData.sec >= row.limit * 60
                     ? Theme.alert : Qt.alpha(Theme.fg, 0.5)
                 font.family: Theme.fontFamily
