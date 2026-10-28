@@ -115,6 +115,21 @@ Singleton {
         return Object.keys(f).reduce((s, k) => s + f[k], 0)
     }
 
+    // work sessions finished on a day
+    function pomodoros(key, rev) {
+        const r = days[key]
+        return r ? (r.pomodoros ?? 0) : 0
+    }
+
+    function addPomodoro() {
+        const key = dayKey()
+        if (!days[key])
+            days[key] = { seconds: {}, alerted: [], blocked: [], focus: {} }
+        days[key].pomodoros = (days[key].pomodoros ?? 0) + 1
+        dirty = true
+        revision++
+    }
+
     // one row per app for a day, most used first
     function totals(key, rev) {
         const r = days[key]
