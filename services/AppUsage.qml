@@ -83,10 +83,10 @@ Singleton {
 
     function dayKey() { return Qt.formatDate(new Date(), "yyyy-MM-dd") }
 
+    // H:MM for every usage total and limit, e.g. 0:05, 1:20, 12:00
     function fmt(sec) {
         const m = Math.floor(sec / 60)
-        const h = Math.floor(m / 60)
-        return h > 0 ? h + "h " + (m % 60) + "m" : m + "m"
+        return Math.floor(m / 60) + ":" + String(m % 60).padStart(2, "0")
     }
 
     // h:mm:ss, as the Pomodoro page shows the day's focus time
