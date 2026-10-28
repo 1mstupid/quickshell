@@ -53,8 +53,30 @@ PanelWindow {
     // hidden while the overview is open, or when switched off
     visible: AppUsage.widgetShown && !Overview.open && allRows.length > 0
 
-    function sweepOf(i) {
+    // 0 → 1 while the ring grows out of its track; 1 once it has settled
+    property real grow: 1
+
+    // the app names in order; the ring only animates when this changes,
+    // not on every tick of the numbers
+    readonly property string segKey: segs.map(s => s.name).join("|")
+
+    NumberAnimation {
+        id: growAnim
+        target: root
+        property: "grow"
+        from: 0
+        to: 1
+        duration: 700
+        easing.type: Easing.OutCubic
+    }
+
+    // a segment's share of the full circle, before the grow animation
+    function shareOf(i) {
         return segs[i].sec / Math.max(totalSec, 1) * 2 * Math.PI
+    }
+
+    function sweepOf(i) {
+        return shareOf(i) * grow
     }
 
     function colorOf(i) {
@@ -76,13 +98,17 @@ PanelWindow {
             t += 2 * Math.PI
         let acc = 0
         for (let i = 0; i < segs.length; i++) {
-            acc += sweepOf(i)
+            acc += shareOf(i)
             if (t <= acc)
                 return i
         }
         return segs.length - 1
     }
 
+    // grow again when the ring appears, or when the set of apps changes
+    onVisibleChanged: if (visible) growAnim.restart()
+    onSegKeyChanged: growAnim.restart()
+    onGrowChanged: ring.requestPaint()
     onSegsChanged: ring.requestPaint()
     onHoveredChanged: ring.requestPaint()
 
@@ -135,7 +161,9 @@ PanelWindow {
                             const sweep = root.sweepOf(i)
                             ctx.beginPath()
                             ctx.arc(cx, cy, root.ringR, a, a + sweep)
-                            ctx.lineWidth = i === root.hovered ? root.ringLw + 4 : root.ringLw
+                            // arcs thicken as they grow out of the track
+                            const base = i === root.hovered ? root.ringLw + 4 : root.ringLw
+                            ctx.lineWidth = base * (0.4 + 0.6 * root.grow)
                             ctx.strokeStyle = String(root.colorOf(i))
                             ctx.stroke()
                             a += sweep
