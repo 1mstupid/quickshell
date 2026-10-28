@@ -21,7 +21,7 @@ Singleton {
 
     // the menu's size; its height is the bar's height plus the panel
     readonly property int menuW: 380
-    readonly property int panelH: 220
+    readonly property int panelH: 230
 
     property bool open: false
     property int tab: 0
