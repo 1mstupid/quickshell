@@ -5,8 +5,9 @@ import Quickshell.Io
 
 // App focus time, from `umbriel subscribe windows`. The window with
 // active: true holds keyboard focus, and its elapsed time goes to its app_id.
-// Focus time is any time a window has focus or a pomodoro runs; it is also
-// kept in 5-minute slots for the Pomodoro page. Totals per day live in
+// Focus time is time a listed app (focus-apps.json) has focus, or any time a
+// pomodoro runs; it is kept in 5-minute slots for the focus widget and the
+// Pomodoro page. Totals per day live in
 // app-usage.json; limits in app-limits, one "app_id minutes" line each. A limit
 // notifies at 80% and at 100%, once each.
 Singleton {
@@ -22,6 +23,8 @@ Singleton {
     property var days: ({})
     // { "helium": 60 } in minutes
     property var limits: ({})
+    // app ids whose focus time counts toward the focus widget; a pomodoro always counts
+    property var focusApps: []
     // bumped whenever the numbers change, so bindings re-read them
     property int revision: 0
 
@@ -101,9 +104,10 @@ Singleton {
     }
 
     // seconds of focus per slot for a day, keyed by slot index
+    // a fresh copy each time, so bindings see a change when revision bumps
     function focusSlots(key, rev) {
         const r = days[key]
-        return (r && r.focus) ? r.focus : {}
+        return (r && r.focus) ? Object.assign({}, r.focus) : {}
     }
 
     function focusTotal(key, rev) {
@@ -148,6 +152,7 @@ Singleton {
         lastMs = now
         if (!ready || dt <= 0 || dt > maxGapMs)
             return
+        const focused = focusApps.indexOf(currentApp) >= 0
         if (currentApp === "" && !Pomodoro.running)
             return
         const key = dayKey()
@@ -155,8 +160,10 @@ Singleton {
             days[key] = { seconds: {}, alerted: [], blocked: [], focus: {} }
         const rec = days[key]
         rec.focus = rec.focus ?? {}
-        const slot = slotOf(now)
-        rec.focus[slot] = (rec.focus[slot] ?? 0) + dt / 1000
+        if (focused || Pomodoro.running) {
+            const slot = slotOf(now)
+            rec.focus[slot] = (rec.focus[slot] ?? 0) + dt / 1000
+        }
         if (currentApp !== "") {
             rec.seconds[currentApp] = (rec.seconds[currentApp] ?? 0) + dt / 1000
             check(key, currentApp)
@@ -225,8 +232,19 @@ Singleton {
         onTriggered: sub.running = true
     }
 
-    // steady ticks keep time flowing while focus does not change; a tick
-    // also saves and refreshes the day, so the widget rolls over at midnight
+    // once a second, so the focus counter ticks live; credit() only adds time
+    // that has really passed, so a slow tick never over-counts
+    Timer {
+        interval: 1000
+        repeat: true
+        running: true
+        onTriggered: {
+            root.credit()
+            root.revision++
+        }
+    }
+
+    // every 30 s: enforce limits, save to disk, and roll the day over at midnight
     Timer {
         interval: 30000
         repeat: true
@@ -266,5 +284,22 @@ Singleton {
         onFileChanged: reload()
         onLoaded: root.parseLimits(text())
         onLoadFailed: root.limits = {}
+    }
+
+    // a JSON array of app ids, e.g. ["helium", "code"]; a bad file counts as empty
+    FileView {
+        path: root.dir + "/focus-apps.json"
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: {
+            let a = []
+            try {
+                a = JSON.parse(text())
+            } catch (e) {
+                a = []
+            }
+            root.focusApps = Array.isArray(a) ? a : []
+        }
+        onLoadFailed: root.focusApps = []
     }
 }
