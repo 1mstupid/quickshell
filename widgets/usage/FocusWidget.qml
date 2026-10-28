@@ -3,9 +3,10 @@ import Quickshell
 import Quickshell.Wayland
 import "../../services"
 
-// Today's focus time on the wallpaper layer, bottom-left, so it sits beside the
-// app widget. Drawn as the bar pill's card: the total and one bar per hour,
-// full at an hour of focus. Hidden while the overview is open. Clicks pass through.
+// Today's focus time on the wallpaper layer, bottom-left, beside the usage ring.
+// Drawn as the same card: the live total, and the study cycle below it, four
+// dots that fill as work sessions finish, with the phase the timer is on.
+// Hidden while the overview is open. Clicks pass through.
 PanelWindow {
     id: root
 
@@ -27,19 +28,15 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell-focus"
     mask: Region {}
 
-    // passing AppUsage.revision makes this re-evaluate when the numbers change
-    readonly property var slots: AppUsage.focusSlots(AppUsage.dayKey(), AppUsage.revision)
+    // passing AppUsage.revision makes these re-evaluate when the numbers change
     readonly property real totalSec: AppUsage.focusTotal(AppUsage.dayKey(), AppUsage.revision)
+    readonly property int pomos: AppUsage.pomodoros(AppUsage.dayKey(), AppUsage.revision)
+    // four dots per cycle; the set shows full through the long break
+    readonly property int setFilled: Pomodoro.phase === "long" ? 4 : pomos % 4
+    readonly property string phaseLabel: Pomodoro.phase === "work" ? "work"
+        : Pomodoro.phase === "short" ? "short break" : "long break"
 
-    // focus seconds in one hour, from its twelve 5-minute slots
-    function hourSec(h) {
-        let s = 0
-        for (let i = 0; i < 12; i++)
-            s += root.slots[h * 12 + i] ?? 0
-        return s
-    }
-
-    visible: AppUsage.focusWidgetShown && !Overview.open && totalSec > 0
+    visible: AppUsage.focusWidgetShown && !Overview.open
 
     Rectangle {
         id: card
@@ -61,6 +58,7 @@ PanelWindow {
             anchors.margins: card.pad
             spacing: 10
 
+            // the live total
             Row {
                 spacing: 8
 
@@ -80,34 +78,38 @@ PanelWindow {
                 }
             }
 
-            // one bar per hour, midnight on the left
+            // the cycle: dots on the left, the phase on the right
             Item {
-                id: strip
                 width: col.width
-                height: 40
+                height: 12
 
-                Rectangle {
+                Row {
+                    id: dots
                     anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.bottom: parent.bottom
-                    height: 1
-                    color: Qt.alpha(Theme.fg, 0.15)
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 6
+
+                    Repeater {
+                        model: 4
+
+                        Rectangle {
+                            required property int index
+                            width: 8
+                            height: 8
+                            radius: 4
+                            color: index < root.setFilled ? Theme.accent : Qt.alpha(Theme.fg, 0.15)
+                            Behavior on color { ColorAnimation { duration: 150 } }
+                        }
+                    }
                 }
 
-                Repeater {
-                    model: 24
-
-                    Rectangle {
-                        required property int index
-                        readonly property real sec: root.hourSec(index)
-
-                        x: index * (width + 2)
-                        width: (strip.width - 23 * 2) / 24
-                        height: 40 * Math.min(sec / 3600, 1)
-                        anchors.bottom: parent.bottom
-                        radius: 1
-                        color: Theme.accent
-                    }
+                Text {
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root.phaseLabel
+                    color: Qt.alpha(Theme.fg, 0.6)
+                    font.family: Theme.fontFamilyAlt
+                    font.pixelSize: 11
                 }
             }
         }
