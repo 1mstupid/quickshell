@@ -120,7 +120,7 @@ Item {
         anchors.left: parent.left
         anchors.leftMargin: 12
         width: parent.width - 24
-        spacing: 1
+        spacing: 0
 
         Repeater {
             model: 24

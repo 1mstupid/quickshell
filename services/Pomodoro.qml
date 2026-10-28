@@ -9,10 +9,10 @@ import Quickshell.Io
 // Durations come from ~/.local/xdg/config/pomodoro-config ("work", "short" and
 // "long" lines, in minutes).
 //
-// The state file holds "endMs minutes remaining phase", so a running or paused
+// The state file holds "endMs minutes remaining phase override", so a running or paused
 // timer survives bar restarts; the file is watched so `echo` edits take effect.
 // Idle = end 0 and remaining 0; paused = end 0 and remaining > 0. The minutes
-// field is kept for older state files and is not read back.
+// field is informational and not read back; override is the hand-set length (0 = config).
 Singleton {
     id: root
 
@@ -28,8 +28,11 @@ Singleton {
 
     // "work", "short" or "long": the session the timer is on, running or idle
     property string phase: "work"
-    readonly property int minutes: phase === "work" ? workMin
+    // minutes set by hand for the idle session; 0 uses the config value
+    property int override: 0
+    readonly property int configured: phase === "work" ? workMin
         : phase === "short" ? shortMin : longMin
+    readonly property int minutes: override > 0 ? override : configured
     readonly property int total: minutes * 60
     property double endMs: 0     // set while running
     property int remaining: 0    // seconds left while running or paused
@@ -42,8 +45,16 @@ Singleton {
 
     function persist() {
         Quickshell.execDetached(["sh", "-c",
-            "printf '%s %s %s %s\\n' " + Math.round(endMs) + " " + minutes + " " + remaining
-            + " " + phase + " > '" + stateFile + "'"])
+            "printf '%s %s %s %s %s\\n' " + Math.round(endMs) + " " + minutes + " " + remaining
+            + " " + phase + " " + override + " > '" + stateFile + "'"])
+    }
+
+    // steps the session length by hand, in 5-minute steps, while idle
+    function adjust(delta) {
+        if (active)
+            return
+        override = Math.max(1, Math.min(90, minutes + delta))
+        persist()
     }
 
     function begin(secs) {
@@ -96,6 +107,8 @@ Singleton {
         endMs = 0
         remaining = 0
         done = true
+        // a hand-set length is for one session only
+        override = 0
         if (finished === "work") {
             AppUsage.addPomodoro()
             const sets = AppUsage.pomodoros(AppUsage.dayKey(), AppUsage.revision)
@@ -150,6 +163,8 @@ Singleton {
         onLoaded: {
             const parts = text().trim().split(/\s+/)
             const end = parseFloat(parts[0]) || 0
+            const set = parseInt(parts[4]) || 0
+            root.override = set >= 1 && set <= 90 ? set : 0
             const left = parseInt(parts[2]) || 0
             if (["work", "short", "long"].indexOf(parts[3]) >= 0)
                 root.phase = parts[3]
