@@ -12,7 +12,9 @@ Item {
     // the Loader in the menu sizes this panel
     anchors.fill: parent
 
-    readonly property int step: 5
+    // work sessions finished today, and the dots they fill: four per cycle
+    readonly property int pomos: AppUsage.pomodoros(AppUsage.dayKey(), AppUsage.revision)
+    readonly property int setFilled: Pomodoro.phase === "long" ? 4 : pomos % 4
     readonly property var slots: AppUsage.focusSlots(AppUsage.dayKey(), AppUsage.revision)
     readonly property real totalSec: AppUsage.focusTotal(AppUsage.dayKey(), AppUsage.revision)
 
@@ -168,56 +170,34 @@ Item {
             }
         }
 
-        Text {
-            id: minus
-            readonly property bool allowed: !Pomodoro.active && Pomodoro.minutes > 1
-            height: parent.height
-            verticalAlignment: Text.AlignVCenter
-            text: "−"
-            color: !allowed ? Qt.alpha(Theme.fg, 0.2)
-                 : minusMouse.containsMouse ? Theme.accent : Theme.fg
-            font.family: Theme.fontFamilyAlt
-            font.pixelSize: 16
-            Behavior on color { ColorAnimation { duration: 120 } }
-
-            MouseArea {
-                id: minusMouse
-                anchors.fill: parent
-                anchors.margins: -6
-                hoverEnabled: true
-                cursorShape: minus.allowed ? Qt.PointingHandCursor : Qt.ArrowCursor
-                onClicked: if (minus.allowed) Pomodoro.setMinutes(Pomodoro.minutes - panel.step)
-            }
-        }
-
+        // which session the timer is on; the durations come from the config file
         Text {
             height: parent.height
             verticalAlignment: Text.AlignVCenter
-            text: Pomodoro.minutes + " min"
+            text: Pomodoro.phase === "work" ? "work"
+                : Pomodoro.phase === "short" ? "short break" : "long break"
             color: Qt.alpha(Theme.fg, 0.6)
             font.family: Theme.fontFamilyAlt
             font.pixelSize: 11
         }
 
-        Text {
-            id: plus
-            readonly property bool allowed: !Pomodoro.active && Pomodoro.minutes < 90
-            height: parent.height
-            verticalAlignment: Text.AlignVCenter
-            text: "+"
-            color: !allowed ? Qt.alpha(Theme.fg, 0.2)
-                 : plusMouse.containsMouse ? Theme.accent : Theme.fg
-            font.family: Theme.fontFamilyAlt
-            font.pixelSize: 16
-            Behavior on color { ColorAnimation { duration: 120 } }
+        // one dot per work session in the current cycle of four; the set
+        // shows full through the long break and empties when work resumes
+        Row {
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 4
 
-            MouseArea {
-                id: plusMouse
-                anchors.fill: parent
-                anchors.margins: -6
-                hoverEnabled: true
-                cursorShape: plus.allowed ? Qt.PointingHandCursor : Qt.ArrowCursor
-                onClicked: if (plus.allowed) Pomodoro.setMinutes(Pomodoro.minutes + panel.step)
+            Repeater {
+                model: 4
+
+                Rectangle {
+                    required property int index
+                    width: 6
+                    height: 6
+                    radius: 3
+                    color: index < panel.setFilled ? Theme.accent : Qt.alpha(Theme.fg, 0.15)
+                    Behavior on color { ColorAnimation { duration: 150 } }
+                }
             }
         }
     }

@@ -3,17 +3,33 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Pomodoro timer. The state file holds "endMs minutes remaining", so a running
-// or paused timer survives bar restarts; the file is watched so `echo` edits
-// take effect. Idle = end 0 and remaining 0; paused = end 0 and remaining > 0.
+// Pomodoro timer with study cycles. A cycle is four work sessions: after each
+// of the first three comes a short break, after the fourth a long break. Work
+// sessions are counted per day in AppUsage, which also drives the dots.
+// Durations come from ~/.local/xdg/config/pomodoro-config ("work", "short" and
+// "long" lines, in minutes).
+//
+// The state file holds "endMs minutes remaining phase", so a running or paused
+// timer survives bar restarts; the file is watched so `echo` edits take effect.
+// Idle = end 0 and remaining 0; paused = end 0 and remaining > 0. The minutes
+// field is kept for older state files and is not read back.
 Singleton {
     id: root
 
     readonly property string stateFile: Quickshell.env("HOME") + "/.local/xdg/config/pomodoro"
+    readonly property string configFile: Quickshell.env("HOME") + "/.local/xdg/config/pomodoro-config"
     readonly property string alarmSound: Quickshell.env("HOME")
         + "/.local/state/home-manager/gcroots/current-home/home-path/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga"
 
-    property int minutes: 25
+    // durations in minutes, from the config file; these defaults are the standard 30-5-15
+    property int workMin: 30
+    property int shortMin: 5
+    property int longMin: 15
+
+    // "work", "short" or "long": the session the timer is on, running or idle
+    property string phase: "work"
+    readonly property int minutes: phase === "work" ? workMin
+        : phase === "short" ? shortMin : longMin
     readonly property int total: minutes * 60
     property double endMs: 0     // set while running
     property int remaining: 0    // seconds left while running or paused
@@ -26,8 +42,8 @@ Singleton {
 
     function persist() {
         Quickshell.execDetached(["sh", "-c",
-            "printf '%s %s %s\\n' " + Math.round(endMs) + " " + minutes + " " + remaining +
-            " > '" + stateFile + "'"])
+            "printf '%s %s %s %s\\n' " + Math.round(endMs) + " " + minutes + " " + remaining
+            + " " + phase + " > '" + stateFile + "'"])
     }
 
     function begin(secs) {
@@ -40,14 +56,6 @@ Singleton {
     function start() {
         if (!active)
             begin(total)
-    }
-
-    // the duration only changes while idle, so a running timer keeps its end time
-    function setMinutes(m) {
-        if (active)
-            return
-        minutes = Math.max(1, Math.min(90, m))
-        persist()
     }
 
     function pause() {
@@ -63,6 +71,7 @@ Singleton {
             begin(remaining)
     }
 
+    // ends the current session without counting it; the phase stays
     function stop() {
         endMs = 0
         remaining = 0
@@ -80,15 +89,27 @@ Singleton {
             start()
     }
 
+    // a finished work session counts and leads to a break; a finished break
+    // leads back to work. The next session waits for the user to start it.
     function finish() {
+        const finished = phase
         endMs = 0
         remaining = 0
         done = true
+        if (finished === "work") {
+            AppUsage.addPomodoro()
+            const sets = AppUsage.pomodoros(AppUsage.dayKey(), AppUsage.revision)
+            phase = sets % 4 === 0 ? "long" : "short"
+        } else {
+            phase = "work"
+        }
         persist()
         doneTimer.restart()
         Quickshell.execDetached(["paplay", "--volume=40000", alarmSound])
-        Quickshell.execDetached(["notify-send", "-u", "critical",
-            "Pomodoro", "Time's up — take a break"])
+        Quickshell.execDetached(["notify-send", "-u", "critical", "Pomodoro",
+            finished === "work"
+                ? "Session done, take a " + (phase === "long" ? "long" : "short") + " break"
+                : "Break over, back to work"])
     }
 
     // the finished state lingers briefly, then hides
@@ -98,6 +119,30 @@ Singleton {
         onTriggered: root.done = false
     }
 
+    // reads the durations; any line that is missing or not a sane number keeps its default
+    function parseConfig(t) {
+        const v = { work: 30, short: 5, long: 15 }
+        for (const line of t.split("\n")) {
+            const p = line.trim().split(/\s+/)
+            if (p.length < 2 || !(p[0] in v))
+                continue
+            const n = parseInt(p[1])
+            if (n >= 1 && n <= 180)
+                v[p[0]] = n
+        }
+        workMin = v.work
+        shortMin = v.short
+        longMin = v.long
+    }
+
+    FileView {
+        path: root.configFile
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: root.parseConfig(text())
+        onLoadFailed: root.parseConfig("")
+    }
+
     FileView {
         path: root.stateFile
         watchChanges: true
@@ -105,10 +150,9 @@ Singleton {
         onLoaded: {
             const parts = text().trim().split(/\s+/)
             const end = parseFloat(parts[0]) || 0
-            const mins = parseInt(parts[1]) || 0
             const left = parseInt(parts[2]) || 0
-            if (mins >= 1 && mins <= 90)
-                root.minutes = mins
+            if (["work", "short", "long"].indexOf(parts[3]) >= 0)
+                root.phase = parts[3]
             if (end > Date.now()) {
                 root.endMs = end
                 root.remaining = Math.round((end - Date.now()) / 1000)
