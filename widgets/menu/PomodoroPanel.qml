@@ -166,8 +166,9 @@ Item {
     Column {
         id: weekList
         visible: panel.weekView
-        anchors.top: header.bottom
-        anchors.topMargin: 10
+        // centred in the space between the header and the timer strip
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.verticalCenterOffset: -4
         anchors.left: parent.left
         anchors.leftMargin: 12
         width: parent.width - 24
