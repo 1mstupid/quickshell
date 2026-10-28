@@ -185,7 +185,7 @@ Item {
                 spacing: 8
 
                 Text {
-                    width: 24
+                    width: 22
                     height: parent.height
                     verticalAlignment: Text.AlignVCenter
                     text: dayRow.modelData.label
@@ -195,7 +195,7 @@ Item {
                 }
                 Rectangle {
                     anchors.verticalCenter: parent.verticalCenter
-                    width: parent.width - 24 - 44 - 34 - 3 * parent.spacing
+                    width: parent.width - 22 - 40 - 22 - 3 * parent.spacing
                     height: 4
                     radius: 2
                     color: Qt.alpha(Theme.fg, 0.07)
@@ -208,7 +208,7 @@ Item {
                     }
                 }
                 Text {
-                    width: 44
+                    width: 40
                     height: parent.height
                     horizontalAlignment: Text.AlignRight
                     verticalAlignment: Text.AlignVCenter
@@ -218,7 +218,7 @@ Item {
                     font.pixelSize: 11
                 }
                 Text {
-                    width: 34
+                    width: 22
                     height: parent.height
                     horizontalAlignment: Text.AlignRight
                     verticalAlignment: Text.AlignVCenter
