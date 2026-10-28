@@ -346,8 +346,9 @@ PanelWindow {
                 Column {
                     anchors.left: art.right
                     anchors.leftMargin: 12
-                    anchors.right: parent.right
-                    anchors.rightMargin: 0
+                    // stop short of the lyrics pill so titles never run under it
+                    anchors.right: lyricsPill.left
+                    anchors.rightMargin: 8
                     anchors.verticalCenter: art.verticalCenter
                     spacing: 3
 
