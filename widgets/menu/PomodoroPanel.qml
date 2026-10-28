@@ -3,8 +3,8 @@ import "../../services"
 import "../../services/menu"
 
 // Pomodoro tab, in two views. Day: the day's focus time and a grid with one row
-// per hour and one cell per 5 minutes (darker = more focus). Week: the last
-// seven days as rows, each with its focus time and finished work sessions.
+// per hour and one cell per 5 minutes (darker = more focus). Week: the current
+// week, Sunday to Saturday, as rows, each with its focus time and finished work sessions.
 // Pomodoro work time counts as focus even when no window has focus. The timer
 // runs in a compact strip at the bottom. The switch shows or hides the focus
 // widget.
@@ -14,7 +14,7 @@ Item {
     // the Loader in the menu sizes this panel
     anchors.fill: parent
 
-    // false: the day grid; true: the seven-day list
+    // false: the day grid; true: the week list
     property bool weekView: false
 
     // work sessions finished today, and the dots they fill: four per cycle
@@ -23,12 +23,13 @@ Item {
     readonly property var slots: AppUsage.focusSlots(AppUsage.dayKey(), AppUsage.revision)
     readonly property real totalSec: AppUsage.focusTotal(AppUsage.dayKey(), AppUsage.revision)
 
-    // the last seven days, oldest first, ending today; share is the bar length
+    // the current week, Sunday to Saturday; days after today have no focus yet
     readonly property var weekDays: {
         const now = new Date()
+        const sunday = now.getDate() - now.getDay()
         const out = []
-        for (let i = 6; i >= 0; i--) {
-            const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i)
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(now.getFullYear(), now.getMonth(), sunday + i)
             const key = Qt.formatDate(d, "yyyy-MM-dd")
             out.push({
                 label: Qt.formatDate(d, "ddd"),
@@ -161,7 +162,7 @@ Item {
         }
     }
 
-    // week view: one row per day, oldest first; the bar is that day's focus against the busiest day
+    // week view: one row per day, Sunday first; the bar is that day's focus against the busiest day
     Column {
         id: weekList
         visible: panel.weekView
