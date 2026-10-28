@@ -5,8 +5,9 @@ import "../../services"
 
 // Today's app time on the wallpaper layer: above the wallpaper, below every
 // window. A ring shows each app's share of today's total, with the four most
-// used apps and "other" for the rest. Hovering an arc or a legend row
-// highlights both and shows that share in the centre.
+// used apps and "other" for the rest. Hovering a section, or its legend row,
+// pulls that section out of the ring and thickens it, and shows its share in
+// the centre.
 PanelWindow {
     id: root
 
@@ -34,7 +35,7 @@ PanelWindow {
     readonly property var allRows: AppUsage.totals(AppUsage.dayKey(), AppUsage.revision)
     readonly property real totalSec: allRows.reduce((s, r) => s + r.sec, 0)
 
-    // the ring's segments: top four apps, then "other" for the rest
+    // the ring's sections: top four apps, then "other" for the rest
     readonly property var segs: {
         const out = allRows.slice(0, 4).map(r => ({ name: r.app, sec: r.sec }))
         const rest = allRows.slice(4).reduce((s, r) => s + r.sec, 0)
@@ -43,40 +44,30 @@ PanelWindow {
         return out
     }
 
-    readonly property int ringSize: 150
+    readonly property int ringSize: 160
     readonly property int ringLw: 12
-    readonly property real ringR: ringSize / 2 - ringLw / 2 - 2
+    // room is left outside the track for a pulled-out section
+    readonly property real ringR: 66
+    readonly property real pullDist: 4
+    readonly property real pullLw: 5
 
-    // index of the hovered segment, or -1
+    // index of the hovered section, or -1
     property int hovered: -1
 
     // hidden while the overview is open, or when switched off
     visible: AppUsage.widgetShown && !Overview.open && allRows.length > 0
 
-    // 0 → 1 while the ring grows out of its track; 1 once it has settled
-    property real grow: 1
-
-    // the app names in order; the ring only animates when this changes,
-    // not on every tick of the numbers
-    readonly property string segKey: segs.map(s => s.name).join("|")
-
-    NumberAnimation {
-        id: growAnim
-        target: root
-        property: "grow"
-        from: 0
-        to: 1
-        duration: 700
-        easing.type: Easing.OutCubic
-    }
-
-    // a segment's share of the full circle, before the grow animation
+    // a section's share of the full circle
     function shareOf(i) {
         return segs[i].sec / Math.max(totalSec, 1) * 2 * Math.PI
     }
 
-    function sweepOf(i) {
-        return shareOf(i) * grow
+    // where a section starts: 12 o'clock, then each section after the last
+    function startOf(i) {
+        let a = -Math.PI / 2
+        for (let j = 0; j < i; j++)
+            a += shareOf(j)
+        return a
     }
 
     function colorOf(i) {
@@ -85,12 +76,12 @@ PanelWindow {
         return Qt.alpha(Theme.accent, Math.max(0.35, 1 - i * 0.2))
     }
 
-    // the segment under a point in the ring box, or -1 off the arc
+    // the section under a point in the ring box, or -1 off the ring
     function arcAt(x, y) {
-        const dx = x - ring.width / 2
-        const dy = y - ring.height / 2
+        const dx = x - ringBox.width / 2
+        const dy = y - ringBox.height / 2
         const d = Math.sqrt(dx * dx + dy * dy)
-        if (Math.abs(d - ringR) > ringLw / 2 + 3)
+        if (Math.abs(d - ringR) > ringLw / 2 + pullDist + pullLw)
             return -1
         // angles start at 12 o'clock and run clockwise, as the canvas draws them
         let t = Math.atan2(dy, dx) + Math.PI / 2
@@ -104,13 +95,6 @@ PanelWindow {
         }
         return segs.length - 1
     }
-
-    // grow again when the ring appears, or when the set of apps changes
-    onVisibleChanged: if (visible) growAnim.restart()
-    onSegKeyChanged: growAnim.restart()
-    onGrowChanged: ring.requestPaint()
-    onSegsChanged: ring.requestPaint()
-    onHoveredChanged: ring.requestPaint()
 
     Rectangle {
         id: card
@@ -134,11 +118,13 @@ PanelWindow {
 
             // the ring, with the centre label: the total, or the hovered share
             Item {
+                id: ringBox
                 width: col.width
                 height: root.ringSize
 
+                // the empty track
                 Canvas {
-                    id: ring
+                    id: track
                     anchors.centerIn: parent
                     width: root.ringSize
                     height: root.ringSize
@@ -146,45 +132,73 @@ PanelWindow {
                     onPaint: {
                         const ctx = getContext("2d")
                         ctx.reset()
-                        const cx = width / 2
-                        const cy = height / 2
-                        ctx.lineCap = "butt"
-
                         ctx.beginPath()
-                        ctx.arc(cx, cy, root.ringR, 0, 2 * Math.PI)
+                        ctx.arc(width / 2, height / 2, root.ringR, 0, 2 * Math.PI)
                         ctx.lineWidth = root.ringLw
                         ctx.strokeStyle = String(Qt.alpha(Theme.fg, 0.08))
                         ctx.stroke()
+                    }
+                }
 
-                        let a = -Math.PI / 2
-                        for (let i = 0; i < root.segs.length; i++) {
-                            const sweep = root.sweepOf(i)
+                // one canvas per section. The slots are fixed, so a tick that
+                // changes the numbers updates them in place and keeps the hover.
+                Repeater {
+                    model: 5
+
+                    Canvas {
+                        id: arc
+                        required property int index
+
+                        readonly property bool present: index < root.segs.length
+                        readonly property real start: present ? root.startOf(index) : 0
+                        readonly property real share: present ? root.shareOf(index) : 0
+                        // 1 while this section is pulled out, 0 at rest
+                        readonly property real pull: root.hovered === index ? 1 : 0
+
+                        Behavior on pull { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+
+                        anchors.centerIn: parent
+                        width: root.ringSize
+                        height: root.ringSize
+                        visible: present
+
+                        onStartChanged: requestPaint()
+                        onShareChanged: requestPaint()
+                        onPullChanged: requestPaint()
+
+                        onPaint: {
+                            if (!present)
+                                return
+                            const ctx = getContext("2d")
+                            ctx.reset()
+                            ctx.lineCap = "butt"
                             ctx.beginPath()
-                            ctx.arc(cx, cy, root.ringR, a, a + sweep)
-                            // arcs thicken as they grow out of the track
-                            const base = i === root.hovered ? root.ringLw + 4 : root.ringLw
-                            ctx.lineWidth = base * (0.4 + 0.6 * root.grow)
-                            ctx.strokeStyle = String(root.colorOf(i))
+                            // pulled out: moved outward and thicker, not just recoloured
+                            ctx.arc(width / 2, height / 2, root.ringR + root.pullDist * pull,
+                                start, start + share)
+                            ctx.lineWidth = root.ringLw + root.pullLw * pull
+                            ctx.strokeStyle = String(root.colorOf(index))
                             ctx.stroke()
-                            a += sweep
                         }
                     }
                 }
 
                 Column {
-                    anchors.centerIn: ring
+                    anchors.centerIn: parent
                     spacing: 2
 
                     Text {
                         anchors.horizontalCenter: parent.horizontalCenter
-                        text: root.hovered >= 0 ? root.segs[root.hovered].name : "today"
+                        text: root.hovered >= 0 && root.hovered < root.segs.length
+                            ? root.segs[root.hovered].name : "today"
                         color: Qt.alpha(Theme.fg, 0.6)
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSize - 1
                     }
                     Text {
                         anchors.horizontalCenter: parent.horizontalCenter
-                        text: AppUsage.fmt(root.hovered >= 0 ? root.segs[root.hovered].sec : root.totalSec)
+                        text: AppUsage.fmt(root.hovered >= 0 && root.hovered < root.segs.length
+                            ? root.segs[root.hovered].sec : root.totalSec)
                         color: Theme.fg
                         font.family: Theme.fontFamilyAlt
                         font.pixelSize: Theme.fontSize + 5
@@ -193,70 +207,78 @@ PanelWindow {
                 }
 
                 MouseArea {
-                    anchors.fill: ring
+                    anchors.fill: parent
                     hoverEnabled: true
                     onPositionChanged: m => root.hovered = root.arcAt(m.x, m.y)
                     onExited: root.hovered = -1
                 }
             }
 
-            // legend: one row per segment, the same highlight as the arc
-            Repeater {
-                model: root.segs
+            // legend: one row per section, the same highlight as the ring
+            Column {
+                width: col.width
+                spacing: 4
 
-                Rectangle {
-                    id: legend
-                    required property var modelData
-                    required property int index
-                    readonly property bool hot: root.hovered === index
-                    readonly property int limit: AppUsage.limits[modelData.name] ?? 0
-                    readonly property bool over: limit > 0 && modelData.sec >= limit * 60
-
-                    width: col.width
-                    height: 24
-                    radius: 6
-                    color: hot ? Qt.alpha(Theme.fg, 0.08) : "transparent"
+                Repeater {
+                    model: 5
 
                     Rectangle {
-                        id: dot
-                        anchors.left: parent.left
-                        anchors.leftMargin: 6
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 8
-                        height: 8
-                        radius: 4
-                        color: root.colorOf(legend.index)
-                    }
-                    Text {
-                        id: name
-                        anchors.left: dot.right
-                        anchors.leftMargin: 8
-                        anchors.right: time.left
-                        anchors.rightMargin: 10
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: legend.modelData.name
-                        color: Theme.fg
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
-                        elide: Text.ElideRight
-                    }
-                    Text {
-                        id: time
-                        anchors.right: parent.right
-                        anchors.rightMargin: 6
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: AppUsage.fmt(legend.modelData.sec)
-                            + (legend.limit > 0 ? " / " + AppUsage.fmt(legend.limit * 60) : "")
-                        color: legend.over ? Theme.alert : Theme.fg
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
-                    }
+                        id: legend
+                        required property int index
 
-                    MouseArea {
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        onEntered: root.hovered = legend.index
-                        onExited: root.hovered = -1
+                        readonly property bool present: index < root.segs.length
+                        readonly property var seg: present ? root.segs[index] : ({ name: "", sec: 0 })
+                        readonly property int limit: AppUsage.limits[seg.name] ?? 0
+                        readonly property bool over: limit > 0 && seg.sec >= limit * 60
+                        readonly property bool hot: root.hovered === index
+
+                        visible: present
+                        width: col.width
+                        height: 24
+                        radius: 6
+                        color: hot ? Qt.alpha(Theme.fg, 0.08) : "transparent"
+
+                        Rectangle {
+                            id: dot
+                            anchors.left: parent.left
+                            anchors.leftMargin: 6
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 8
+                            height: 8
+                            radius: 4
+                            color: legend.present ? root.colorOf(legend.index) : "transparent"
+                        }
+                        Text {
+                            id: name
+                            anchors.left: dot.right
+                            anchors.leftMargin: 8
+                            anchors.right: time.left
+                            anchors.rightMargin: 10
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: legend.seg.name
+                            color: Theme.fg
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSize
+                            elide: Text.ElideRight
+                        }
+                        Text {
+                            id: time
+                            anchors.right: parent.right
+                            anchors.rightMargin: 6
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: AppUsage.fmt(legend.seg.sec)
+                                + (legend.limit > 0 ? " / " + AppUsage.fmt(legend.limit * 60) : "")
+                            color: legend.over ? Theme.alert : Theme.fg
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSize
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            onEntered: root.hovered = legend.index
+                            onExited: root.hovered = -1
+                        }
                     }
                 }
             }
