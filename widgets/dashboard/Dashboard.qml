@@ -49,6 +49,9 @@ PanelWindow {
     // 0 = the bar pill, 1 = the full dashboard
     property real t: 0
 
+    // the card's grey backdrop; text and dividers are tuned to sit on it
+    readonly property color surface: Qt.rgba(0.17, 0.18, 0.2, 0.96)
+
     // ── Mode and span ──────────────────────────────────────────────────────
     // "apps" shows time per app; "focus" shows focus time
     property string metric: "apps"
@@ -184,7 +187,7 @@ PanelWindow {
     // so 2 categories and 8 both use the full brightness range. "Other" is grey.
     function colorFor(c) {
         if (c === "Other")
-            return Qt.alpha(Theme.fg, 0.25)
+            return Qt.alpha(Theme.fg, 0.45)
         const named = categoryOrder.filter(x => x !== "Other")
         const n = named.length
         const i = Math.max(0, named.indexOf(c))
@@ -339,6 +342,7 @@ PanelWindow {
         bodyHeight: card.height
         x: card.x - bodyX
         y: card.y
+        fillColor: root.surface
     }
 
     Rectangle {
@@ -381,7 +385,7 @@ PanelWindow {
 
                     Text {
                         text: root.periodLabels[root.period]
-                        color: Qt.alpha(Theme.fg, 0.5)
+                        color: Qt.alpha(Theme.fg, 0.75)
                         font.family: Theme.fontFamilyAlt
                         font.pixelSize: 10
                         font.letterSpacing: 1
@@ -407,7 +411,7 @@ PanelWindow {
                             id: metricTab
                             required property var modelData
                             text: metricTab.modelData.name
-                            color: root.metric === metricTab.modelData.key ? Theme.accent : Qt.alpha(Theme.fg, 0.5)
+                            color: root.metric === metricTab.modelData.key ? Theme.accent : Qt.alpha(Theme.fg, 0.75)
                             font.family: Theme.fontFamily
                             font.pixelSize: 12
                             font.bold: root.metric === metricTab.modelData.key
@@ -437,7 +441,7 @@ PanelWindow {
                             id: periodTab
                             required property var modelData
                             text: periodTab.modelData.name
-                            color: root.period === periodTab.modelData.key ? Theme.accent : Qt.alpha(Theme.fg, 0.5)
+                            color: root.period === periodTab.modelData.key ? Theme.accent : Qt.alpha(Theme.fg, 0.75)
                             font.family: Theme.fontFamily
                             font.pixelSize: 12
                             font.bold: root.period === periodTab.modelData.key
@@ -495,7 +499,7 @@ PanelWindow {
                                         }
                                         Text {
                                             text: entry.modelData
-                                            color: Qt.alpha(Theme.fg, 0.6)
+                                            color: Qt.alpha(Theme.fg, 0.85)
                                             font.family: Theme.fontFamilyAlt
                                             font.pixelSize: 10
                                         }
@@ -549,7 +553,7 @@ PanelWindow {
                             width: root.slotW
                             horizontalAlignment: Text.AlignHCenter
                             text: root.labelFor(label.index)
-                            color: Qt.alpha(Theme.fg, 0.4)
+                            color: Qt.alpha(Theme.fg, 0.85)
                             font.family: Theme.fontFamilyAlt
                             font.pixelSize: 9
                         }
@@ -586,7 +590,7 @@ PanelWindow {
 
                     Text {
                         text: root.focusMode ? "FOCUS APPS" : "MOST USED"
-                        color: Qt.alpha(Theme.fg, 0.5)
+                        color: Qt.alpha(Theme.fg, 0.75)
                         font.family: Theme.fontFamilyAlt
                         font.pixelSize: 10
                         font.letterSpacing: 1
@@ -615,7 +619,7 @@ PanelWindow {
                                 id: time
                                 anchors.right: parent.right
                                 text: AppUsage.fmt(row.modelData.sec)
-                                color: Qt.alpha(Theme.fg, 0.5)
+                                color: Qt.alpha(Theme.fg, 0.75)
                                 font.family: Theme.fontFamilyAlt
                                 font.pixelSize: 11
                             }
@@ -650,7 +654,7 @@ PanelWindow {
 
                         Text {
                             text: stat.modelData.label
-                            color: Qt.alpha(Theme.fg, 0.5)
+                            color: Qt.alpha(Theme.fg, 0.75)
                             font.family: Theme.fontFamilyAlt
                             font.pixelSize: 9
                             font.letterSpacing: 1
