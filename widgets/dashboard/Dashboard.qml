@@ -4,7 +4,7 @@ import QtQuick
 import "../../services"
 import "../notch"
 
-// Usage dashboard: today, the last 7 days or the last 31 days. It shows time
+// Usage dashboard: today, this week (Sunday to Saturday) or this month. It shows time
 // per app, split by category. Today is charted by hour, the other spans by day,
 // and today has a strip of sessions under the chart. It morphs out of
 // the bar pill like the other panels, and `qs ipc call dashboard toggle` opens
@@ -56,18 +56,33 @@ PanelWindow {
     readonly property color surface: Qt.rgba(0.17, 0.18, 0.2, 0.96)
 
     // ── Span ───────────────────────────────────────────────────────────────
-    // "day" for today, "week" for the last 7 days, "month" for the last 31
+    // "day" for today, "week" for this calendar week, "month" for this calendar month
     property string period: "day"
-    readonly property var spanDays: ({ day: 1, week: 7, month: 31 })
-    readonly property var periodLabels: ({ day: "TODAY", week: "LAST 7 DAYS", month: "LAST 31 DAYS" })
+    readonly property var periodLabels: ({ day: "TODAY", week: "THIS WEEK", month: "THIS MONTH" })
     readonly property var periodTabs: [
         { key: "day", name: "Day" },
         { key: "week", name: "Week" },
         { key: "month", name: "Month" }
     ]
 
-    // the day keys in the span, oldest first, ending today
-    readonly property var spanKeys: AppUsage.dayKeys(spanDays[period], AppUsage.revision)
+    // the day keys in the span, oldest first. Today is the day key for the day
+    // span; the week runs Sunday to Saturday and the month runs from its first
+    // day to its last, so future days in either span are empty.
+    readonly property var spanKeys: {
+        AppUsage.revision
+        const now = new Date()
+        const y = now.getFullYear()
+        const m = now.getMonth()
+        const key = d => Qt.formatDate(d, "yyyy-MM-dd")
+        if (period === "day")
+            return [key(now)]
+        if (period === "week") {
+            const sunday = now.getDate() - now.getDay()
+            return [0, 1, 2, 3, 4, 5, 6].map(i => key(new Date(y, m, sunday + i)))
+        }
+        const count = new Date(y, m + 1, 0).getDate()
+        return Array.from({ length: count }, (_, i) => key(new Date(y, m, i + 1)))
+    }
     // one column per hour for today, otherwise one per day
     readonly property int columns: period === "day" ? 24 : spanKeys.length
     readonly property real slotW: chartW / columns
@@ -143,8 +158,10 @@ PanelWindow {
         return Object.keys(a).reduce((s, k) => s + a[k], 0)
     }
 
-    // the busiest column sets the scale, so a quiet span still fills the chart
+    // the busiest column sets the scale in the day view, so a quiet day still fills
+    // the chart. Week and month use a fixed 24 hours for a full bar.
     readonly property real peakSec: Math.max(60, ...Array.from({ length: columns }, (_, i) => columnTotal(i)))
+    readonly property real scaleSec: period === "day" ? peakSec : 86400
 
     // the named categories share an accent ramp spread across the whole range,
     // so 2 categories and 8 both use the full brightness range. "Other" is grey.
@@ -161,7 +178,7 @@ PanelWindow {
     // one column's bar, split by category from the bottom up. Each piece gets
     // its distance from the bottom and its height.
     function segmentsFor(i) {
-        const scale = chartH / peakSec
+        const scale = chartH / scaleSec
         const a = columnApps(i)
         const sums = {}
         for (const app of Object.keys(a)) {
@@ -194,7 +211,9 @@ PanelWindow {
             const p = k.split("-").map(Number)
             return Qt.formatDate(new Date(p[0], p[1] - 1, p[2]), "ddd")
         }
-        return i % 5 === 0 ? String(Number(k.slice(8))) : ""
+        // the first of the month, then every fifth day
+        const d = Number(k.slice(8))
+        return d === 1 || d % 5 === 0 ? String(d) : ""
     }
 
     // local midnight of today, in ms, for placing sessions on the strip
