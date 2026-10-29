@@ -237,16 +237,11 @@ PanelWindow {
                 source: "HabitsPanel.qml"
             }
 
-            // group 1: focus
+            // group 1: focus. The pomodoro timer is the focus widget and the
+            // bar ring; its history is on the usage dashboard.
             Loader {
                 anchors.fill: parent
                 active: MenuState.tab === 1 && MenuState.page[1] === 0
-                source: "PomodoroPanel.qml"
-            }
-
-            Loader {
-                anchors.fill: parent
-                active: MenuState.tab === 1 && MenuState.page[1] === 1
                 source: "UsagePanel.qml"
             }
 
