@@ -5,9 +5,10 @@ import "../../services"
 import "../notch"
 
 // Usage dashboard: focus time for today, the last 7 days or the last 31 days.
-// Today is charted by hour, the other spans by day, split by category. It
-// morphs out of the bar pill like the other panels, and
-// `qs ipc call dashboard toggle` opens it. Escape or a click outside closes it.
+// Today is charted by hour, the other spans by day, split by category. Today
+// also has a strip of focus sessions under the chart. It morphs out of the bar
+// pill like the other panels, and `qs ipc call dashboard toggle` opens it.
+// Escape or a click outside closes it.
 PanelWindow {
     id: root
 
@@ -28,12 +29,21 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell-dashboard"
 
     // ── Geometry ───────────────────────────────────────────────────────────
-    // 12 pad, 46 header, 14 gap, 160 body, 14 gap, 40 stats, 12 pad
+    // 12 pad, 46 header, 14 gap, body, 14 gap, 40 stats, 12 pad
     readonly property int panelW: 640
-    readonly property int panelH: 298
-    readonly property int bodyH: 160
+    readonly property int bodyH: 184
+    readonly property int panelH: bodyH + 138
     readonly property int chartW: 380
-    readonly property int chartH: 130
+
+    // the body's column, top to bottom: legend, gap, bars, labels, sessions strip.
+    // The legend wraps to as many rows as its categories need, and the bars
+    // give up the same height, so more categories never push into other elements.
+    readonly property int legendRowH: 24
+    readonly property int legendH: legendRows.length > 0 ? legendRows.length * legendRowH - 10 : 0
+    readonly property int barsTop: legendH + 8
+    readonly property int chartH: Math.max(60, bodyH - barsTop - 16 - 24)
+    readonly property int labelsTop: barsTop + chartH + 4
+    readonly property int stripTop: labelsTop + 18
 
     // 0 = the bar pill, 1 = the full dashboard
     property real t: 0
@@ -81,6 +91,27 @@ PanelWindow {
         return Object.keys(sums).sort((a, b) => sums[b] - sums[a])
     }
 
+    // the legend, split into rows. The widths are estimates from the name
+    // lengths, so the rows are a little generous rather than cramped.
+    readonly property var legendRows: {
+        const rows = []
+        let row = []
+        let w = 0
+        for (const c of categoryOrder) {
+            const cw = 14 + c.length * 7 + 12
+            if (w + cw > chartW && row.length > 0) {
+                rows.push(row)
+                row = []
+                w = 0
+            }
+            row.push(c)
+            w += cw
+        }
+        if (row.length > 0)
+            rows.push(row)
+        return rows
+    }
+
     // the apps behind one column: an hour of today, or a whole day
     function columnApps(i) {
         if (period === "day")
@@ -99,10 +130,16 @@ PanelWindow {
     // the busiest column sets the scale, so a quiet span still fills the chart
     readonly property real peakSec: Math.max(60, ...Array.from({ length: columns }, (_, i) => columnTotal(i)))
 
+    // the named categories share an accent ramp, spread across the whole range,
+    // so 2 categories and 8 both use the full brightness range. "Other" is grey.
     function colorFor(c) {
         if (c === "Other")
             return Qt.alpha(Theme.fg, 0.25)
-        return Qt.alpha(Theme.accent, Math.max(0.35, 1 - Math.max(0, categoryOrder.indexOf(c)) * 0.2))
+        const named = categoryOrder.filter(x => x !== "Other")
+        const n = named.length
+        const i = Math.max(0, named.indexOf(c))
+        const step = n > 1 ? 0.7 / (n - 1) : 0
+        return Qt.alpha(Theme.accent, 1 - i * step)
     }
 
     // one column's bar, split by category from the bottom up. Each piece gets
@@ -142,6 +179,12 @@ PanelWindow {
             return Qt.formatDate(new Date(p[0], p[1] - 1, p[2]), "ddd")
         }
         return i % 5 === 0 ? String(Number(k.slice(8))) : ""
+    }
+
+    // local midnight of today, in ms, for placing sessions on the strip
+    function dayStartMs() {
+        const n = new Date()
+        return new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime()
     }
 
     // ── Stats ──────────────────────────────────────────────────────────────
@@ -314,7 +357,7 @@ PanelWindow {
                 }
             }
 
-            // body: the chart with its legend, then the most used apps
+            // body: the chart column, then the most used apps
             Row {
                 spacing: 16
                 height: root.bodyH
@@ -323,8 +366,51 @@ PanelWindow {
                     width: root.chartW
                     height: root.bodyH
 
+                    // legend, wrapped to fit the chart's width
+                    Column {
+                        id: legend
+                        width: root.chartW
+                        height: root.legendH
+                        spacing: 10
+
+                        Repeater {
+                            model: root.legendRows
+
+                            Row {
+                                id: legendRow
+                                required property var modelData
+                                spacing: 12
+
+                                Repeater {
+                                    model: legendRow.modelData
+
+                                    Row {
+                                        id: entry
+                                        required property var modelData
+                                        spacing: 6
+
+                                        Rectangle {
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            width: 8
+                                            height: 8
+                                            radius: 4
+                                            color: root.colorFor(entry.modelData)
+                                        }
+                                        Text {
+                                            text: entry.modelData
+                                            color: Qt.alpha(Theme.fg, 0.6)
+                                            font.family: Theme.fontFamilyAlt
+                                            font.pixelSize: 10
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     Item {
                         id: bars
+                        y: root.barsTop
                         width: parent.width
                         height: root.chartH
 
@@ -362,7 +448,7 @@ PanelWindow {
                             id: label
                             required property int index
                             x: label.index * root.slotW
-                            y: bars.height + 4
+                            y: root.labelsTop
                             width: root.slotW
                             horizontalAlignment: Text.AlignHCenter
                             text: root.labelFor(label.index)
@@ -372,32 +458,28 @@ PanelWindow {
                         }
                     }
 
-                    // legend: one entry per category, in the same order as the bars
-                    Row {
-                        y: bars.height + 22
-                        spacing: 12
+                    // today's focus sessions along the day, coloured by category.
+                    // Only for Today: older days have no session times worth a strip.
+                    Rectangle {
+                        visible: root.period === "day"
+                        y: root.stripTop
+                        width: root.chartW
+                        height: 6
+                        radius: 3
+                        color: Qt.alpha(Theme.fg, 0.06)
 
                         Repeater {
-                            model: root.categoryOrder
+                            model: root.period === "day"
+                                ? AppUsage.sessionsOf(root.spanKeys[0], AppUsage.revision) : []
 
-                            Row {
-                                id: entry
+                            Rectangle {
+                                id: block
                                 required property var modelData
-                                spacing: 6
-
-                                Rectangle {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    width: 8
-                                    height: 8
-                                    radius: 4
-                                    color: root.colorFor(entry.modelData)
-                                }
-                                Text {
-                                    text: entry.modelData
-                                    color: Qt.alpha(Theme.fg, 0.6)
-                                    font.family: Theme.fontFamilyAlt
-                                    font.pixelSize: 10
-                                }
+                                x: (block.modelData.start - root.dayStartMs()) / 86400000 * root.chartW
+                                width: Math.max(2, (block.modelData.end - block.modelData.start) / 86400000 * root.chartW)
+                                height: 6
+                                radius: 3
+                                color: root.colorFor(AppUsage.categoryOf(block.modelData.app))
                             }
                         }
                     }
