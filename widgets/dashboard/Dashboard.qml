@@ -4,11 +4,12 @@ import QtQuick
 import "../../services"
 import "../notch"
 
-// Usage dashboard: focus time for today, the last 7 days or the last 31 days.
-// Today is charted by hour, the other spans by day, split by category. Today
-// also has a strip of focus sessions under the chart. It morphs out of the bar
-// pill like the other panels, and `qs ipc call dashboard toggle` opens it.
-// Escape or a click outside closes it.
+// Usage dashboard: today, the last 7 days or the last 31 days. Apps shows
+// time per app, split by category; Focus shows focus time, which is time a
+// listed app or a pomodoro has focus. Today is charted by hour, the other spans
+// by day, and today has a strip of sessions under the chart. It morphs out of
+// the bar pill like the other panels, and `qs ipc call dashboard toggle` opens
+// it. Escape or a click outside closes it.
 PanelWindow {
     id: root
 
@@ -35,7 +36,7 @@ PanelWindow {
     readonly property int panelH: bodyH + 138
     readonly property int chartW: 380
 
-    // the body's column, top to bottom: legend, gap, bars, labels, sessions strip.
+    // the body's column, top to bottom: legend, gap, bars, labels, strip.
     // The legend wraps to as many rows as its categories need, and the bars
     // give up the same height, so more categories never push into other elements.
     readonly property int legendRowH: 24
@@ -48,7 +49,15 @@ PanelWindow {
     // 0 = the bar pill, 1 = the full dashboard
     property real t: 0
 
-    // ── Span ───────────────────────────────────────────────────────────────
+    // ── Mode and span ──────────────────────────────────────────────────────
+    // "apps" shows time per app; "focus" shows focus time
+    property string metric: "apps"
+    readonly property bool focusMode: metric === "focus"
+    readonly property var metricTabs: [
+        { key: "apps", name: "Apps" },
+        { key: "focus", name: "Focus" }
+    ]
+
     // "day" for today, "week" for the last 7 days, "month" for the last 31
     property string period: "day"
     readonly property var spanDays: ({ day: 1, week: 7, month: 31 })
@@ -77,12 +86,39 @@ PanelWindow {
             .map(a => ({ app: a, sec: sums[a] }))
             .sort((a, b) => b.sec - a.sec)
     }
-    readonly property var topApps: allApps.slice(0, 6)
-    readonly property real totalSec: allApps.reduce((s, r) => s + r.sec, 0)
-    readonly property real topSec: topApps.length > 0 ? topApps[0].sec : 1
 
-    // categories across the span, most used first: the legend and the stacking order
+    // focus seconds across the span, from the focus slots
+    readonly property real focusAll: spanKeys.reduce((s, k) => s + AppUsage.focusTotal(k, AppUsage.revision), 0)
+
+    // sessions across the span, in day order then time order
+    readonly property var sessions: {
+        const out = []
+        for (const k of spanKeys)
+            out.push(...AppUsage.sessionsOf(k, AppUsage.revision))
+        return out
+    }
+
+    // time per focus app across the span. Sessions start with this change, so
+    // earlier days show no focus apps even though their focus slots count.
+    readonly property var focusList: {
+        const sums = {}
+        for (const s of sessions)
+            if (AppUsage.focusApps.indexOf(s.app) >= 0)
+                sums[s.app] = (sums[s.app] ?? 0) + (s.end - s.start) / 1000
+        return Object.keys(sums)
+            .map(a => ({ app: a, sec: sums[a] }))
+            .sort((a, b) => b.sec - a.sec)
+    }
+
+    readonly property var listRows: focusMode ? focusList.slice(0, 6) : allApps.slice(0, 6)
+    readonly property real totalSec: focusMode ? focusAll : allApps.reduce((s, r) => s + r.sec, 0)
+    readonly property real topSec: listRows.length > 0 ? listRows[0].sec : 1
+
+    // categories across the span, most used first: the legend and the stacking
+    // order. Focus has no per-app split, so it has no categories.
     readonly property var categoryOrder: {
+        if (focusMode)
+            return []
         const sums = {}
         for (const r of allApps) {
             const c = AppUsage.categoryOf(r.app)
@@ -112,7 +148,7 @@ PanelWindow {
         return rows
     }
 
-    // the apps behind one column: an hour of today, or a whole day
+    // the apps behind one column: an hour of today, or a whole day (Apps mode)
     function columnApps(i) {
         if (period === "day")
             return AppUsage.hoursOf(spanKeys[0], AppUsage.revision)[i] ?? {}
@@ -122,7 +158,21 @@ PanelWindow {
         return sums
     }
 
+    // focus seconds for one column: the hour's twelve 5-minute slots, or a whole day
+    function focusColumn(i) {
+        if (period === "day") {
+            const slots = AppUsage.focusSlots(spanKeys[0], AppUsage.revision)
+            let sum = 0
+            for (let s = 0; s < 12; s++)
+                sum += slots[i * 12 + s] ?? 0
+            return sum
+        }
+        return AppUsage.focusTotal(spanKeys[i], AppUsage.revision)
+    }
+
     function columnTotal(i) {
+        if (focusMode)
+            return focusColumn(i)
         const a = columnApps(i)
         return Object.keys(a).reduce((s, k) => s + a[k], 0)
     }
@@ -130,7 +180,7 @@ PanelWindow {
     // the busiest column sets the scale, so a quiet span still fills the chart
     readonly property real peakSec: Math.max(60, ...Array.from({ length: columns }, (_, i) => columnTotal(i)))
 
-    // the named categories share an accent ramp, spread across the whole range,
+    // the named categories share an accent ramp spread across the whole range,
     // so 2 categories and 8 both use the full brightness range. "Other" is grey.
     function colorFor(c) {
         if (c === "Other")
@@ -142,16 +192,20 @@ PanelWindow {
         return Qt.alpha(Theme.accent, 1 - i * step)
     }
 
-    // one column's bar, split by category from the bottom up. Each piece gets
-    // its distance from the bottom and its height, in pixels.
+    // one column's bar. Apps: split by category from the bottom up. Focus: one
+    // accent piece. Each piece gets its distance from the bottom and its height.
     function segmentsFor(i) {
+        const scale = chartH / peakSec
+        if (focusMode) {
+            const size = focusColumn(i) * scale
+            return size > 0 ? [{ bottom: 0, size: size, color: Theme.accent }] : []
+        }
         const a = columnApps(i)
         const sums = {}
         for (const app of Object.keys(a)) {
             const c = AppUsage.categoryOf(app)
             sums[c] = (sums[c] ?? 0) + a[app]
         }
-        const scale = chartH / peakSec
         const out = []
         let bottom = 0
         for (const c of categoryOrder) {
@@ -187,13 +241,24 @@ PanelWindow {
         return new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime()
     }
 
-    // ── Stats ──────────────────────────────────────────────────────────────
-    readonly property var sessions: {
-        const out = []
-        for (const k of spanKeys)
-            out.push(...AppUsage.sessionsOf(k, AppUsage.revision))
-        return out
+    // today's strip. Apps: every session, in its category colour. Focus: the
+    // sessions of focus apps and the pomodoro runs, in the accent colour.
+    readonly property var stripItems: {
+        if (period !== "day")
+            return []
+        const today = spanKeys[0]
+        const apps = AppUsage.sessionsOf(today, AppUsage.revision)
+        if (!focusMode)
+            return apps.map(s => ({ start: s.start, end: s.end, color: colorFor(AppUsage.categoryOf(s.app)) }))
+        const focus = apps
+            .filter(s => AppUsage.focusApps.indexOf(s.app) >= 0)
+            .map(s => ({ start: s.start, end: s.end, color: Theme.accent }))
+        const runs = AppUsage.runsOf(today, AppUsage.revision)
+            .map(r => ({ start: r.start, end: r.end, color: Theme.accent }))
+        return focus.concat(runs)
     }
+
+    // ── Stats ──────────────────────────────────────────────────────────────
     readonly property string firstUse: sessions.length > 0
         ? Qt.formatDateTime(new Date(sessions[0].start), period === "day" ? "HH:mm" : "ddd HH:mm")
         : "—"
@@ -202,6 +267,8 @@ PanelWindow {
         ? Math.max(1, Math.round(longestSec / 60)) + " min" : "—"
     readonly property string notifyText: String(spanKeys.reduce(
         (s, k) => s + AppUsage.notificationsOf(k, AppUsage.revision), 0))
+    readonly property string pomodoroText: String(spanKeys.reduce(
+        (s, k) => s + AppUsage.pomodoros(k, AppUsage.revision), 0))
 
     // ── Open / close ───────────────────────────────────────────────────────
     function openDash() {
@@ -304,7 +371,7 @@ PanelWindow {
             spacing: 14
             opacity: Math.max(0, (root.t - 0.5) * 2)
 
-            // header: the span's label and total, and the Day | Week | Month tabs
+            // header: the span's label and total, then the Apps | Focus and Day | Week | Month tabs
             Item {
                 width: parent.width
                 height: 46
@@ -334,30 +401,60 @@ PanelWindow {
                     spacing: 14
 
                     Repeater {
-                        model: root.periodTabs
+                        model: root.metricTabs
 
                         Text {
-                            id: tab
+                            id: metricTab
                             required property var modelData
-                            text: modelData.name
-                            color: root.period === tab.modelData.key ? Theme.accent : Qt.alpha(Theme.fg, 0.5)
+                            text: metricTab.modelData.name
+                            color: root.metric === metricTab.modelData.key ? Theme.accent : Qt.alpha(Theme.fg, 0.5)
                             font.family: Theme.fontFamily
                             font.pixelSize: 12
-                            font.bold: root.period === tab.modelData.key
+                            font.bold: root.metric === metricTab.modelData.key
                             Behavior on color { ColorAnimation { duration: 120 } }
 
                             MouseArea {
                                 anchors.fill: parent
                                 anchors.margins: -6
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: root.period = tab.modelData.key
+                                onClicked: root.metric = metricTab.modelData.key
+                            }
+                        }
+                    }
+
+                    // divides the two switches; no anchors, since a Row positions its children
+                    Rectangle {
+                        width: 1
+                        height: 12
+                        y: 2
+                        color: Qt.alpha(Theme.fg, 0.2)
+                    }
+
+                    Repeater {
+                        model: root.periodTabs
+
+                        Text {
+                            id: periodTab
+                            required property var modelData
+                            text: periodTab.modelData.name
+                            color: root.period === periodTab.modelData.key ? Theme.accent : Qt.alpha(Theme.fg, 0.5)
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 12
+                            font.bold: root.period === periodTab.modelData.key
+                            Behavior on color { ColorAnimation { duration: 120 } }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                anchors.margins: -6
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.period = periodTab.modelData.key
                             }
                         }
                     }
                 }
             }
 
-            // body: the chart column, then the most used apps
+            // body: the chart column, then the most used apps or focus apps
             Row {
                 spacing: 16
                 height: root.bodyH
@@ -390,7 +487,7 @@ PanelWindow {
                                         spacing: 6
 
                                         Rectangle {
-                                            anchors.verticalCenter: parent.verticalCenter
+                                            y: 3
                                             width: 8
                                             height: 8
                                             radius: 4
@@ -458,8 +555,7 @@ PanelWindow {
                         }
                     }
 
-                    // today's focus sessions along the day, coloured by category.
-                    // Only for Today: older days have no session times worth a strip.
+                    // today's strip, for today only
                     Rectangle {
                         visible: root.period === "day"
                         y: root.stripTop
@@ -469,8 +565,7 @@ PanelWindow {
                         color: Qt.alpha(Theme.fg, 0.06)
 
                         Repeater {
-                            model: root.period === "day"
-                                ? AppUsage.sessionsOf(root.spanKeys[0], AppUsage.revision) : []
+                            model: root.stripItems
 
                             Rectangle {
                                 id: block
@@ -479,7 +574,7 @@ PanelWindow {
                                 width: Math.max(2, (block.modelData.end - block.modelData.start) / 86400000 * root.chartW)
                                 height: 6
                                 radius: 3
-                                color: root.colorFor(AppUsage.categoryOf(block.modelData.app))
+                                color: block.modelData.color
                             }
                         }
                     }
@@ -490,7 +585,7 @@ PanelWindow {
                     spacing: 6
 
                     Text {
-                        text: "MOST USED"
+                        text: root.focusMode ? "FOCUS APPS" : "MOST USED"
                         color: Qt.alpha(Theme.fg, 0.5)
                         font.family: Theme.fontFamilyAlt
                         font.pixelSize: 10
@@ -498,7 +593,7 @@ PanelWindow {
                     }
 
                     Repeater {
-                        model: root.topApps
+                        model: root.listRows
 
                         Item {
                             id: row
@@ -538,13 +633,14 @@ PanelWindow {
 
             // stats row
             Row {
-                spacing: 36
+                spacing: 28
 
                 Repeater {
                     model: [
                         { label: "FIRST USE", value: root.firstUse },
                         { label: "NOTIFICATIONS", value: root.notifyText },
-                        { label: "LONGEST SESSION", value: root.longestText }
+                        { label: "LONGEST SESSION", value: root.longestText },
+                        { label: "POMODOROS", value: root.pomodoroText }
                     ]
 
                     Column {
