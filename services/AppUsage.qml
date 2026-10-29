@@ -8,27 +8,36 @@ import Quickshell.Io
 // Focus time is time a listed app (focus-apps.json) has focus, or any time a
 // pomodoro runs; it is kept in 5-minute slots for the focus widget and the
 // Pomodoro page. Totals per day live in
-// app-usage.json; limits in app-limits, one "app_id minutes" line each. A limit
+// app-usage.json; categories in app-categories, one "app_id category" line each;
+// limits in app-limits, one "app_id minutes" line each. A limit
 // notifies at 80% and at 100%, once each.
 Singleton {
     id: root
 
     readonly property string dir: Quickshell.env("HOME") + "/.local/xdg/config"
-    readonly property int keepDays: 7
+    readonly property int keepDays: 31
     // longer gaps (suspend, a stalled shell) are not counted as use
     readonly property int maxGapMs: 90000
 
     // { "2026-10-25": { "seconds": { "helium": 1234.5 }, "alerted": ["helium:80"],
-    //   "focus": { "132": 240 } } }   focus: seconds per 5-minute slot from midnight
+    //   "focus": { "132": 240 }, "hours": { "9": { "helium": 600 } },
+    //   "sessions": [{ "app": "helium", "start": 1761731400000, "end": 1761732000000 }],
+    //   "notifications": 3 } }
+    //   focus: seconds per 5-minute slot from midnight; hours: seconds per clock hour
+    //   per app; sessions: one entry per focus stretch, recorded when focus moves on
     property var days: ({})
     // { "helium": 60 } in minutes
     property var limits: ({})
+    // { "helium": "Internet" } from app-categories; unlisted apps are "Other"
+    property var categories: ({})
     // app ids whose focus time counts toward the focus widget; a pomodoro always counts
     property var focusApps: []
     // bumped whenever the numbers change, so bindings re-read them
     property int revision: 0
 
     property string currentApp: ""
+    // when the current app got focus; the session is recorded when focus moves on
+    property double sessionStart: Date.now()
     property double lastMs: Date.now()
     property bool ready: false
     property bool dirty: false
@@ -83,6 +92,55 @@ Singleton {
 
     function dayKey() { return Qt.formatDate(new Date(), "yyyy-MM-dd") }
 
+    // the day's record, created or topped up with any field it is missing
+    function ensureDay(key) {
+        const rec = days[key] ?? {}
+        rec.seconds = rec.seconds ?? {}
+        rec.alerted = rec.alerted ?? []
+        rec.blocked = rec.blocked ?? []
+        rec.focus = rec.focus ?? {}
+        rec.hours = rec.hours ?? {}
+        rec.sessions = rec.sessions ?? []
+        rec.notifications = rec.notifications ?? 0
+        days[key] = rec
+        return rec
+    }
+
+    // the last n day keys, oldest first, ending today
+    function dayKeys(n) {
+        const today = new Date()
+        const out = []
+        for (let i = n - 1; i >= 0; i--)
+            out.push(Qt.formatDate(new Date(today.getFullYear(), today.getMonth(), today.getDate() - i), "yyyy-MM-dd"))
+        return out
+    }
+
+    // per-day readers, in the same style as focusSlots and pomodoros
+    function hoursOf(key, rev) {
+        const r = days[key]
+        return (r && r.hours) ? r.hours : {}
+    }
+
+    function sessionsOf(key, rev) {
+        const r = days[key]
+        return (r && r.sessions) ? r.sessions : []
+    }
+
+    function notificationsOf(key, rev) {
+        const r = days[key]
+        return r ? (r.notifications ?? 0) : 0
+    }
+
+    // every notification that arrives counts, the shell's own included
+    function countNotification() {
+        if (!ready)
+            return
+        const rec = ensureDay(dayKey())
+        rec.notifications += 1
+        dirty = true
+        revision++
+    }
+
     // H:MM for every usage total and limit, e.g. 0:05, 1:20, 12:00
     function fmt(sec) {
         const m = Math.floor(sec / 60)
@@ -122,10 +180,8 @@ Singleton {
     }
 
     function addPomodoro() {
-        const key = dayKey()
-        if (!days[key])
-            days[key] = { seconds: {}, alerted: [], blocked: [], focus: {} }
-        days[key].pomodoros = (days[key].pomodoros ?? 0) + 1
+        const rec = ensureDay(dayKey())
+        rec.pomodoros = (rec.pomodoros ?? 0) + 1
         dirty = true
         revision++
     }
@@ -171,18 +227,30 @@ Singleton {
         if (currentApp === "" && !Pomodoro.running)
             return
         const key = dayKey()
-        if (!days[key])
-            days[key] = { seconds: {}, alerted: [], blocked: [], focus: {} }
-        const rec = days[key]
-        rec.focus = rec.focus ?? {}
+        const rec = ensureDay(key)
         if (focused || Pomodoro.running) {
             const slot = slotOf(now)
             rec.focus[slot] = (rec.focus[slot] ?? 0) + dt / 1000
         }
         if (currentApp !== "") {
+            // the whole interval goes to the hour it ends in, which is exact
+            // except for the one tick that straddles an hour boundary
+            const hour = new Date(now).getHours()
             rec.seconds[currentApp] = (rec.seconds[currentApp] ?? 0) + dt / 1000
+            rec.hours[hour] = rec.hours[hour] ?? {}
+            rec.hours[hour][currentApp] = (rec.hours[hour][currentApp] ?? 0) + dt / 1000
             check(key, currentApp)
         }
+        dirty = true
+    }
+
+    // a focus stretch ends: keep it if it lasted at least a second. Recorded
+    // under the day it ends on, so one that crosses midnight lands on the later day.
+    function endSession(now) {
+        if (!ready || currentApp === "" || now - sessionStart < 1000)
+            return
+        const rec = ensureDay(dayKey())
+        rec.sessions.push({ app: currentApp, start: sessionStart, end: now })
         dirty = true
     }
 
@@ -197,7 +265,13 @@ Singleton {
             return
         credit()
         const w = msg.data.find(x => x.active === true)
-        currentApp = w ? w.app_id : ""
+        const app = w ? w.app_id : ""
+        if (app !== currentApp) {
+            const now = Date.now()
+            endSession(now)
+            currentApp = app
+            sessionStart = now
+        }
         lastWindows = msg.data
         enforce(lastWindows)
         revision++
@@ -211,6 +285,37 @@ Singleton {
         while (keys.length > keepDays)
             delete days[keys.shift()]
         store.setText(JSON.stringify(days, null, 2) + "\n")
+    }
+
+    // "app_id category" per line; the category may hold spaces
+    function parseCategories(t) {
+        const m = {}
+        for (const line of t.split("\n")) {
+            const p = line.trim().split(/\s+/)
+            if (p.length >= 2)
+                m[p[0]] = p.slice(1).join(" ")
+        }
+        categories = m
+    }
+
+    function categoryOf(app) {
+        return categories[app] ?? "Other"
+    }
+
+    // seconds per category for a day, most used first. Looked up at read time,
+    // so editing app-categories also re-sorts past days.
+    function categoryTotals(key, rev) {
+        const r = days[key]
+        if (!r)
+            return []
+        const sums = {}
+        for (const app of Object.keys(r.seconds)) {
+            const c = categoryOf(app)
+            sums[c] = (sums[c] ?? 0) + r.seconds[app]
+        }
+        return Object.keys(sums)
+            .map(c => ({ category: c, sec: sums[c] }))
+            .sort((a, b) => b.sec - a.sec)
     }
 
     function parseLimits(t) {
@@ -299,6 +404,15 @@ Singleton {
         onFileChanged: reload()
         onLoaded: root.parseLimits(text())
         onLoadFailed: root.limits = {}
+    }
+
+    // one "app_id category" per line; a missing file means everything is "Other"
+    FileView {
+        path: root.dir + "/app-categories"
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: root.parseCategories(text())
+        onLoadFailed: root.categories = {}
     }
 
     // a JSON array of app ids, e.g. ["helium", "code"]; a bad file counts as empty

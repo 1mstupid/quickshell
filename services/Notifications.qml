@@ -18,6 +18,7 @@ Singleton {
 
         onNotification: n => {
             n.tracked = true
+            AppUsage.countNotification()
         }
     }
 
