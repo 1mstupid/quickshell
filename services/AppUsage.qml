@@ -8,7 +8,8 @@ import Quickshell.Io
 // Focus time is time a listed app (focus-apps.json) has focus, or any time a
 // pomodoro runs; it is kept in 5-minute slots for the focus widget and the
 // Pomodoro page. Totals per day live in
-// app-usage.json; limits in app-limits, one "app_id minutes" line each. A limit
+// app-usage.json; categories in app-categories, one "app_id category" line each;
+// limits in app-limits, one "app_id minutes" line each. A limit
 // notifies at 80% and at 100%, once each.
 Singleton {
     id: root
@@ -27,6 +28,8 @@ Singleton {
     property var days: ({})
     // { "helium": 60 } in minutes
     property var limits: ({})
+    // { "helium": "Internet" } from app-categories; unlisted apps are "Other"
+    property var categories: ({})
     // app ids whose focus time counts toward the focus widget; a pomodoro always counts
     property var focusApps: []
     // bumped whenever the numbers change, so bindings re-read them
@@ -284,6 +287,37 @@ Singleton {
         store.setText(JSON.stringify(days, null, 2) + "\n")
     }
 
+    // "app_id category" per line; the category may hold spaces
+    function parseCategories(t) {
+        const m = {}
+        for (const line of t.split("\n")) {
+            const p = line.trim().split(/\s+/)
+            if (p.length >= 2)
+                m[p[0]] = p.slice(1).join(" ")
+        }
+        categories = m
+    }
+
+    function categoryOf(app) {
+        return categories[app] ?? "Other"
+    }
+
+    // seconds per category for a day, most used first. Looked up at read time,
+    // so editing app-categories also re-sorts past days.
+    function categoryTotals(key, rev) {
+        const r = days[key]
+        if (!r)
+            return []
+        const sums = {}
+        for (const app of Object.keys(r.seconds)) {
+            const c = categoryOf(app)
+            sums[c] = (sums[c] ?? 0) + r.seconds[app]
+        }
+        return Object.keys(sums)
+            .map(c => ({ category: c, sec: sums[c] }))
+            .sort((a, b) => b.sec - a.sec)
+    }
+
     function parseLimits(t) {
         const m = {}
         for (const line of t.split("\n")) {
@@ -370,6 +404,15 @@ Singleton {
         onFileChanged: reload()
         onLoaded: root.parseLimits(text())
         onLoadFailed: root.limits = {}
+    }
+
+    // one "app_id category" per line; a missing file means everything is "Other"
+    FileView {
+        path: root.dir + "/app-categories"
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: root.parseCategories(text())
+        onLoadFailed: root.categories = {}
     }
 
     // a JSON array of app ids, e.g. ["helium", "code"]; a bad file counts as empty
