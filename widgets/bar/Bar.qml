@@ -294,7 +294,7 @@ PanelWindow {
             }
         }
 
-        // lock readout: "CAPS LOCK", "NUM LOCK", or both; replaces the contents while on
+        // lock readout: "CAPS LOCK"; replaces the contents while Caps Lock is on
         Text {
             id: lockRow
             anchors.centerIn: parent
