@@ -1,5 +1,0 @@
-# Pomodoro durations, in minutes. One value per line, read from
-# ~/.local/xdg/config/pomodoro-config. Missing lines use the defaults below.
-work 30
-short 5
-long 15
