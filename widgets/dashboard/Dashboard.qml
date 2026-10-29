@@ -4,10 +4,10 @@ import QtQuick
 import "../../services"
 import "../notch"
 
-// Usage dashboard for today: focus time by hour, split by category, the most
-// used apps, and a few stats. It morphs out of the bar pill like the other
-// panels, and `qs ipc call dashboard toggle` opens it. Escape or a click
-// outside closes it.
+// Usage dashboard: focus time for today, the last 7 days or the last 31 days.
+// Today is charted by hour, the other spans by day, split by category. It
+// morphs out of the bar pill like the other panels, and
+// `qs ipc call dashboard toggle` opens it. Escape or a click outside closes it.
 PanelWindow {
     id: root
 
@@ -34,36 +34,70 @@ PanelWindow {
     readonly property int bodyH: 160
     readonly property int chartW: 380
     readonly property int chartH: 130
-    readonly property real slotW: chartW / 24
 
     // 0 = the bar pill, 1 = the full dashboard
     property real t: 0
 
+    // ── Span ───────────────────────────────────────────────────────────────
+    // "day" for today, "week" for the last 7 days, "month" for the last 31
+    property string period: "day"
+    readonly property var spanDays: ({ day: 1, week: 7, month: 31 })
+    readonly property var periodLabels: ({ day: "TODAY", week: "LAST 7 DAYS", month: "LAST 31 DAYS" })
+    readonly property var periodTabs: [
+        { key: "day", name: "Day" },
+        { key: "week", name: "Week" },
+        { key: "month", name: "Month" }
+    ]
+
+    // the day keys in the span, oldest first, ending today
+    readonly property var spanKeys: AppUsage.dayKeys(spanDays[period], AppUsage.revision)
+    // one column per hour for today, otherwise one per day
+    readonly property int columns: period === "day" ? 24 : spanKeys.length
+    readonly property real slotW: chartW / columns
+    readonly property real barW: Math.min(slotW - 4, 24)
+
     // ── Data ───────────────────────────────────────────────────────────────
-    // each binding names the day and reads revision, so it refreshes every
-    // tick and rolls over at midnight
-    readonly property var allApps: AppUsage.totals(AppUsage.dayKey(), AppUsage.revision)
+    // seconds per app across the span, most used first
+    readonly property var allApps: {
+        const sums = {}
+        for (const k of spanKeys)
+            for (const r of AppUsage.totals(k, AppUsage.revision))
+                sums[r.app] = (sums[r.app] ?? 0) + r.sec
+        return Object.keys(sums)
+            .map(a => ({ app: a, sec: sums[a] }))
+            .sort((a, b) => b.sec - a.sec)
+    }
     readonly property var topApps: allApps.slice(0, 6)
-    readonly property var hours: AppUsage.hoursOf(AppUsage.dayKey(), AppUsage.revision)
-    readonly property var sessions: AppUsage.sessionsOf(AppUsage.dayKey(), AppUsage.revision)
-    readonly property var categoryOrder: AppUsage.categoryTotals(AppUsage.dayKey(), AppUsage.revision)
-        .map(r => r.category)
     readonly property real totalSec: allApps.reduce((s, r) => s + r.sec, 0)
     readonly property real topSec: topApps.length > 0 ? topApps[0].sec : 1
 
-    readonly property string firstUse: sessions.length > 0
-        ? Qt.formatTime(new Date(sessions[0].start), "HH:mm") : "—"
-    readonly property real longestSec: sessions.reduce((m, s) => Math.max(m, (s.end - s.start) / 1000), 0)
-    readonly property string longestText: longestSec > 0
-        ? Math.max(1, Math.round(longestSec / 60)) + " min" : "—"
-    readonly property string notifyText: String(AppUsage.notificationsOf(AppUsage.dayKey(), AppUsage.revision))
+    // categories across the span, most used first: the legend and the stacking order
+    readonly property var categoryOrder: {
+        const sums = {}
+        for (const r of allApps) {
+            const c = AppUsage.categoryOf(r.app)
+            sums[c] = (sums[c] ?? 0) + r.sec
+        }
+        return Object.keys(sums).sort((a, b) => sums[b] - sums[a])
+    }
 
-    // the tallest hour sets the scale, so a quiet day still fills the chart
-    function hourTotal(h) {
-        const a = hours[h] ?? {}
+    // the apps behind one column: an hour of today, or a whole day
+    function columnApps(i) {
+        if (period === "day")
+            return AppUsage.hoursOf(spanKeys[0], AppUsage.revision)[i] ?? {}
+        const sums = {}
+        for (const r of AppUsage.totals(spanKeys[i], AppUsage.revision))
+            sums[r.app] = r.sec
+        return sums
+    }
+
+    function columnTotal(i) {
+        const a = columnApps(i)
         return Object.keys(a).reduce((s, k) => s + a[k], 0)
     }
-    readonly property real peakSec: Math.max(60, ...Array.from({ length: 24 }, (_, h) => hourTotal(h)))
+
+    // the busiest column sets the scale, so a quiet span still fills the chart
+    readonly property real peakSec: Math.max(60, ...Array.from({ length: columns }, (_, i) => columnTotal(i)))
 
     function colorFor(c) {
         if (c === "Other")
@@ -71,10 +105,10 @@ PanelWindow {
         return Qt.alpha(Theme.accent, Math.max(0.35, 1 - Math.max(0, categoryOrder.indexOf(c)) * 0.2))
     }
 
-    // one hour's bar, split by category from the bottom up. Each piece gets its
-    // distance from the bottom and its height, in pixels.
-    function segmentsFor(h) {
-        const a = hours[h] ?? {}
+    // one column's bar, split by category from the bottom up. Each piece gets
+    // its distance from the bottom and its height, in pixels.
+    function segmentsFor(i) {
+        const a = columnApps(i)
         const sums = {}
         for (const app of Object.keys(a)) {
             const c = AppUsage.categoryOf(app)
@@ -93,6 +127,38 @@ PanelWindow {
         }
         return out
     }
+
+    function colX(i) {
+        return i * slotW + (slotW - barW) / 2
+    }
+
+    // hour of the day for today, weekday for the week, day of month for the month
+    function labelFor(i) {
+        if (period === "day")
+            return i % 6 === 0 ? String(i).padStart(2, "0") : ""
+        const k = spanKeys[i]
+        if (period === "week") {
+            const p = k.split("-").map(Number)
+            return Qt.formatDate(new Date(p[0], p[1] - 1, p[2]), "ddd")
+        }
+        return i % 5 === 0 ? String(Number(k.slice(8))) : ""
+    }
+
+    // ── Stats ──────────────────────────────────────────────────────────────
+    readonly property var sessions: {
+        const out = []
+        for (const k of spanKeys)
+            out.push(...AppUsage.sessionsOf(k, AppUsage.revision))
+        return out
+    }
+    readonly property string firstUse: sessions.length > 0
+        ? Qt.formatDateTime(new Date(sessions[0].start), period === "day" ? "HH:mm" : "ddd HH:mm")
+        : "—"
+    readonly property real longestSec: sessions.reduce((m, s) => Math.max(m, (s.end - s.start) / 1000), 0)
+    readonly property string longestText: longestSec > 0
+        ? Math.max(1, Math.round(longestSec / 60)) + " min" : "—"
+    readonly property string notifyText: String(spanKeys.reduce(
+        (s, k) => s + AppUsage.notificationsOf(k, AppUsage.revision), 0))
 
     // ── Open / close ───────────────────────────────────────────────────────
     function openDash() {
@@ -195,27 +261,60 @@ PanelWindow {
             spacing: 14
             opacity: Math.max(0, (root.t - 0.5) * 2)
 
-            // header: the label and today's total
-            Column {
-                spacing: 2
+            // header: the span's label and total, and the Day | Week | Month tabs
+            Item {
+                width: parent.width
+                height: 46
 
-                Text {
-                    text: "TODAY"
-                    color: Qt.alpha(Theme.fg, 0.5)
-                    font.family: Theme.fontFamilyAlt
-                    font.pixelSize: 10
-                    font.letterSpacing: 1
+                Column {
+                    spacing: 2
+
+                    Text {
+                        text: root.periodLabels[root.period]
+                        color: Qt.alpha(Theme.fg, 0.5)
+                        font.family: Theme.fontFamilyAlt
+                        font.pixelSize: 10
+                        font.letterSpacing: 1
+                    }
+                    Text {
+                        text: AppUsage.fmt(root.totalSec)
+                        color: Theme.fg
+                        font.family: Theme.fontFamilyAlt
+                        font.pixelSize: 22
+                        font.bold: true
+                    }
                 }
-                Text {
-                    text: AppUsage.fmt(root.totalSec)
-                    color: Theme.fg
-                    font.family: Theme.fontFamilyAlt
-                    font.pixelSize: 22
-                    font.bold: true
+
+                Row {
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 14
+
+                    Repeater {
+                        model: root.periodTabs
+
+                        Text {
+                            id: tab
+                            required property var modelData
+                            text: modelData.name
+                            color: root.period === tab.modelData.key ? Theme.accent : Qt.alpha(Theme.fg, 0.5)
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 12
+                            font.bold: root.period === tab.modelData.key
+                            Behavior on color { ColorAnimation { duration: 120 } }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                anchors.margins: -6
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.period = tab.modelData.key
+                            }
+                        }
+                    }
                 }
             }
 
-            // body: the hourly chart with its legend, then the most used apps
+            // body: the chart with its legend, then the most used apps
             Row {
                 spacing: 16
                 height: root.bodyH
@@ -230,39 +329,43 @@ PanelWindow {
                         height: root.chartH
 
                         Repeater {
-                            model: 24
+                            model: root.columns
 
                             Item {
                                 id: col
                                 required property int index
-                                x: col.index * root.slotW
-                                width: root.slotW - 4
+                                x: root.colX(col.index)
+                                width: root.barW
                                 height: bars.height
 
                                 Repeater {
                                     model: root.segmentsFor(col.index)
 
                                     Rectangle {
+                                        id: piece
                                         required property var modelData
                                         width: col.width
-                                        y: col.height - modelData.bottom - modelData.size
-                                        height: modelData.size
-                                        color: modelData.color
+                                        y: col.height - piece.modelData.bottom - piece.modelData.size
+                                        height: piece.modelData.size
+                                        color: piece.modelData.color
                                     }
                                 }
                             }
                         }
                     }
 
-                    // hour labels, every six hours
+                    // column labels under the bars
                     Repeater {
-                        model: [0, 6, 12, 18]
+                        model: root.columns
 
                         Text {
-                            required property int modelData
-                            x: modelData * root.slotW
+                            id: label
+                            required property int index
+                            x: label.index * root.slotW
                             y: bars.height + 4
-                            text: String(modelData).padStart(2, "0")
+                            width: root.slotW
+                            horizontalAlignment: Text.AlignHCenter
+                            text: root.labelFor(label.index)
                             color: Qt.alpha(Theme.fg, 0.4)
                             font.family: Theme.fontFamilyAlt
                             font.pixelSize: 9
@@ -278,6 +381,7 @@ PanelWindow {
                             model: root.categoryOrder
 
                             Row {
+                                id: entry
                                 required property var modelData
                                 spacing: 6
 
@@ -286,10 +390,10 @@ PanelWindow {
                                     width: 8
                                     height: 8
                                     radius: 4
-                                    color: root.colorFor(modelData)
+                                    color: root.colorFor(entry.modelData)
                                 }
                                 Text {
-                                    text: modelData
+                                    text: entry.modelData
                                     color: Qt.alpha(Theme.fg, 0.6)
                                     font.family: Theme.fontFamilyAlt
                                     font.pixelSize: 10
@@ -315,6 +419,7 @@ PanelWindow {
                         model: root.topApps
 
                         Item {
+                            id: row
                             required property var modelData
                             width: parent.width
                             height: 22
@@ -323,7 +428,7 @@ PanelWindow {
                                 anchors.left: parent.left
                                 anchors.right: time.left
                                 anchors.rightMargin: 8
-                                text: modelData.app
+                                text: row.modelData.app
                                 elide: Text.ElideRight
                                 color: Theme.fg
                                 font.family: Theme.fontFamily
@@ -332,7 +437,7 @@ PanelWindow {
                             Text {
                                 id: time
                                 anchors.right: parent.right
-                                text: AppUsage.fmt(modelData.sec)
+                                text: AppUsage.fmt(row.modelData.sec)
                                 color: Qt.alpha(Theme.fg, 0.5)
                                 font.family: Theme.fontFamilyAlt
                                 font.pixelSize: 11
@@ -342,7 +447,7 @@ PanelWindow {
                                 height: 2
                                 radius: 1
                                 color: Theme.accent
-                                width: parent.width * modelData.sec / root.topSec
+                                width: parent.width * row.modelData.sec / root.topSec
                             }
                         }
                     }
@@ -361,18 +466,19 @@ PanelWindow {
                     ]
 
                     Column {
+                        id: stat
                         required property var modelData
                         spacing: 2
 
                         Text {
-                            text: modelData.label
+                            text: stat.modelData.label
                             color: Qt.alpha(Theme.fg, 0.5)
                             font.family: Theme.fontFamilyAlt
                             font.pixelSize: 9
                             font.letterSpacing: 1
                         }
                         Text {
-                            text: modelData.value
+                            text: stat.modelData.value
                             color: Theme.fg
                             font.family: Theme.fontFamilyAlt
                             font.pixelSize: 13

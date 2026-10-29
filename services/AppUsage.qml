@@ -106,8 +106,9 @@ Singleton {
         return rec
     }
 
-    // the last n day keys, oldest first, ending today
-    function dayKeys(n) {
+    // the last n day keys, oldest first, ending today. Takes rev like the other
+    // readers, so bindings that call it refresh every tick and roll over at midnight.
+    function dayKeys(n, rev) {
         const today = new Date()
         const out = []
         for (let i = n - 1; i >= 0; i--)
