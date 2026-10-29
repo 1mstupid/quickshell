@@ -60,7 +60,9 @@ PanelWindow {
         // volume readout replaces the contents while it is shown; panels
         // also hide the contents, but they keep the pill's own background
         readonly property bool volumeOn: Volume.shown && !PillState.active
-        readonly property bool contentHidden: PillState.active || Volume.shown
+        // lock readout, shown while Caps or Num Lock is on and the volume readout is not
+        readonly property bool lockOn: Locks.shown && !PillState.active && !Volume.shown
+        readonly property bool contentHidden: PillState.active || Volume.shown || Locks.shown
 
         // each side reserves its own content width; the larger one is used on
         // both sides, so the clock stays centered
@@ -72,7 +74,8 @@ PanelWindow {
         }
         anchors.horizontalCenter: parent.horizontalCenter
         width: volumeOn ? volumeRow.implicitWidth + 4 * pad
-                        : clock.implicitWidth + 2 * (pad + side)
+             : lockOn ? lockRow.implicitWidth + 4 * pad
+             : clock.implicitWidth + 2 * (pad + side)
         height: Theme.effectiveBarHeight
 
         // the notch is painted by the Canvas below, so the rectangle itself stays clear
@@ -289,6 +292,22 @@ PanelWindow {
                 font.pixelSize: Theme.fontSize
                 font.bold: true
             }
+        }
+
+        // lock readout: "CAPS LOCK", "NUM LOCK", or both; replaces the contents while on
+        Text {
+            id: lockRow
+            anchors.centerIn: parent
+
+            opacity: pill.lockOn ? 1 : 0
+            visible: opacity > 0
+            Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
+
+            text: Locks.label
+            color: Theme.alert
+            font.family: Theme.fontFamilyAlt
+            font.pixelSize: Theme.fontSize
+            font.bold: true
         }
 
         Clock {
