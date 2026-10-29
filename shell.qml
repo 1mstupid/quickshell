@@ -9,6 +9,7 @@ import "./widgets/app_launcher"
 import "./widgets/bar"
 import "./widgets/bar/media"
 import "./widgets/clipboard"
+import "./widgets/dashboard"
 import "./widgets/menu"
 import "./widgets/border"
 import "./widgets/notifications"
@@ -27,6 +28,8 @@ ShellRoot {
     PowerMenu {}
 
     Clipboard {}
+
+    Dashboard {}
 
     Menu {}
 
