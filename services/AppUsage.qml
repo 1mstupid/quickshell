@@ -101,6 +101,7 @@ Singleton {
         rec.focus = rec.focus ?? {}
         rec.hours = rec.hours ?? {}
         rec.sessions = rec.sessions ?? []
+        rec.runs = rec.runs ?? []
         rec.notifications = rec.notifications ?? 0
         days[key] = rec
         return rec
@@ -125,6 +126,21 @@ Singleton {
     function sessionsOf(key, rev) {
         const r = days[key]
         return (r && r.sessions) ? r.sessions : []
+    }
+
+    // pomodoro work runs: {start, end} in ms, one per run, recorded when the run stops
+    function runsOf(key, rev) {
+        const r = days[key]
+        return (r && r.runs) ? r.runs : []
+    }
+
+    function addPomodoroRun(start, end) {
+        if (!ready || end - start < 1000)
+            return
+        const rec = ensureDay(dayKey())
+        rec.runs.push({ start: start, end: end })
+        dirty = true
+        revision++
     }
 
     function notificationsOf(key, rev) {

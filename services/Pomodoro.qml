@@ -35,6 +35,7 @@ Singleton {
     readonly property int minutes: override > 0 ? override : configured
     readonly property int total: minutes * 60
     property double endMs: 0     // set while running
+    property double runStart: 0  // when the current work run started; 0 when not in one
     property int remaining: 0    // seconds left while running or paused
     property bool done: false    // brief finished state after the alarm
 
@@ -61,7 +62,16 @@ Singleton {
         done = false
         remaining = secs
         endMs = Date.now() + secs * 1000
+        if (phase === "work")
+            runStart = Date.now()
         persist()
+    }
+
+    // a work run ends by pausing, stopping or finishing: record how long it ran
+    function closeRun() {
+        if (runStart > 0)
+            AppUsage.addPomodoroRun(runStart, Date.now())
+        runStart = 0
     }
 
     function start() {
@@ -72,6 +82,7 @@ Singleton {
     function pause() {
         if (!running)
             return
+        closeRun()
         remaining = Math.max(0, Math.round((endMs - Date.now()) / 1000))
         endMs = 0
         persist()
@@ -84,6 +95,7 @@ Singleton {
 
     // ends the current session without counting it; the phase stays
     function stop() {
+        closeRun()
         endMs = 0
         remaining = 0
         done = false
@@ -104,6 +116,7 @@ Singleton {
     // leads back to work. The next session waits for the user to start it.
     function finish() {
         const finished = phase
+        closeRun()
         endMs = 0
         remaining = 0
         done = true
@@ -176,6 +189,10 @@ Singleton {
                 root.endMs = 0
                 root.remaining = end === 0 ? Math.min(left, root.total) : 0
             }
+            // a run already in progress when the shell (re)loads starts counting
+            // from here; the time before the reload is not recorded
+            if (root.running && root.phase === "work" && root.runStart === 0)
+                root.runStart = Date.now()
         }
     }
 
