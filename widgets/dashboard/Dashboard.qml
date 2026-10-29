@@ -551,10 +551,17 @@ PanelWindow {
                                         y: col.height - piece.modelData.bottom - piece.modelData.size
                                         height: piece.modelData.size
                                         color: piece.modelData.color
-                                        // a thin edge so stacked categories and bar tops read against the grey
-                                        border.width: 1
-                                        border.color: Qt.alpha(Theme.fg, 0.35)
                                     }
+                                }
+
+                                // the empty stage: an outline the height of the peak column.
+                                // The segments fill it from the bottom, so a full column reaches the top.
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: 3
+                                    color: "transparent"
+                                    border.width: 1
+                                    border.color: Qt.alpha(Theme.fg, 0.35)
                                 }
                             }
                         }
