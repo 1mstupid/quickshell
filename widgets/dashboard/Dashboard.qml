@@ -551,6 +551,9 @@ PanelWindow {
                                         y: col.height - piece.modelData.bottom - piece.modelData.size
                                         height: piece.modelData.size
                                         color: piece.modelData.color
+                                        // a thin edge so stacked categories and bar tops read against the grey
+                                        border.width: 1
+                                        border.color: Qt.alpha(Theme.fg, 0.35)
                                     }
                                 }
                             }
