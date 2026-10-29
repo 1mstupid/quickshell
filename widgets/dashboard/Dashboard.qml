@@ -33,8 +33,12 @@ PanelWindow {
     // 12 pad, 46 header, 14 gap, body, 14 gap, 40 stats, 12 pad
     readonly property int panelW: 640
     readonly property int bodyH: 184
-    readonly property int panelH: bodyH + 138
+    // the body sits on two grey panels, each padded by panelPad on every side
+    readonly property int panelPad: 10
+    readonly property int panelH: bodyH + 2 * panelPad + 138
     readonly property int chartW: 380
+    readonly property int chartPanelW: chartW + 2 * panelPad
+    readonly property int listPanelW: panelW - 24 - chartPanelW - 16
 
     // the body's column, top to bottom: legend, gap, bars, labels, strip.
     // The legend wraps to as many rows as its categories need, and the bars
@@ -49,7 +53,7 @@ PanelWindow {
     // 0 = the bar pill, 1 = the full dashboard
     property real t: 0
 
-    // the card's grey backdrop; text and dividers are tuned to sit on it
+    // the grey panels behind the chart and the list; the card itself stays dark
     readonly property color surface: Qt.rgba(0.17, 0.18, 0.2, 0.96)
 
     // ── Mode and span ──────────────────────────────────────────────────────
@@ -342,7 +346,6 @@ PanelWindow {
         bodyHeight: card.height
         x: card.x - bodyX
         y: card.y
-        fillColor: root.surface
     }
 
     Rectangle {
@@ -461,9 +464,22 @@ PanelWindow {
             // body: the chart column, then the most used apps or focus apps
             Row {
                 spacing: 16
-                height: root.bodyH
+                height: root.bodyH + 2 * root.panelPad
 
+                // the chart's grey panel
                 Item {
+                    width: root.chartPanelW
+                    height: root.bodyH + 2 * root.panelPad
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 10
+                        color: root.surface
+                    }
+
+                    Item {
+                    x: root.panelPad
+                    y: root.panelPad
                     width: root.chartW
                     height: root.bodyH
 
@@ -582,10 +598,24 @@ PanelWindow {
                             }
                         }
                     }
+                    }
                 }
 
+                // the list's grey panel
+                Item {
+                    width: root.listPanelW
+                    height: root.bodyH + 2 * root.panelPad
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 10
+                        color: root.surface
+                    }
+
                 Column {
-                    width: root.panelW - 24 - root.chartW - 16
+                    x: root.panelPad
+                    y: root.panelPad
+                    width: root.listPanelW - 2 * root.panelPad
                     spacing: 6
 
                     Text {
@@ -632,6 +662,7 @@ PanelWindow {
                             }
                         }
                     }
+                }
                 }
             }
 
