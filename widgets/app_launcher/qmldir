@@ -1,1 +1,2 @@
+AppLauncher AppLauncher.qml
 singleton AppLauncherState AppLauncherState.qml
