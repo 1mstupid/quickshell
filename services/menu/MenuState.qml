@@ -12,7 +12,7 @@ Singleton {
     // three groups, in bar order; each lists its pages in the order of its switch
     readonly property var tabs: [
         { name: "Tasks", icon: "󰄬", pages: ["todo", "habits"] },
-        { name: "Focus", icon: "󰔛", pages: ["pomodoro", "usage"] },
+        { name: "Focus", icon: "󰔛", pages: ["usage"] },
         { name: "Network", icon: "󰖩", pages: ["wi-fi", "bluetooth", "vpn"] }
     ]
 
