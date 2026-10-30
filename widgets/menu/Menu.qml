@@ -237,30 +237,22 @@ PanelWindow {
                 source: "HabitsPanel.qml"
             }
 
-            // group 1: focus. The pomodoro timer is the focus widget and the
-            // bar ring; its history is on the usage dashboard.
+            // group 1: network
             Loader {
                 anchors.fill: parent
                 active: MenuState.tab === 1 && MenuState.page[1] === 0
-                source: "UsagePanel.qml"
-            }
-
-            // group 2: network
-            Loader {
-                anchors.fill: parent
-                active: MenuState.tab === 2 && MenuState.page[2] === 0
                 source: "WifiPanel.qml"
             }
 
             Loader {
                 anchors.fill: parent
-                active: MenuState.tab === 2 && MenuState.page[2] === 1
+                active: MenuState.tab === 1 && MenuState.page[1] === 1
                 source: "BluetoothPanel.qml"
             }
 
             Loader {
                 anchors.fill: parent
-                active: MenuState.tab === 2 && MenuState.page[2] === 2
+                active: MenuState.tab === 1 && MenuState.page[1] === 2
                 source: "VpnPanel.qml"
             }
         }
