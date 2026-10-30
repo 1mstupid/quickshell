@@ -14,3 +14,4 @@ singleton Locks Locks.qml
 Recorder Recorder.qml
 
 
+singleton UserSettings UserSettings.qml
