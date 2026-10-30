@@ -43,8 +43,8 @@ Singleton {
     property bool dirty: false
     // the desktop widget and the focus widget; the values come from settings.json
     // and are flipped by `qs ipc call usage toggle` / `toggleFocus`
-    readonly property alias widgetShown: UserSettings.usageRing
-    readonly property alias focusWidgetShown: UserSettings.focusWidget
+    readonly property bool widgetShown: UserSettings.usageRing
+    readonly property bool focusWidgetShown: UserSettings.focusWidget
 
     function toggleWidget() { UserSettings.usageRing = !UserSettings.usageRing }
     function toggleFocusWidget() { UserSettings.focusWidget = !UserSettings.focusWidget }
