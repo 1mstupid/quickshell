@@ -41,13 +41,13 @@ Singleton {
     property double lastMs: Date.now()
     property bool ready: false
     property bool dirty: false
-    // the desktop widget; toggled from the Usage tab or `qs ipc call usage toggle`
-    property bool widgetShown: true
-    // the focus widget on the wallpaper; toggled from the Pomodoro page
-    property bool focusWidgetShown: true
+    // the desktop widget and the focus widget; the values come from settings.json
+    // and are flipped by `qs ipc call usage toggle` / `toggleFocus`
+    readonly property bool widgetShown: UserSettings.usageRing
+    readonly property bool focusWidgetShown: UserSettings.focusWidget
 
-    function toggleWidget() { widgetShown = !widgetShown }
-    function toggleFocusWidget() { focusWidgetShown = !focusWidgetShown }
+    function toggleWidget() { UserSettings.usageRing = !UserSettings.usageRing }
+    function toggleFocusWidget() { UserSettings.focusWidget = !UserSettings.focusWidget }
 
     // the window list from the last event, re-checked on each tick
     property var lastWindows: []
