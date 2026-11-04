@@ -53,6 +53,15 @@ Singleton {
         return n
     }
 
+    // every completed day on record, today included
+    function total(id) {
+        let n = doneOn(id, data.day) ? 1 : 0
+        for (const d in data.history)
+            if (d !== data.day && data.history[d].indexOf(id) >= 0)
+                n++
+        return n
+    }
+
     // weeks * 7 day strings, oldest first, one column per week starting on Sunday.
     // Days after today are included so the grid stays rectangular; the panel leaves them empty.
     function gridDates() {
