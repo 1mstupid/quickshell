@@ -41,13 +41,13 @@ Singleton {
     property double lastMs: Date.now()
     property bool ready: false
     property bool dirty: false
-    // the desktop widget; toggled from the Usage tab or `qs ipc call usage toggle`
-    property bool widgetShown: true
-    // the focus widget on the wallpaper; toggled from the Pomodoro page
-    property bool focusWidgetShown: true
+    // the desktop widget and the focus widget; the values come from settings.json
+    // and are flipped by `qs ipc call usage toggle` / `toggleFocus`
+    readonly property bool widgetShown: UserSettings.usageRing
+    readonly property bool focusWidgetShown: UserSettings.focusWidget
 
-    function toggleWidget() { widgetShown = !widgetShown }
-    function toggleFocusWidget() { focusWidgetShown = !focusWidgetShown }
+    function toggleWidget() { UserSettings.usageRing = !UserSettings.usageRing }
+    function toggleFocusWidget() { UserSettings.focusWidget = !UserSettings.focusWidget }
 
     // the window list from the last event, re-checked on each tick
     property var lastWindows: []
@@ -73,14 +73,22 @@ Singleton {
         return false
     }
 
+    // focus mode: during a work session, any app not in focus-apps.json is
+    // blocked. An empty list blocks nothing, so a missing file cannot close everything.
+    function outOfFocus(app) {
+        return Pomodoro.running && Pomodoro.phase === "work"
+            && focusApps.length > 0 && focusApps.indexOf(app) < 0
+    }
+
     // ask each open window of a blocked app to close, retrying every 10 s
-    // while it stays open (an app may show a save prompt first)
+    // while it stays open (an app may show a save prompt first). Blocked means
+    // over its limit, or outside focus mode during a work session.
     function enforce(list) {
         const now = Date.now()
         const next = {}
         for (const w of list) {
             const last = closeSent[w.id] ?? 0
-            if (blocked(w.app_id) && now - last >= 10000) {
+            if ((blocked(w.app_id) || outOfFocus(w.app_id)) && now - last >= 10000) {
                 Quickshell.execDetached(["umbriel", "msg", "window-close:" + w.id])
                 next[w.id] = now
             } else if (last) {
