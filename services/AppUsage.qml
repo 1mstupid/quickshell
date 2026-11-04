@@ -73,14 +73,22 @@ Singleton {
         return false
     }
 
+    // focus mode: during a work session, any app not in focus-apps.json is
+    // blocked. An empty list blocks nothing, so a missing file cannot close everything.
+    function outOfFocus(app) {
+        return Pomodoro.running && Pomodoro.phase === "work"
+            && focusApps.length > 0 && focusApps.indexOf(app) < 0
+    }
+
     // ask each open window of a blocked app to close, retrying every 10 s
-    // while it stays open (an app may show a save prompt first)
+    // while it stays open (an app may show a save prompt first). Blocked means
+    // over its limit, or outside focus mode during a work session.
     function enforce(list) {
         const now = Date.now()
         const next = {}
         for (const w of list) {
             const last = closeSent[w.id] ?? 0
-            if (blocked(w.app_id) && now - last >= 10000) {
+            if ((blocked(w.app_id) || outOfFocus(w.app_id)) && now - last >= 10000) {
                 Quickshell.execDetached(["umbriel", "msg", "window-close:" + w.id])
                 next[w.id] = now
             } else if (last) {
