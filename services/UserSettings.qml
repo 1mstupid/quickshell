@@ -4,7 +4,7 @@ import Quickshell
 import Quickshell.Io
 
 // Widget visibility, read from ~/.local/xdg/config/settings.json:
-//   {"usageRing": true, "focusWidget": true}
+//   {"usageRing": true, "focusWidget": true, "todoWidget": true, "habitsWidget": true}
 // A missing file, a bad file or a missing key keeps the default (shown). The
 // file is read on start and whenever it changes. The IPC toggles change the
 // running value only, so the file stays the source of truth.
@@ -15,6 +15,8 @@ Singleton {
 
     property bool usageRing: true
     property bool focusWidget: true
+    property bool todoWidget: true
+    property bool habitsWidget: true
 
     function parse(t) {
         let d = null
@@ -27,6 +29,8 @@ Singleton {
             d = {}
         usageRing = typeof d.usageRing === "boolean" ? d.usageRing : true
         focusWidget = typeof d.focusWidget === "boolean" ? d.focusWidget : true
+        todoWidget = typeof d.todoWidget === "boolean" ? d.todoWidget : true
+        habitsWidget = typeof d.habitsWidget === "boolean" ? d.habitsWidget : true
     }
 
     FileView {

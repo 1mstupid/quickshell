@@ -12,8 +12,10 @@ import "./widgets/clipboard"
 import "./widgets/dashboard"
 import "./widgets/menu"
 import "./widgets/border"
+import "./widgets/habits"
 import "./widgets/notifications"
 import "./widgets/power_menu"
+import "./widgets/todo"
 import "./widgets/usage"
 import "./widgets/wallpaper"
 
@@ -38,6 +40,10 @@ ShellRoot {
     Usage {}
 
     FocusWidget {}
+
+    TodoWidget {}
+
+    HabitsWidget {}
 
     Variants {
         model: Quickshell.screens

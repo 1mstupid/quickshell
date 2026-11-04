@@ -224,35 +224,22 @@ PanelWindow {
             height: parent.height - root.barH - root.subH
             opacity: Math.max(0, (root.t - 0.5) * 2)
 
-            // group 0: tasks
+            // group 0: network
             Loader {
                 anchors.fill: parent
                 active: MenuState.tab === 0 && MenuState.page[0] === 0
-                source: "TodoPanel.qml"
-            }
-
-            Loader {
-                anchors.fill: parent
-                active: MenuState.tab === 0 && MenuState.page[0] === 1
-                source: "HabitsPanel.qml"
-            }
-
-            // group 1: network
-            Loader {
-                anchors.fill: parent
-                active: MenuState.tab === 1 && MenuState.page[1] === 0
                 source: "WifiPanel.qml"
             }
 
             Loader {
                 anchors.fill: parent
-                active: MenuState.tab === 1 && MenuState.page[1] === 1
+                active: MenuState.tab === 0 && MenuState.page[0] === 1
                 source: "BluetoothPanel.qml"
             }
 
             Loader {
                 anchors.fill: parent
-                active: MenuState.tab === 1 && MenuState.page[1] === 2
+                active: MenuState.tab === 0 && MenuState.page[0] === 2
                 source: "VpnPanel.qml"
             }
         }

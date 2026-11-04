@@ -9,9 +9,8 @@ import Quickshell.Io
 Singleton {
     id: root
 
-    // two groups, in bar order; each lists its pages in the order of its switch
+    // the groups, in bar order; each lists its pages in the order of its switch
     readonly property var tabs: [
-        { name: "Tasks", icon: "󰄬", pages: ["todo", "habits"] },
         { name: "Network", icon: "󰖩", pages: ["wi-fi", "bluetooth", "vpn"] }
     ]
 
@@ -23,7 +22,7 @@ Singleton {
     property bool open: false
     property int tab: 0
     // the page shown in each group, by index into that group's pages; kept per group
-    property var page: [0, 0]
+    property var page: [0]
 
     function toggle() { open = !open }
     function show() { open = true }
