@@ -7,7 +7,8 @@ import "../../services"
 import "../notch"
 
 // One notch hung from the top-right corner, holding the stacked toasts.
-// Hidden while there are no notifications.
+// Hidden while there are no toasts, and while the history notch is open.
+// A toast that times out only goes away; its notification stays in the history.
 PanelWindow {
     id: root
 
@@ -19,7 +20,7 @@ PanelWindow {
     implicitHeight: notch.height
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
-    visible: Notifications.notifications.values.length > 0
+    visible: Notifications.toastCount > 0 && !Notifications.open
 
     // only the notch takes clicks; the rest of the window passes them through
     mask: Region { item: notch }
@@ -51,15 +52,18 @@ PanelWindow {
 
                 // how long a toast stays; the timer and the ring both use it
                 readonly property int lifetime: 5000
+                // whether this notification still has a toast; the rest are history only
+                readonly property bool live: Notifications.isToast(modelData)
 
                 Timer {
-                    running: card.modelData.urgency !== NotificationUrgency.Critical
+                    running: card.live && card.modelData.urgency !== NotificationUrgency.Critical
                     interval: card.lifetime
-                    onTriggered: card.modelData.dismiss()
+                    onTriggered: Notifications.expire(card.modelData)
                 }
 
 
                 Layout.fillWidth: true
+                visible: live
                 // sized to its content, so long bodies are not clipped
                 implicitHeight: layout.implicitHeight + 20
                 radius: 8
@@ -128,7 +132,7 @@ PanelWindow {
                         from: 1
                         to: 0
                         duration: card.lifetime
-                        running: ring.visible
+                        running: card.live && ring.visible
                     }
 
                     onPaint: {

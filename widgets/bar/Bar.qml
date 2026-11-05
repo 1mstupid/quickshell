@@ -110,7 +110,7 @@ PanelWindow {
             Behavior on opacity { NumberAnimation { duration: 120 } }
         }
 
-        // right: recorder, then pomodoro ring
+        // right: recorder, pomodoro ring, then the notification bell
         RowLayout {
             id: rightRow
             anchors.verticalCenter: parent.verticalCenter
@@ -226,6 +226,40 @@ PanelWindow {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
                     onClicked: Pomodoro.done ? Pomodoro.stop() : Pomodoro.toggle()
+                }
+            }
+
+            // notification bell: a dot while the history holds something, a
+            // crossed bell while muted; click opens the history (origin screen only)
+            Item {
+                id: bell
+                Layout.alignment: Qt.AlignVCenter
+                visible: root.isOrigin
+                implicitWidth: bellIcon.implicitWidth
+                implicitHeight: bellIcon.implicitHeight
+
+                Text {
+                    id: bellIcon
+                    // nf-md-bell_off / nf-md-bell
+                    text: Notifications.muted ? "󰂛" : "󰂚"
+                    color: Notifications.open ? Theme.accent : Qt.alpha(Theme.fg, Notifications.muted ? 0.4 : 0.7)
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.iconSize
+                }
+                Rectangle {
+                    visible: Notifications.count > 0
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    width: 5
+                    height: 5
+                    radius: 2.5
+                    color: Theme.accent
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    anchors.margins: -4
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: Notifications.toggleHistory()
                 }
             }
         }
