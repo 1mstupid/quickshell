@@ -10,6 +10,7 @@ import "./widgets/bar"
 import "./widgets/bar/media"
 import "./widgets/clipboard"
 import "./widgets/dashboard"
+import "./widgets/drawer"
 import "./widgets/menu"
 import "./widgets/border"
 import "./widgets/habits"
@@ -24,6 +25,8 @@ ShellRoot {
     NotificationToast {}
 
     NotificationHistory {}
+
+    ControlDrawer {}
 
     WallpaperPicker {}
 
