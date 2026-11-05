@@ -10,6 +10,7 @@ singleton SleepReminder SleepReminder.qml
 singleton MediaWidgetState MediaWidgetState.qml
 singleton ClipboardHistory ClipboardHistory.qml
 singleton DashboardState DashboardState.qml
+singleton DrawerState DrawerState.qml
 singleton Locks Locks.qml
 Recorder Recorder.qml
 

@@ -10,6 +10,8 @@ Singleton {
     readonly property var profileOrder: ["performance", "balanced", "power-saver"]
 
     property string profile: "balanced"
+    // whether powerprofilesctl answered, so a machine without it shows no selector
+    property bool hasProfiles: false
     property bool caffeine: false
     property bool nightLight: false
     property bool hasBacklight: false
@@ -29,7 +31,8 @@ Singleton {
         stdout: StdioCollector {
             onStreamFinished: {
                 const lines = text.split("\n")
-                if (root.profileOrder.indexOf(lines[0]) >= 0)
+                root.hasProfiles = root.profileOrder.indexOf(lines[0]) >= 0
+                if (root.hasProfiles)
                     root.profile = lines[0]
                 const bl = (lines[1] ?? "").split(",")
                 root.hasBacklight = bl.length >= 4
@@ -45,6 +48,11 @@ Singleton {
         const next = profileOrder[(profileOrder.indexOf(profile) + 1) % profileOrder.length]
         Quickshell.execDetached(["powerprofilesctl", "set", next])
         profile = next
+    }
+
+    function setProfile(p) {
+        profile = p
+        Quickshell.execDetached(["powerprofilesctl", "set", p])
     }
 
     function setCaffeine(on) {

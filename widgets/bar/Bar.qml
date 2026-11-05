@@ -110,7 +110,7 @@ PanelWindow {
             Behavior on opacity { NumberAnimation { duration: 120 } }
         }
 
-        // right: recorder, pomodoro ring, then the notification bell
+        // right: recorder, pomodoro ring, the notification bell, then the control icon
         RowLayout {
             id: rightRow
             anchors.verticalCenter: parent.verticalCenter
@@ -260,6 +260,30 @@ PanelWindow {
                     anchors.margins: -4
                     cursorShape: Qt.PointingHandCursor
                     onClicked: Notifications.toggleHistory()
+                }
+            }
+
+            // control icon: click opens the drawer (origin screen only)
+            Item {
+                id: control
+                Layout.alignment: Qt.AlignVCenter
+                visible: root.isOrigin
+                implicitWidth: controlIcon.implicitWidth
+                implicitHeight: controlIcon.implicitHeight
+
+                Text {
+                    id: controlIcon
+                    // nf-md-tune
+                    text: "󰘮"
+                    color: DrawerState.open ? Theme.accent : Qt.alpha(Theme.fg, 0.7)
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.iconSize
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    anchors.margins: -4
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: DrawerState.toggle()
                 }
             }
         }

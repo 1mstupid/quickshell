@@ -7,7 +7,7 @@ import "../../services"
 import "../notch"
 
 // One notch hung from the top-right corner, holding the stacked toasts.
-// Hidden while there are no toasts, and while the history notch is open.
+// Hidden while there are no toasts, and while the history or the drawer is open.
 // A toast that times out only goes away; its notification stays in the history.
 PanelWindow {
     id: root
@@ -20,7 +20,7 @@ PanelWindow {
     implicitHeight: notch.height
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
-    visible: Notifications.toastCount > 0 && !Notifications.open
+    visible: Notifications.toastCount > 0 && !Notifications.open && !DrawerState.open
 
     // only the notch takes clicks; the rest of the window passes them through
     mask: Region { item: notch }
