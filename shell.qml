@@ -23,6 +23,8 @@ ShellRoot {
 
     NotificationToast {}
 
+    NotificationHistory {}
+
     WallpaperPicker {}
 
     AppLauncher {}
