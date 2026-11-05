@@ -2,19 +2,21 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import "../../services"
+import "../notch"
 
-// The control drawer: a card on the right edge, below the bar, opened by the
-// bar's control icon. Tiles for the quick switches, sliders for volume and
+// The control drawer: a notch hung from the top-right corner, like the toasts
+// and the notification history, opened by the bar's control icon. It grows out
+// of the corner. Tiles for the quick switches, sliders for volume and
 // brightness, and the power profile. Brightness and the profile only show on
 // hardware that has them, and every item can be turned off in settings.json.
-// A click outside the card closes it, and Escape does too.
+// A click outside the notch closes it, and Escape does too.
 PanelWindow {
     id: root
 
     screen: PillState.originScreen
     visible: false
 
-    // full screen, so a click anywhere outside the card can close the drawer
+    // full screen, so a click anywhere outside the notch can close the drawer
     anchors {
         top: true
         bottom: true
@@ -29,7 +31,6 @@ PanelWindow {
 
     readonly property int cardWidth: 300
     readonly property int pad: 14
-    readonly property int cardRadius: 12
     readonly property int tileGap: 8
     readonly property int tileWidth: (cardWidth - 2 * pad - tileGap) / 2
 
@@ -39,7 +40,7 @@ PanelWindow {
     // run once the drawer has closed, so it is not in the shot
     readonly property var screenshotCommand: ["screenshot"]
 
-    // 0 = closed, 1 = fully out
+    // 0 = closed, 1 = fully open
     property real t: 0
 
     // so the brightness and profile rows are known before the first opening
@@ -142,7 +143,7 @@ PanelWindow {
         }
     }
 
-    // a click outside the card closes the drawer
+    // a click outside the notch closes the drawer
     MouseArea {
         anchors.fill: parent
         onClicked: DrawerState.hide()
@@ -298,21 +299,30 @@ PanelWindow {
         }
     }
 
+    // flush with the top and right screen edges, like the toast and history notches
+    Notch {
+        id: outline
+        bodyWidth: card.width
+        bodyHeight: card.height
+        leftShoulder: true
+        rightShoulder: false
+        bottomRightSquare: true
+        x: card.x - bodyX
+        y: card.y
+    }
+
     Rectangle {
         id: card
 
-        // wider than what shows: the right corners sit past the screen edge, so
-        // only the left ones read as rounded
-        width: root.cardWidth + root.cardRadius
-        height: col.implicitHeight + 2 * root.pad
-        x: root.width - root.cardWidth * root.t
-        y: Theme.effectiveBarHeight + Theme.edgeInset
-        radius: root.cardRadius
-        color: Theme.bg
-        border.width: 1
-        border.color: Qt.alpha(Theme.border, 0.6)
+        // grows out of the top-right corner, the way the history does
+        width: root.cardWidth * root.t
+        height: (col.implicitHeight + 2 * root.pad) * root.t
+        x: root.width - width
+        y: 0
+        color: "transparent"
+        clip: true
 
-        // clicks on the card stay on the card, not the catcher behind it
+        // clicks on the notch stay on the notch, not the catcher behind it
         MouseArea { anchors.fill: parent }
 
         Item {
@@ -322,12 +332,15 @@ PanelWindow {
             Keys.onEscapePressed: DrawerState.hide()
         }
 
+        // full size from the start and anchored to the corner, so the notch
+        // reveals it as it grows; it fades in during the second half
         Column {
             id: col
-            x: root.pad
+            x: parent.width - root.cardWidth + root.pad
             y: root.pad
             width: root.cardWidth - 2 * root.pad
             spacing: 12
+            opacity: Math.max(0, (root.t - 0.5) * 2)
 
             Grid {
                 columns: 2
