@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import "../../services"
+import "../../services/menu"
 import "../notch"
 
 // The control drawer: a notch hung from the top-right corner, like the toasts
@@ -9,6 +10,8 @@ import "../notch"
 // of the corner. Tiles for the quick switches, sliders for volume and
 // brightness, and the power profile. Brightness and the profile only show on
 // hardware that has them, and every item can be turned off in settings.json.
+// The Wi-Fi and Bluetooth tiles switch on a tap and open their list from the
+// arrow; the VPN tile opens its list. A list replaces the switches until Back.
 // A click outside the notch closes it, and Escape does too.
 PanelWindow {
     id: root
@@ -37,11 +40,22 @@ PanelWindow {
     readonly property bool showBrightness: UserSettings.brightness && Power.hasBacklight
     readonly property bool showProfile: UserSettings.powerProfile && Power.hasProfiles
 
+    // "" for the switches, or "wifi", "bluetooth" or "vpn" for a list in their place
+    property string view: ""
+    readonly property bool inView: view !== ""
+
     // run once the drawer has closed, so it is not in the shot
     readonly property var screenshotCommand: ["screenshot"]
 
     // 0 = closed, 1 = fully open
     property real t: 0
+
+    // the notch's height, eased so it does not jump when the view or the rows change
+    readonly property real targetH: col.implicitHeight + 2 * pad
+    property real shownH: targetH
+    Behavior on shownH {
+        NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+    }
 
     // so the brightness and profile rows are known before the first opening
     Component.onCompleted: Power.refresh()
@@ -52,6 +66,8 @@ PanelWindow {
             PillState.owner = ""
         Notifications.open = false
         Power.refresh()
+        Net.refreshState()
+        view = ""
         visible = true
         slide.stop()
         slide.from = root.t
@@ -91,6 +107,14 @@ PanelWindow {
             if (root.pendingBrightness >= 0)
                 flush()
         }
+    }
+
+    // the network tiles are read on demand, so keep them fresh while it is open
+    Timer {
+        interval: 5000
+        repeat: true
+        running: root.visible
+        onTriggered: Net.refreshState()
     }
 
     Timer {
@@ -157,7 +181,10 @@ PanelWindow {
         property string title
         property string subtitle
         property bool active: false
+        // with an arrow at the right that opens a list, apart from the tap
+        property bool expandable: false
         signal clicked()
+        signal expand()
 
         height: 52
         radius: 10
@@ -181,7 +208,7 @@ PanelWindow {
             anchors.left: tileIcon.right
             anchors.leftMargin: 8
             anchors.right: parent.right
-            anchors.rightMargin: 6
+            anchors.rightMargin: tile.expandable ? 24 : 6
             anchors.verticalCenter: parent.verticalCenter
             spacing: 1
 
@@ -211,6 +238,30 @@ PanelWindow {
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             onClicked: tile.clicked()
+        }
+
+        Text {
+            visible: tile.expandable
+            anchors.right: parent.right
+            anchors.rightMargin: 6
+            anchors.verticalCenter: parent.verticalCenter
+            width: 16
+            horizontalAlignment: Text.AlignHCenter
+            text: "›"
+            color: tile.active ? Theme.bg : Qt.alpha(Theme.fg, 0.6)
+            font.family: Theme.fontFamily
+            font.pixelSize: 18
+        }
+
+        // above the tile's own area, so the arrow does not switch
+        MouseArea {
+            visible: tile.expandable
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            anchors.right: parent.right
+            width: 28
+            cursorShape: Qt.PointingHandCursor
+            onClicked: tile.expand()
         }
     }
 
@@ -316,7 +367,7 @@ PanelWindow {
 
         // grows out of the top-right corner, the way the history does
         width: root.cardWidth * root.t
-        height: (col.implicitHeight + 2 * root.pad) * root.t
+        height: root.shownH * root.t
         x: root.width - width
         y: 0
         color: "transparent"
@@ -329,7 +380,12 @@ PanelWindow {
             id: keyHost
             anchors.fill: parent
             focus: true
-            Keys.onEscapePressed: DrawerState.hide()
+            Keys.onEscapePressed: {
+                if (root.inView)
+                    root.view = ""
+                else
+                    DrawerState.hide()
+            }
         }
 
         // full size from the start and anchored to the corner, so the notch
@@ -345,6 +401,50 @@ PanelWindow {
             Grid {
                 columns: 2
                 spacing: root.tileGap
+                visible: !root.inView
+
+                Tile {
+                    width: root.tileWidth
+                    visible: UserSettings.wifi
+                    // without a wireless device this shows the wired link and only opens the list
+                    expandable: Net.hasWifi
+                    glyph: "󰖩"
+                    title: Net.hasWifi ? "Wi-Fi" : "Network"
+                    subtitle: Net.hasWifi
+                        ? (Net.wifiOn ? (Net.wifiConn !== "" ? Net.wifiConn : "Not connected") : "Off")
+                        : (Net.wiredUp ? "Ethernet" : "Disconnected")
+                    active: Net.hasWifi ? Net.wifiOn : Net.wiredUp
+                    onClicked: {
+                        if (Net.hasWifi)
+                            Net.toggleWifi()
+                        else
+                            root.view = "wifi"
+                    }
+                    onExpand: root.view = "wifi"
+                }
+                Tile {
+                    width: root.tileWidth
+                    visible: UserSettings.bluetooth && Net.btPresent
+                    expandable: true
+                    glyph: "󰂯"
+                    title: "Bluetooth"
+                    subtitle: Net.btOn ? "On" : "Off"
+                    active: Net.btOn
+                    onClicked: Net.toggleBluetooth()
+                    onExpand: root.view = "bluetooth"
+                }
+                // which profile to switch is a choice, so a tap opens the list
+                Tile {
+                    width: root.tileWidth
+                    visible: UserSettings.vpn && Net.vpnCount > 0
+                    glyph: "󰦝"
+                    title: "VPN"
+                    subtitle: Net.vpnActive.length === 0 ? "Off"
+                        : Net.vpnActive.length === 1 ? Net.vpnActive[0]
+                        : Net.vpnActive.length + " active"
+                    active: Net.vpnActive.length > 0
+                    onClicked: root.view = "vpn"
+                }
 
                 Tile {
                     width: root.tileWidth
@@ -387,7 +487,7 @@ PanelWindow {
             Column {
                 width: parent.width
                 spacing: 6
-                visible: Volume.audio !== null || root.showBrightness
+                visible: !root.inView && (Volume.audio !== null || root.showBrightness)
 
                 SliderRow {
                     width: parent.width
@@ -416,7 +516,7 @@ PanelWindow {
 
             // power profile: one of three, the current one filled
             Row {
-                visible: root.showProfile
+                visible: !root.inView && root.showProfile
                 spacing: 4
 
                 Repeater {
@@ -453,6 +553,65 @@ PanelWindow {
                             cursorShape: Qt.PointingHandCursor
                             onClicked: Power.setProfile(seg.modelData.key)
                         }
+                    }
+                }
+            }
+
+            // a network list, in place of the switches
+            Column {
+                visible: root.inView
+                width: parent.width
+                spacing: 6
+
+                Rectangle {
+                    width: backRow.implicitWidth + 20
+                    height: 24
+                    radius: height / 2
+                    color: Qt.alpha(Theme.fg, backMouse.containsMouse ? 0.14 : 0.08)
+
+                    Row {
+                        id: backRow
+                        anchors.centerIn: parent
+                        spacing: 6
+
+                        Text {
+                            text: "‹"
+                            color: Theme.fg
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 13
+                        }
+                        Text {
+                            text: "Back"
+                            color: Theme.fg
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 11
+                        }
+                    }
+
+                    MouseArea {
+                        id: backMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.view = ""
+                    }
+                }
+
+                Item {
+                    width: parent.width
+                    height: 230
+
+                    // the lists keep their own 10 px margins, so the loader reaches past
+                    // the padding to line them up with the switches
+                    Loader {
+                        x: -10
+                        width: parent.width + 20
+                        height: parent.height
+                        active: root.inView
+                        source: root.view === "wifi" ? "../menu/WifiPanel.qml"
+                              : root.view === "bluetooth" ? "../menu/BluetoothPanel.qml"
+                              : root.view === "vpn" ? "../menu/VpnPanel.qml"
+                              : ""
                     }
                 }
             }

@@ -9,7 +9,7 @@ import "../../services/menu"
 Item {
     id: panel
 
-    // the Loader in the menu sizes this panel
+    // the Loader in the drawer sizes this panel
     anchors.fill: parent
 
     property var devices: []

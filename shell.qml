@@ -11,7 +11,6 @@ import "./widgets/bar/media"
 import "./widgets/clipboard"
 import "./widgets/dashboard"
 import "./widgets/drawer"
-import "./widgets/menu"
 import "./widgets/border"
 import "./widgets/habits"
 import "./widgets/notifications"
@@ -37,8 +36,6 @@ ShellRoot {
     Clipboard {}
 
     Dashboard {}
-
-    Menu {}
 
     MediaWidget {}
 
