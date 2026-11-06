@@ -82,13 +82,11 @@ PanelWindow {
         slide.start()
     }
 
-    // brightnessctl is a process per call, so a drag applies at most every
-    // 100 ms and always ends on the last value
+    // brightness execution using ddcutil for absolute values
     property int pendingBrightness: -1
 
     function moveBrightness(v) {
-        const p = Math.max(1, Math.round(v * 100))
-        // the track follows the pointer right away
+        const p = Math.max(0, Math.min(100, Math.round(v * 100)))
         Power.brightness = p
         pendingBrightness = p
         if (!gate.running)
@@ -99,8 +97,11 @@ PanelWindow {
         id: gate
         interval: 100
         function flush() {
-            Power.setBrightness(root.pendingBrightness)
-            root.pendingBrightness = -1
+            if (root.pendingBrightness >= 0) {
+                // Execute ddcutil command for absolute brightness setting (VCP 10)
+                Quickshell.execDetached(["sh", "-c", "ddcutil --display 1 setvcp 10 " + root.pendingBrightness])
+                root.pendingBrightness = -1
+            }
             start()
         }
         onTriggered: {
@@ -487,7 +488,7 @@ PanelWindow {
             Column {
                 width: parent.width
                 spacing: 6
-                visible: !root.inView && (Volume.audio !== null || root.showBrightness)
+                visible: !root.inView && (Volume.audio !== null || UserSettings.brightness)
 
                 SliderRow {
                     width: parent.width
@@ -506,7 +507,7 @@ PanelWindow {
 
                 SliderRow {
                     width: parent.width
-                    visible: root.showBrightness
+                    visible: true
                     glyph: "󰃟"
                     value: Power.brightness / 100
                     readout: Power.brightness.toString()
@@ -609,9 +610,9 @@ PanelWindow {
                         height: parent.height
                         active: root.inView
                         source: root.view === "wifi" ? "../menu/WifiPanel.qml"
-                              : root.view === "bluetooth" ? "../menu/BluetoothPanel.qml"
-                              : root.view === "vpn" ? "../menu/VpnPanel.qml"
-                              : ""
+                                    : root.view === "bluetooth" ? "../menu/BluetoothPanel.qml"
+                                    : root.view === "vpn" ? "../menu/VpnPanel.qml"
+                                    : ""
                     }
                 }
             }
