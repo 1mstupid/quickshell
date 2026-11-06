@@ -288,12 +288,12 @@ PanelWindow {
             }
         }
 
-        // clicking the clock opens or closes the menu (origin screen only)
+        // clicking the clock opens or closes the drawer (origin screen only)
         MouseArea {
             anchors.fill: clock
             enabled: root.isOrigin
             cursorShape: Qt.PointingHandCursor
-            onClicked: MenuState.toggle()
+            onClicked: DrawerState.toggle()
         }
 
         // volume readout: icon, track, number; "MU" when muted
