@@ -234,7 +234,7 @@ PanelWindow {
             Item {
                 id: bell
                 Layout.alignment: Qt.AlignVCenter
-                visible: root.isOrigin
+                visible: false
                 implicitWidth: bellIcon.implicitWidth
                 implicitHeight: bellIcon.implicitHeight
 
@@ -267,7 +267,7 @@ PanelWindow {
             Item {
                 id: control
                 Layout.alignment: Qt.AlignVCenter
-                visible: root.isOrigin
+                visible: false
                 implicitWidth: controlIcon.implicitWidth
                 implicitHeight: controlIcon.implicitHeight
 
