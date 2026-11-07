@@ -7,8 +7,8 @@ const assert = require("assert")
 
 const src = fs.readFileSync(path.join(__dirname, "FileSearch.js"), "utf8")
     .replace(/^\.pragma library\s*$/m, "")
-const { tilde, parentOf, classify, parseLs, parseFd } =
-    new Function(src + "\nreturn { tilde, parentOf, classify, parseLs, parseFd };")()
+const { tilde, parentOf, classify, parseLs, prepare, fuzzy } =
+    new Function(src + "\nreturn { tilde, parentOf, classify, parseLs, prepare, fuzzy };")()
 
 let failures = 0
 function test(name, fn) {
@@ -67,19 +67,62 @@ test("browse: empty output, or a name that is only a slash, gives no rows", () =
     assert.deepStrictEqual(parseLs("/\n", "/x/", "", H), [])
 })
 
-test("search: shallow first, folders with or without a trailing slash", () => {
-    const rows = parseFd("/home/u/a/b/c.txt\n/home/u/c.txt\n/home/u/a/c/\n", H)
-    assert.deepStrictEqual(rows.map(r => r.path), ["/home/u/c.txt", "/home/u/a/c", "/home/u/a/b/c.txt"])
-    assert.deepStrictEqual(rows.map(r => r.dir), [false, true, false])
-    assert.deepStrictEqual(rows.map(r => r.sub), ["~", "~/a", "~/a/b"])
-    assert.strictEqual(rows[0].name, "c.txt")
-    assert.strictEqual(rows[1].name, "c")
-    assert.strictEqual(rows[1].next, "")
+const items = prepare([
+    "/home/u/notes/todo.txt", "/home/u/todo/archive.md", "/home/u/proj/README.md",
+    "/home/u/proj/src/", "/home/u/r/d/m/e", "/home/u/Music/Main.c", "/home/u/my_a_i_n.c",
+    "/etc/hosts", ""
+].join("\n"), H)
+
+test("prepare: folders lose the slash, paths are lower-cased under home", () => {
+    assert.strictEqual(items.length, 8)
+    const d = items.find(i => i.path === "/home/u/proj/src")
+    assert.strictEqual(d.dir, true)
+    assert.strictEqual(items[0].low, "notes/todo.txt")
+    assert.strictEqual(items.find(i => i.path === "/etc/hosts").low, "/etc/hosts")
+    assert.deepStrictEqual(prepare("", H), [])
+    assert.deepStrictEqual(prepare("\n\n", H), [])
 })
 
-test("search: no output gives no rows", () => {
-    assert.deepStrictEqual(parseFd("", H), [])
-    assert.deepStrictEqual(parseFd("\n\n", H), [])
+test("fuzzy: letters in order match, others do not", () => {
+    const r = fuzzy(items, "rdme", 50, H)
+    assert.ok(r.top.some(e => e.name === "README.md"))
+    assert.ok(!r.top.some(e => e.name === "hosts"))
+    assert.strictEqual(fuzzy(items, "zzz", 50, H).top.length, 0)
+})
+
+test("fuzzy: a file-name match beats a folder-only match", () => {
+    const r = fuzzy(items, "todo", 50, H)
+    assert.strictEqual(r.top[0].path, "/home/u/notes/todo.txt")
+})
+
+test("fuzzy: the whole piece beats scattered letters, case does not matter", () => {
+    const r = fuzzy(items, "MAIN", 50, H)
+    assert.strictEqual(r.top[0].name, "Main.c")
+    assert.strictEqual(r.top[1].name, "my_a_i_n.c")
+})
+
+test("fuzzy: rows carry the folder, the glyph and no next", () => {
+    const [e] = fuzzy(items, "archive", 50, H).top
+    assert.strictEqual(e.sub, "~/todo")
+    assert.strictEqual(e.next, "")
+    const d = fuzzy(items, "src", 50, H).top[0]
+    assert.strictEqual(d.dir, true)
+    assert.notStrictEqual(d.glyph, e.glyph)
+})
+
+test("fuzzy: spaces are ignored, an empty query has no rows, limit applies", () => {
+    assert.deepStrictEqual(fuzzy(items, "to do", 50, H).top.map(e => e.path),
+        fuzzy(items, "todo", 50, H).top.map(e => e.path))
+    const r = fuzzy(items, "  ", 50, H)
+    assert.deepStrictEqual(r, { pool: [], top: [] })
+    assert.strictEqual(fuzzy(items, "e", 2, H).top.length, 2)
+})
+
+test("fuzzy: searching the pool of a shorter query gives the same rows", () => {
+    const short = fuzzy(items, "re", 50, H)
+    const viaPool = fuzzy(short.pool, "rea", 50, H)
+    const whole = fuzzy(items, "rea", 50, H)
+    assert.deepStrictEqual(viaPool.top, whole.top)
 })
 
 process.exitCode = failures ? 1 : 0
