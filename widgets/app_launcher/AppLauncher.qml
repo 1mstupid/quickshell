@@ -4,6 +4,7 @@ import Quickshell.Io
 import QtQuick
 import "../../services"
 import "../notch"
+import "Modes.js" as Modes
 
 // Top-anchored launcher. Grows out of the bar pill, the same way the
 // wallpaper picker and clipboard do.
@@ -44,7 +45,7 @@ PanelWindow {
     property real t: 0
 
     // eases when the number of results changes
-    property real panelH: chromeH + Math.max(1, Math.min(filteredApps.length, maxVisible)) * itemH
+    property real panelH: chromeH + Math.max(1, Math.min(results.length, maxVisible)) * itemH
     Behavior on panelH {
         NumberAnimation { duration: 250; easing.type: Easing.OutCubic }
     }
@@ -54,13 +55,43 @@ PanelWindow {
     property int selectedIndex: 0
     readonly property bool isSearching: searchQuery.trim() !== ""
 
-    property var filteredApps: {
-        var q = searchQuery.trim().toLowerCase();
+    // "" is the app list; "calc" etc. come from a bang (Modes.js)
+    property string mode: ""
+    readonly property var modeInfo: Modes.find(mode)
+
+    // what the list shows, whichever mode: plain objects, so every row looks
+    // alike. kind says what Enter does: "app", "mode" or "calc".
+    property var results: {
+        var q = searchQuery.trim();
+
+        if (mode === "calc") {
+            // an answer for an older expression is not shown while typing
+            if (Calc.result === "" || Calc.resultFor !== q)
+                return [];
+            return [{ kind: "calc", title: Calc.result, subtitle: q, icon: "", glyph: modeInfo.glyph, value: Calc.result }];
+        }
+
+        // a half-typed bang offers the modes it could become
+        var hints = Modes.hints(searchQuery);
+        if (hints.length > 0) {
+            return hints.map(function (m) {
+                return { kind: "mode", title: m.title, subtitle: m.subtitle, icon: "", glyph: m.glyph, value: m.name };
+            });
+        }
+
+        return appResults(q.toLowerCase());
+    }
+
+    onResultsChanged: selectedIndex = 0
+
+    // Search: filter by name / genericName / keywords, alpha sort. No query:
+    // recent apps first, then alphabetical.
+    function appResults(q) {
         var vals = DesktopEntries.applications.values;
+        var list;
 
         if (q !== "") {
-            // Search mode: filter by name / genericName / keywords, alpha sort
-            return vals.filter(function (e) {
+            list = vals.filter(function (e) {
                 if (e.name.toLowerCase().indexOf(q) !== -1)
                     return true;
                 if (e.genericName && e.genericName.toLowerCase().indexOf(q) !== -1)
@@ -72,24 +103,33 @@ PanelWindow {
             }).sort(function (a, b) {
                 return a.name.localeCompare(b.name);
             });
+        } else {
+            var recent = AppLauncherState.recentIds;
+            list = vals.slice().sort(function (a, b) {
+                var ai = recent.indexOf(a.id);
+                var bi = recent.indexOf(b.id);
+                if (ai !== -1 && bi !== -1)
+                    return ai - bi;
+                if (ai !== -1)
+                    return -1;
+                if (bi !== -1)
+                    return 1;
+                return a.name.localeCompare(b.name);
+            });
         }
 
-        // Default mode: recent apps first, then alphabetical
-        var recent = AppLauncherState.recentIds;
-        return vals.slice().sort(function (a, b) {
-            var ai = recent.indexOf(a.id);
-            var bi = recent.indexOf(b.id);
-            if (ai !== -1 && bi !== -1)
-                return ai - bi;
-            if (ai !== -1)
-                return -1;
-            if (bi !== -1)
-                return 1;
-            return a.name.localeCompare(b.name);
+        return list.map(function (e) {
+            return { kind: "app", title: e.name, subtitle: subtitleOf(e), icon: e.icon, glyph: "", entry: e };
         });
     }
 
-    onFilteredAppsChanged: selectedIndex = 0
+    readonly property string emptyText: {
+        if (mode !== "calc")
+            return "No apps found";
+        if (searchQuery.trim() === "")
+            return "Type an expression";
+        return Calc.busy ? "" : "No result";
+    }
 
     // one line of secondary text per app: its generic name, else its category
     function subtitleOf(entry) {
@@ -103,6 +143,7 @@ PanelWindow {
     // ── Open / close ───────────────────────────────────────────────────────
     function openLauncher() {
         PillState.owner = "applauncher";
+        mode = "";
         searchInput.text = "";
         visible = true;
         morph.stop();
@@ -157,23 +198,45 @@ PanelWindow {
             searchInput.forceActiveFocus();
     }
 
-    // ── Launch ─────────────────────────────────────────────────────────────
-    function launchEntry(entry) {
-        AppLauncherState.recordLaunch(entry.id);
-        entry.execute();
-        AppLauncherState.hide();
+    // ── Activate ───────────────────────────────────────────────────────────
+    function enterMode(name) {
+        mode = name;
+        searchInput.text = "";
+    }
+
+    function activate(r) {
+        if (!r)
+            return;
+        if (r.kind === "app") {
+            AppLauncherState.recordLaunch(r.entry.id);
+            r.entry.execute();
+            AppLauncherState.hide();
+        } else if (r.kind === "mode") {
+            enterMode(r.value);
+        } else if (r.kind === "calc") {
+            // "--" so a negative answer is not read as an option
+            Quickshell.execDetached(["wl-copy", "--", r.value]);
+            AppLauncherState.hide();
+        }
     }
 
     // ── Navigation ─────────────────────────────────────────────────────────
     function navigate(delta) {
-        if (filteredApps.length === 0)
+        if (results.length === 0)
             return;
-        selectedIndex = (selectedIndex + delta + filteredApps.length) % filteredApps.length;
+        selectedIndex = (selectedIndex + delta + results.length) % results.length;
         listView.positionViewAtIndex(selectedIndex, ListView.Contain);
     }
 
     // ── Colours ────────────────────────────────────────────────────────────
     readonly property color accentFill: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.18)
+
+    // the calculator only evaluates while it is the open mode
+    Binding {
+        target: Calc
+        property: "expression"
+        value: root.mode === "calc" ? root.searchQuery.trim() : ""
+    }
 
     // only the card takes clicks; everything around it passes through
     mask: Region { item: outline }
@@ -224,8 +287,8 @@ PanelWindow {
                     anchors.left: parent.left
                     anchors.leftMargin: 14
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "󰍉"
-                    color: Qt.alpha(Theme.fg, 0.45)
+                    text: root.modeInfo ? root.modeInfo.glyph : "󰍉"
+                    color: root.modeInfo ? Theme.primary : Qt.alpha(Theme.fg, 0.45)
                     font.family: Theme.fontFamily
                     font.pixelSize: 15
                 }
@@ -236,7 +299,7 @@ PanelWindow {
                     anchors.right: countText.left
                     anchors.rightMargin: 10
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "Search apps"
+                    text: root.modeInfo ? root.modeInfo.placeholder : "Search apps"
                     color: Theme.fg
                     opacity: 0.28
                     font.family: Theme.fontFamily
@@ -258,7 +321,19 @@ PanelWindow {
                     font.pixelSize: 13
                     clip: true
 
-                    onTextChanged: root.searchQuery = text
+                    onTextChanged: {
+                        // a bang plus space moves into its mode, and the text
+                        // carries on after it
+                        if (root.mode === "") {
+                            var p = Modes.parse(text);
+                            if (p.mode !== "") {
+                                root.mode = p.mode;
+                                text = p.text;
+                                return;
+                            }
+                        }
+                        root.searchQuery = text;
+                    }
 
                     Keys.onPressed: function (event) {
                         if (event.key === Qt.Key_Up) {
@@ -268,8 +343,11 @@ PanelWindow {
                             root.navigate(1);
                             event.accepted = true;
                         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                            if (root.filteredApps.length > 0)
-                                root.launchEntry(root.filteredApps[root.selectedIndex]);
+                            root.activate(root.results[root.selectedIndex]);
+                            event.accepted = true;
+                        } else if (event.key === Qt.Key_Backspace && root.mode !== "" && text === "") {
+                            // Backspace on an empty line leaves the mode
+                            root.mode = "";
                             event.accepted = true;
                         } else if (event.key === Qt.Key_Escape) {
                             AppLauncherState.hide();
@@ -283,7 +361,7 @@ PanelWindow {
                     anchors.right: parent.right
                     anchors.rightMargin: 14
                     anchors.verticalCenter: parent.verticalCenter
-                    text: root.filteredApps.length + " / " + DesktopEntries.applications.values.length
+                    text: root.mode !== "" ? "" : root.results.length + " / " + DesktopEntries.applications.values.length
                     color: Theme.fg
                     opacity: 0.35
                     font.family: Theme.fontFamilyAlt
@@ -295,16 +373,16 @@ PanelWindow {
             ListView {
                 id: listView
                 width: parent.width
-                height: Math.max(1, Math.min(root.filteredApps.length, root.maxVisible)) * root.itemH
-                model: root.filteredApps
+                height: Math.max(1, Math.min(root.results.length, root.maxVisible)) * root.itemH
+                model: root.results
                 clip: true
                 interactive: false
 
-                // "No apps found" when the search matches nothing
+                // says why the list is empty
                 Text {
                     anchors.centerIn: parent
-                    visible: root.filteredApps.length === 0
-                    text: "No apps found"
+                    visible: root.results.length === 0
+                    text: root.emptyText
                     color: Theme.fg
                     opacity: 0.28
                     font.family: Theme.fontFamily
@@ -359,14 +437,14 @@ PanelWindow {
                                 mipmap: true
                             }
 
-                            // letter fallback while there is no icon
+                            // the row's glyph, else a letter while there is no icon
                             Text {
                                 anchors.centerIn: parent
                                 visible: appIcon.status !== Image.Ready
-                                text: appRow.modelData.name.charAt(0).toUpperCase()
+                                text: appRow.modelData.glyph !== "" ? appRow.modelData.glyph : appRow.modelData.title.charAt(0).toUpperCase()
                                 font.family: Theme.fontFamily
-                                font.pixelSize: 14
-                                font.weight: Font.Bold
+                                font.pixelSize: appRow.modelData.glyph !== "" ? 17 : 14
+                                font.weight: appRow.modelData.glyph !== "" ? Font.Normal : Font.Bold
                                 color: appRow.sel ? Theme.primary : Theme.fg
                             }
                         }
@@ -378,7 +456,7 @@ PanelWindow {
 
                             Text {
                                 width: parent.width
-                                text: appRow.modelData.name
+                                text: appRow.modelData.title
                                 elide: Text.ElideRight
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 13
@@ -390,7 +468,7 @@ PanelWindow {
                             Text {
                                 width: parent.width
                                 visible: text !== ""
-                                text: root.subtitleOf(appRow.modelData)
+                                text: appRow.modelData.subtitle
                                 elide: Text.ElideRight
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 10
@@ -418,7 +496,7 @@ PanelWindow {
                         anchors.fill: parent
                         hoverEnabled: true
                         onEntered: root.selectedIndex = appRow.index
-                        onClicked: root.launchEntry(appRow.modelData)
+                        onClicked: root.activate(appRow.modelData)
                     }
                 }
             }
@@ -427,7 +505,7 @@ PanelWindow {
             Text {
                 width: parent.width
                 horizontalAlignment: Text.AlignHCenter
-                text: "↑↓ move   ↵ launch   esc close"
+                text: root.mode === "calc" ? "↵ copy   ⌫ back   esc close" : "↑↓ move   ↵ launch   esc close"
                 color: Theme.fg
                 opacity: 0.25
                 font.family: Theme.fontFamilyAlt
