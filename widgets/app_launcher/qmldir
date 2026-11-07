@@ -1,2 +1,3 @@
 AppLauncher AppLauncher.qml
 singleton AppLauncherState AppLauncherState.qml
+singleton Calc Calc.qml
