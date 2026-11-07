@@ -263,6 +263,12 @@ PanelWindow {
 
     Binding {
         target: Files
+        property: "active"
+        value: root.mode === "file"
+    }
+
+    Binding {
+        target: Files
         property: "query"
         value: root.mode === "file" ? root.searchQuery.trim() : ""
     }

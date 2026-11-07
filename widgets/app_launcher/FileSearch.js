@@ -3,7 +3,7 @@
 // The file mode's logic: what a typed line means, and how the output of the
 // two tools becomes rows. No QML types, so it can be tested with plain node.
 //   browse: the line is a path ("/etc/ng", "~/Doc"), listed with ls
-//   search: anything else, looked up under $HOME with fd
+//   search: anything else, fuzzy-matched against the files under $HOME that fd lists
 const FILE_GLYPH = "󰈔"
 const FOLDER_GLYPH = "󰉋"
 const MAX_BROWSE = 100
@@ -75,17 +75,80 @@ function parseLs(out, dir, frag, home) {
     })
 }
 
-// Output of `fd --absolute-path`: one path per line, folders possibly with a
-// trailing "/". Shallower paths first, since fd's own order is arbitrary.
-function parseFd(out, home) {
-    const rows = []
+// Output of `fd --absolute-path`, read once into the list the search runs on:
+// one item per path, with its lower-cased path under $HOME to match against.
+// A folder may come with a trailing "/".
+function prepare(out, home) {
+    const items = []
     for (const line of out.split("\n")) {
         if (line === "")
             continue
-        const isDir = line.length > 1 && line.charAt(line.length - 1) === "/"
-        rows.push({ path: isDir ? line.slice(0, -1) : line, dir: isDir })
+        const dir = line.length > 1 && line.charAt(line.length - 1) === "/"
+        const path = dir ? line.slice(0, -1) : line
+        const rel = home !== "" && path.indexOf(home + "/") === 0 ? path.slice(home.length + 1) : path
+        items.push({ path: path, dir: dir, low: rel.toLowerCase() })
     }
-    const depth = p => p.split("/").length
-    rows.sort((a, b) => depth(a.path) - depth(b.path) || a.path.localeCompare(b.path))
-    return rows.map(r => entry(r.path, r.dir, tilde(parentOf(r.path), home), ""))
+    return items
+}
+
+// How well the letters of q appear in order in s (both lower case): -1 if they
+// do not, else a score. Letters that follow each other, and letters that start
+// a word, count extra.
+function subseq(s, q) {
+    let score = 0
+    let from = 0
+    let prev = -2
+    for (let i = 0; i < q.length; i++) {
+        const j = s.indexOf(q.charAt(i), from)
+        if (j < 0)
+            return -1
+        if (j === prev + 1)
+            score += 5
+        const b = j === 0 ? "/" : s.charAt(j - 1)
+        if (b === "/" || b === "." || b === "-" || b === "_" || b === " ")
+            score += 8
+        prev = j
+        from = j + 1
+    }
+    return score
+}
+
+// null when qn is not in the path. A match in the file name beats one spread
+// over the folders, an exact piece of the name beats scattered letters, and a
+// shorter path breaks ties.
+function scoreOf(low, qn) {
+    const base = low.slice(low.lastIndexOf("/") + 1)
+    let total
+    const s = subseq(base, qn)
+    if (s >= 0) {
+        const k = base.indexOf(qn)
+        total = 100 + s + (k >= 0 ? 40 : 0) + (k === 0 ? 20 : 0)
+    } else {
+        const p = subseq(low, qn)
+        if (p < 0)
+            return null
+        total = p
+    }
+    return total - low.length * 0.2
+}
+
+// Fuzzy search over prepared items; spaces in q are ignored. -> { pool, top }:
+// every item that matches, best first, and the best `limit` of them as rows.
+// Any longer query that starts with q can only match what is in pool, so the
+// next keystroke can search that instead of the whole list.
+function fuzzy(items, q, limit, home) {
+    const qn = q.replace(/\s+/g, "").toLowerCase()
+    if (qn === "")
+        return { pool: [], top: [] }
+    const hits = []
+    for (const it of items) {
+        const s = scoreOf(it.low, qn)
+        if (s !== null)
+            hits.push({ it: it, s: s })
+    }
+    hits.sort((a, b) => b.s - a.s || a.it.low.length - b.it.low.length || (a.it.low < b.it.low ? -1 : 1))
+    return {
+        pool: hits.map(h => h.it),
+        top: hits.slice(0, limit).map(h => entry(h.it.path, h.it.dir, tilde(parentOf(h.it.path), home), ""))
+    }
 }
