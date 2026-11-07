@@ -411,8 +411,9 @@ PanelWindow {
                     expandable: Net.hasWifi
                     glyph: "󰖩"
                     title: Net.hasWifi ? "Wi-Fi" : "Network"
+                    // a wireless card that is idle while the cable is up reads "Ethernet", not "Not connected"
                     subtitle: Net.hasWifi
-                        ? (Net.wifiOn ? (Net.wifiConn !== "" ? Net.wifiConn : "Not connected") : "Off")
+                        ? (Net.wifiOn ? (Net.wifiConn !== "" ? Net.wifiConn : (Net.wiredUp ? "Ethernet" : "Not connected")) : "Off")
                         : (Net.wiredUp ? "Ethernet" : "Disconnected")
                     active: Net.hasWifi ? Net.wifiOn : Net.wiredUp
                     onClicked: {
