@@ -24,6 +24,7 @@ test("a bang and a space enters the mode, the rest is the text", () => {
     assert.deepStrictEqual(parse("!calc 2+2"), { mode: "calc", text: "2+2" })
     assert.deepStrictEqual(parse("!CALC 5 km to mi"), { mode: "calc", text: "5 km to mi" })
     assert.deepStrictEqual(parse("!calc "), { mode: "calc", text: "" })
+    assert.deepStrictEqual(parse("!file ~/Doc"), { mode: "file", text: "~/Doc" })
 })
 
 test("no space yet, an unknown bang, or no bang: plain text", () => {
@@ -36,9 +37,10 @@ test("the text after the bang keeps its own spaces and bangs", () => {
 })
 
 test("hints complete a half-typed bang", () => {
-    assert.deepStrictEqual(hints("!").map(m => m.name), ["calc"])
+    assert.deepStrictEqual(hints("!").map(m => m.name), ["calc", "file"])
     assert.deepStrictEqual(hints("!ca").map(m => m.name), ["calc"])
     assert.deepStrictEqual(hints("!calc").map(m => m.name), ["calc"])
+    assert.deepStrictEqual(hints("!f").map(m => m.name), ["file"])
     assert.deepStrictEqual(hints("!x"), [])
     assert.deepStrictEqual(hints("!calc 1"), [])
     assert.deepStrictEqual(hints("calc"), [])

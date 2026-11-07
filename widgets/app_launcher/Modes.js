@@ -3,7 +3,8 @@
 // Launcher modes, entered by typing a bang and a space ("!calc 2+2"). Kept free
 // of QML types so it can be tested with plain node.
 const MODES = [
-    { name: "calc", title: "Calculator", subtitle: "!calc  evaluate with qalc", glyph: "󰃬", placeholder: "Calculate" }
+    { name: "calc", title: "Calculator", subtitle: "!calc  evaluate with qalc", glyph: "󰃬", placeholder: "Calculate" },
+    { name: "file", title: "Files", subtitle: "!file  find, or / ~ to browse", glyph: "󰈔", placeholder: "Find files, or / ~ to browse" }
 ]
 
 function find(name) {
