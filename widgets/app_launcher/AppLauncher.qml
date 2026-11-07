@@ -55,12 +55,12 @@ PanelWindow {
     property int selectedIndex: 0
     readonly property bool isSearching: searchQuery.trim() !== ""
 
-    // "" is the app list; "calc" etc. come from a bang (Modes.js)
+    // "" is the app list; "calc", "file" come from a bang (Modes.js)
     property string mode: ""
     readonly property var modeInfo: Modes.find(mode)
 
     // what the list shows, whichever mode: plain objects, so every row looks
-    // alike. kind says what Enter does: "app", "mode" or "calc".
+    // alike. kind says what Enter does: "app", "mode", "calc" or "file".
     property var results: {
         var q = searchQuery.trim();
 
@@ -69,6 +69,14 @@ PanelWindow {
             if (Calc.result === "" || Calc.resultFor !== q)
                 return [];
             return [{ kind: "calc", title: Calc.result, subtitle: q, icon: "", glyph: modeInfo.glyph, value: Calc.result }];
+        }
+
+        if (mode === "file") {
+            if (Files.entriesFor !== q)
+                return [];
+            return Files.entries.map(function (e) {
+                return { kind: "file", title: e.name, subtitle: e.sub, icon: "", glyph: e.glyph, value: e.path, next: e.next };
+            });
         }
 
         // a half-typed bang offers the modes it could become
@@ -124,11 +132,17 @@ PanelWindow {
     }
 
     readonly property string emptyText: {
-        if (mode !== "calc")
-            return "No apps found";
-        if (searchQuery.trim() === "")
-            return "Type an expression";
-        return Calc.busy ? "" : "No result";
+        if (mode === "calc") {
+            if (searchQuery.trim() === "")
+                return "Type an expression";
+            return Calc.busy ? "" : "No result";
+        }
+        if (mode === "file") {
+            if (searchQuery.trim() === "")
+                return "Type a name, or / or ~ to browse";
+            return Files.busy ? "" : "Nothing found";
+        }
+        return "No apps found";
     }
 
     // one line of secondary text per app: its generic name, else its category
@@ -217,6 +231,15 @@ PanelWindow {
             // "--" so a negative answer is not read as an option
             Quickshell.execDetached(["wl-copy", "--", r.value]);
             AppLauncherState.hide();
+        } else if (r.kind === "file") {
+            if (r.next !== "") {
+                // a folder opens into the line, so browsing carries on
+                searchInput.text = r.next;
+            } else {
+                // r.value is an absolute path, so it cannot be read as an option
+                Quickshell.execDetached(["xdg-open", r.value]);
+                AppLauncherState.hide();
+            }
         }
     }
 
@@ -231,11 +254,17 @@ PanelWindow {
     // ── Colours ────────────────────────────────────────────────────────────
     readonly property color accentFill: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.18)
 
-    // the calculator only evaluates while it is the open mode
+    // each mode's service only works while its mode is open
     Binding {
         target: Calc
         property: "expression"
         value: root.mode === "calc" ? root.searchQuery.trim() : ""
+    }
+
+    Binding {
+        target: Files
+        property: "query"
+        value: root.mode === "file" ? root.searchQuery.trim() : ""
     }
 
     // only the card takes clicks; everything around it passes through
@@ -505,7 +534,7 @@ PanelWindow {
             Text {
                 width: parent.width
                 horizontalAlignment: Text.AlignHCenter
-                text: root.mode === "calc" ? "↵ copy   ⌫ back   esc close" : "↑↓ move   ↵ launch   esc close"
+                text: root.mode === "calc" ? "↵ copy   ⌫ back   esc close" : root.mode === "file" ? "↵ open   ⌫ back   esc close" : "↑↓ move   ↵ launch   esc close"
                 color: Theme.fg
                 opacity: 0.25
                 font.family: Theme.fontFamilyAlt
