@@ -15,11 +15,7 @@ Item {
     property var vpns: []
     property var _vpns: []
 
-    Component.onCompleted: {
-        Net.users += 1
-        refresh()
-    }
-    Component.onDestruction: Net.users -= 1
+    Component.onCompleted: refresh()
 
     Connections {
         target: Net
@@ -115,17 +111,6 @@ Item {
                 color: vpnRow.modelData.active ? Theme.green : Theme.fg
                 font.family: Theme.fontFamily
                 font.pixelSize: 12
-            }
-
-            Text {
-                visible: vpnRow.modelData.active
-                anchors.left: vpnName.right
-                anchors.leftMargin: 12
-                anchors.verticalCenter: parent.verticalCenter
-                text: Net.rateText(vpnRow.modelData.name)
-                color: Theme.disabled
-                font.family: Theme.fontFamily
-                font.pixelSize: 11
             }
 
             Text {

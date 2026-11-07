@@ -30,11 +30,7 @@ Item {
     property var _saved: []
     property var _nets: []
 
-    Component.onCompleted: {
-        Net.users += 1
-        refresh(false)
-    }
-    Component.onDestruction: Net.users -= 1
+    Component.onCompleted: refresh(false)
 
     Connections {
         target: Net
@@ -247,17 +243,6 @@ Item {
                     color: Theme.fg
                     font.family: Theme.fontFamily
                     font.pixelSize: 12
-                }
-
-                Text {
-                    visible: devRow.modelData.state === "connected"
-                    anchors.left: devName.right
-                    anchors.leftMargin: 12
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: Net.rateText(devRow.modelData.dev)
-                    color: Theme.disabled
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 11
                 }
 
                 Text {
