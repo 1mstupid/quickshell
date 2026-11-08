@@ -207,7 +207,7 @@ PanelWindow {
                             font.strikeout: row.task ? row.task.done : false
                         }
 
-                        // the day for overdue tasks, then the priority
+                        // the day for overdue tasks, then the hour, then the priority
                         Row {
                             id: meta
                             anchors.right: del.left
@@ -219,6 +219,13 @@ PanelWindow {
                                 visible: row.isLate
                                 text: row.task ? row.task.due.slice(5) : ""
                                 color: Theme.alert
+                                font.family: Theme.fontFamilyAlt
+                                font.pixelSize: 11
+                            }
+                            Text {
+                                visible: row.task !== null && row.task.time !== ""
+                                text: row.task ? row.task.time : ""
+                                color: Qt.alpha(Theme.fg, 0.5)
                                 font.family: Theme.fontFamilyAlt
                                 font.pixelSize: 11
                             }

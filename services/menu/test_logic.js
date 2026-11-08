@@ -11,7 +11,7 @@ function load(name, exports) {
     return new Function(src + "\nreturn { " + exports + " };")()
 }
 
-const Todo = load("TodoMd.js", "parse, toggled, edit, upcoming")
+const Todo = load("TodoMd.js", "parse, toggled, edit, upcoming, withSpent, fmtSpent")
 const Month = load("MonthGrid.js", "grid")
 
 let failures = 0
@@ -176,6 +176,66 @@ test("upcoming: overdue first, then priority, then file order; done and future a
 
 test("upcoming of nothing is empty", () => {
     assert.deepStrictEqual(Todo.upcoming([], "2026-11-08"), [])
+})
+
+test("parse reads the hour and the time spent, in any order", () => {
+    const t = Todo.parse([
+        "## 2026-11-08",
+        "- [ ] Call mom @16:30",
+        "- [ ] Report @9:05 p2 ~1h05m",
+        "- [ ] Gym ~45m p1 @17:53",
+        "- [ ] Mail me@home.org",
+        "- [ ] Odd @25:00",
+        "- [ ] Twice @10:00 @11:00",
+        "- [ ] Only tilde ~",
+        ""
+    ].join("\n"))
+    assert.deepStrictEqual(t.map(x => [x.title, x.time, x.priority, x.spent]), [
+        ["Call mom", "16:30", 0, 0],
+        ["Report", "09:05", 2, 65],
+        ["Gym", "17:53", 1, 45],
+        ["Mail me@home.org", "", 0, 0],
+        ["Odd @25:00", "", 0, 0],
+        ["Twice @10:00", "11:00", 0, 0],
+        ["Only tilde ~", "", 0, 0]
+    ])
+})
+
+test("withSpent replaces the token where it stands or adds one", () => {
+    assert.strictEqual(Todo.withSpent("- [ ] A @15:00", 5), "- [ ] A @15:00 ~5m")
+    assert.strictEqual(Todo.withSpent("- [ ] A ~10m @15:00 p1", 70), "- [ ] A ~1h10m @15:00 p1")
+    assert.strictEqual(Todo.withSpent("- [ ] A @15:00 ~1h05m", 125), "- [ ] A @15:00 ~2h05m")
+    assert.strictEqual(Todo.withSpent("- [ ] A\r", 3), "- [ ] A ~3m\r")
+    assert.strictEqual(Todo.withSpent("- [x] A", 60), "- [x] A ~1h00m")
+})
+
+test("withSpent round-trips through parse", () => {
+    const raw = "- [ ] Write the report @15:00 p2"
+    const text = "## 2026-11-08\n" + raw
+    const item = Todo.parse(text)[0]
+    const next = Todo.parse("## 2026-11-08\n" + Todo.withSpent(item.raw, 42))[0]
+    assert.deepStrictEqual([next.title, next.time, next.priority, next.spent], ["Write the report", "15:00", 2, 42])
+})
+
+test("upcoming: timed tasks come first within a day, earliest first", () => {
+    const text = [
+        "## 2026-11-07",
+        "- [ ] late untimed p1  p1",
+        "- [ ] late timed @08:00",
+        "## 2026-11-08",
+        "- [ ] today untimed p1  p1",
+        "- [ ] today evening @21:00",
+        "- [ ] today morning @09:30",
+        "- [ ] today untimed"
+    ].join("\n")
+    assert.deepStrictEqual(Todo.upcoming(Todo.parse(text), "2026-11-08").map(t => t.title), [
+        "late timed",
+        "late untimed p1",
+        "today morning",
+        "today evening",
+        "today untimed p1",
+        "today untimed"
+    ])
 })
 
 process.exitCode = failures ? 1 : 0
