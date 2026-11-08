@@ -91,6 +91,18 @@ PanelWindow {
             NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
         }
 
+        // the focus notch opens when the pointer rests on the pill (origin screen only)
+        HoverHandler {
+            id: pillHover
+            enabled: root.isOrigin
+        }
+        Binding {
+            target: FocusNotchState
+            property: "pillHovered"
+            value: pillHover.hovered
+            when: root.isOrigin
+        }
+
         // notch outline; the shoulders reach past the pill onto the screen edge
         Notch {
             x: -bodyX

@@ -11,6 +11,7 @@ singleton MediaWidgetState MediaWidgetState.qml
 singleton ClipboardHistory ClipboardHistory.qml
 singleton DashboardState DashboardState.qml
 singleton DrawerState DrawerState.qml
+singleton FocusNotchState FocusNotchState.qml
 singleton Locks Locks.qml
 Recorder Recorder.qml
 
