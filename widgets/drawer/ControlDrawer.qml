@@ -61,10 +61,15 @@ PanelWindow {
     // the per-app volume list under the volume slider; a right click on its icon toggles it
     property bool mixerOpen: false
 
-    // streams only report their volume once bound, so bind them while the list is shown
+    // streams only report their volume and properties once bound, so bind them
+    // while the list is shown
     PwObjectTracker {
         objects: root.mixerOpen ? Volume.streams : []
     }
+
+    // apps playing sound, by PipeWire's media class rather than the sink flag,
+    // which does not say playback from capture; empty until the streams are bound
+    readonly property var playback: Volume.streams.filter(n => n.properties["media.class"] === "Stream/Output/Audio")
 
     // so the brightness and profile rows are known before the first opening
     Component.onCompleted: Power.refresh()
@@ -566,7 +571,7 @@ PanelWindow {
                     visible: root.mixerOpen && Volume.audio !== null
 
                     Repeater {
-                        model: Volume.streams
+                        model: root.playback
 
                         StreamRow {
                             required property var modelData
@@ -576,7 +581,7 @@ PanelWindow {
                     }
 
                     Text {
-                        visible: Volume.streams.length === 0
+                        visible: root.playback.length === 0
                         text: "No app is playing audio"
                         color: Qt.alpha(Theme.fg, 0.5)
                         font.family: Theme.fontFamily
