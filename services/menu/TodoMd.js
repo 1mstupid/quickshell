@@ -64,3 +64,20 @@ function edit(text, line, raw, to) {
         lines[line] = to
     return lines.join("\n")
 }
+
+// What is left to do by `today`: open tasks due today or overdue, overdue first
+// (oldest day first), then p1 before p2 before p3 with unprioritised last, then
+// file order. Returns the same objects parse() gave, so they can still be edited.
+function upcoming(items, today) {
+    const rank = t => (t.priority === 0 ? 4 : t.priority)
+    return items
+        .filter(t => !t.done && t.due !== "" && t.due <= today)
+        .sort((a, b) => {
+            const aLate = a.due < today, bLate = b.due < today
+            if (aLate !== bLate)
+                return aLate ? -1 : 1
+            if (aLate && a.due !== b.due)
+                return a.due < b.due ? -1 : 1
+            return (rank(a) - rank(b)) || (a.line - b.line)
+        })
+}

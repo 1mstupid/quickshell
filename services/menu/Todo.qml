@@ -20,6 +20,9 @@ Singleton {
     // the minute clock rolls this over at midnight, so nothing has to poll
     readonly property string today: Qt.formatDate(clock.date, "yyyy-MM-dd")
 
+    // open tasks due today or overdue, in the order to do them
+    readonly property var upcoming: TodoMd.upcoming(items, today)
+
     function toDate(s) {
         const p = s.split("-").map(Number)
         return new Date(p[0], p[1] - 1, p[2])

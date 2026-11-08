@@ -11,7 +11,7 @@ function load(name, exports) {
     return new Function(src + "\nreturn { " + exports + " };")()
 }
 
-const Todo = load("TodoMd.js", "parse, toggled, edit")
+const Todo = load("TodoMd.js", "parse, toggled, edit, upcoming")
 const Month = load("MonthGrid.js", "grid")
 
 let failures = 0
@@ -148,6 +148,34 @@ test("grid: every row is seven days and days run one after another", () => {
 
 test("grid of an empty day is empty", () => {
     assert.deepStrictEqual(Month.grid(""), [])
+})
+
+test("upcoming: overdue first, then priority, then file order; done and future are left out", () => {
+    const text = [
+        "## 2026-11-06",
+        "- [ ] late, no priority",
+        "## 2026-11-05",
+        "- [ ] later still overdue earlier day p3",
+        "## 2026-11-08",
+        "- [ ] today plain",
+        "- [ ] today p2  p2",
+        "- [x] today done  p1",
+        "- [ ] today p1  p1",
+        "## 2026-11-09",
+        "- [ ] tomorrow, not yet"
+    ].join("\n")
+    const titles = Todo.upcoming(Todo.parse(text), "2026-11-08").map(t => t.title)
+    assert.deepStrictEqual(titles, [
+        "later still overdue earlier day",
+        "late, no priority",
+        "today p1",
+        "today p2",
+        "today plain"
+    ])
+})
+
+test("upcoming of nothing is empty", () => {
+    assert.deepStrictEqual(Todo.upcoming([], "2026-11-08"), [])
 })
 
 process.exitCode = failures ? 1 : 0

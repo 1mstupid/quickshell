@@ -11,6 +11,7 @@ import "./widgets/bar/media"
 import "./widgets/clipboard"
 import "./widgets/dashboard"
 import "./widgets/drawer"
+import "./widgets/focus_notch"
 import "./widgets/border"
 import "./widgets/habits"
 import "./widgets/notifications"
@@ -36,6 +37,8 @@ ShellRoot {
     Clipboard {}
 
     Dashboard {}
+
+    FocusNotch {}
 
     MediaWidget {}
 
