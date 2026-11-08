@@ -17,6 +17,11 @@ Singleton {
     // PipeWire allows boosting past 100%; the readout caps at 100
     readonly property int volume: audio ? Math.min(100, Math.round(audio.volume * 100)) : 0
 
+    // Every program audio stream, playback and capture. Event-driven, the list
+    // follows PipeWire as streams appear and go. The drawer binds them
+    // (PwObjectTracker) while its mixer is open and keeps the playback ones.
+    readonly property var streams: Pipewire.nodes.values.filter(n => n.isStream && n.audio)
+
     property bool shown: false
     property bool armed: false   // ignore the initial values at startup
 

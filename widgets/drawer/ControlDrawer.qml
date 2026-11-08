@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
+import Quickshell.Services.Pipewire
 import "../../services"
 import "../../services/menu"
 import "../notch"
@@ -57,6 +58,19 @@ PanelWindow {
         NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
     }
 
+    // the per-app volume list under the volume slider; a right click on its icon toggles it
+    property bool mixerOpen: false
+
+    // streams only report their volume and properties once bound, so bind them
+    // while the list is shown
+    PwObjectTracker {
+        objects: root.mixerOpen ? Volume.streams : []
+    }
+
+    // apps playing sound, by PipeWire's media class rather than the sink flag,
+    // which does not say playback from capture; empty until the streams are bound
+    readonly property var playback: Volume.streams.filter(n => n.properties["media.class"] === "Stream/Output/Audio")
+
     // so the brightness and profile rows are known before the first opening
     Component.onCompleted: Power.refresh()
 
@@ -68,6 +82,7 @@ PanelWindow {
         Power.refresh()
         Net.refreshState()
         view = ""
+        mixerOpen = false
         visible = true
         slide.stop()
         slide.from = root.t
@@ -277,6 +292,7 @@ PanelWindow {
         property bool dim: false
         signal moved(real v)
         signal glyphClicked()
+        signal glyphRightClicked()
 
         height: 28
 
@@ -294,8 +310,14 @@ PanelWindow {
             MouseArea {
                 anchors.fill: parent
                 anchors.margins: -4
+                acceptedButtons: Qt.LeftButton | Qt.RightButton
                 cursorShape: Qt.PointingHandCursor
-                onClicked: row.glyphClicked()
+                onClicked: mouse => {
+                    if (mouse.button === Qt.RightButton)
+                        row.glyphRightClicked()
+                    else
+                        row.glyphClicked()
+                }
             }
         }
 
@@ -348,6 +370,41 @@ PanelWindow {
                 if (pressed)
                     set(mouse.x)
             }
+        }
+    }
+
+    // one app's volume: its name over a slider row; the icon mutes just that app
+    component StreamRow: Column {
+        id: stream
+
+        required property var node
+        readonly property var audio: node.audio
+
+        spacing: 0
+
+        Text {
+            // lines up with the track, past the icon
+            x: 30
+            width: parent.width - 30
+            text: stream.node.properties["application.name"] || stream.node.description || stream.node.name
+            elide: Text.ElideRight
+            color: Qt.alpha(Theme.fg, 0.5)
+            font.family: Theme.fontFamily
+            font.pixelSize: 10
+        }
+
+        SliderRow {
+            width: parent.width
+            glyph: stream.audio.muted ? "󰝟" : "󰕾"
+            value: Math.min(1, stream.audio.volume)
+            readout: stream.audio.muted ? "MU" : Math.min(100, Math.round(stream.audio.volume * 100)).toString()
+            dim: stream.audio.muted
+            onMoved: v => {
+                stream.audio.volume = v
+                if (stream.audio.muted)
+                    stream.audio.muted = false
+            }
+            onGlyphClicked: stream.audio.muted = !stream.audio.muted
         }
     }
 
@@ -504,6 +561,32 @@ PanelWindow {
                             Volume.audio.muted = false
                     }
                     onGlyphClicked: Volume.audio.muted = !Volume.audio.muted
+                    onGlyphRightClicked: root.mixerOpen = !root.mixerOpen
+                }
+
+                // per-app volumes; the notch eases taller to fit them
+                Column {
+                    width: parent.width
+                    spacing: 6
+                    visible: root.mixerOpen && Volume.audio !== null
+
+                    Repeater {
+                        model: root.playback
+
+                        StreamRow {
+                            required property var modelData
+                            node: modelData
+                            width: parent.width
+                        }
+                    }
+
+                    Text {
+                        visible: root.playback.length === 0
+                        text: "No app is playing audio"
+                        color: Qt.alpha(Theme.fg, 0.5)
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 11
+                    }
                 }
 
                 SliderRow {
