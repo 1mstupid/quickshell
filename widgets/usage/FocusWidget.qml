@@ -32,6 +32,8 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell-focus"
     mask: Region { item: card }
 
+    Component.onCompleted: WidgetLayout.register("focus", root)
+
     // passing AppUsage.revision makes this re-evaluate when the numbers change
     readonly property int pomos: AppUsage.pomodoros(AppUsage.dayKey(), AppUsage.revision)
     // four dots per cycle; the set shows full through the long break
@@ -48,7 +50,7 @@ PanelWindow {
     readonly property string readout: Pomodoro.done ? "00:00"
         : fmt(Pomodoro.active ? Pomodoro.remaining : Pomodoro.minutes * 60)
 
-    visible: AppUsage.focusWidgetShown && !Overview.open
+    visible: WidgetLayout.shown("focus") && !Overview.open
 
     Rectangle {
         id: card
