@@ -435,7 +435,6 @@ PanelWindow {
             opacity: Math.max(0, (root.expand - 0.5) * 2)
             visible: opacity > 0
 
-            // header: the day, and the control drawer
             Item {
                 x: 18
                 y: 8
@@ -461,26 +460,6 @@ PanelWindow {
                         font.family: Theme.fontFamily
                         font.pixelSize: 13
                         font.bold: true
-                    }
-                }
-
-                // nf-md-tune: opens the control drawer
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.right: parent.right
-                    text: "󰘮"
-                    color: tuneMouse.containsMouse ? Theme.accent : Qt.alpha(Theme.fg, 0.7)
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.iconSize
-                    Behavior on color { ColorAnimation { duration: 120 } }
-
-                    MouseArea {
-                        id: tuneMouse
-                        anchors.fill: parent
-                        anchors.margins: -6
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: DrawerState.show()
                     }
                 }
             }
