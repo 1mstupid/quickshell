@@ -34,11 +34,13 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell-todo"
     mask: Region { item: card }
 
-    visible: UserSettings.todoWidget && !Overview.open
+    Component.onCompleted: WidgetLayout.register("todo", root)
+
+    visible: WidgetLayout.shown("todo") && !Overview.open
 
     IpcHandler {
         target: "todo"
-        function toggle(): void { UserSettings.todoWidget = !UserSettings.todoWidget }
+        function toggle(): void { WidgetLayout.toggle("todo") }
     }
 
     // task rows shown at most; what does not fit is counted in a "+N more" line
