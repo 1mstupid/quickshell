@@ -14,7 +14,6 @@ import "./widgets/drawer"
 import "./widgets/focus_notch"
 import "./widgets/border"
 import "./widgets/habits"
-import "./widgets/layout"
 import "./widgets/notifications"
 import "./widgets/power_menu"
 import "./widgets/todo"
@@ -50,8 +49,6 @@ ShellRoot {
     TodoWidget {}
 
     HabitsWidget {}
-
-    LayoutEditor {}
 
     Variants {
         model: Quickshell.screens

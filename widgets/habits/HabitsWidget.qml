@@ -36,14 +36,12 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell-habits"
     mask: Region { item: card }
 
-    Component.onCompleted: WidgetLayout.register("habits", root)
-
     // the day is empty only until habits.json has been read
-    visible: WidgetLayout.shown("habits") && !Overview.open && Habits.data.day !== ""
+    visible: UserSettings.habitsWidget && !Overview.open && Habits.data.day !== ""
 
     IpcHandler {
         target: "habits"
-        function toggle(): void { WidgetLayout.toggle("habits") }
+        function toggle(): void { UserSettings.habitsWidget = !UserSettings.habitsWidget }
     }
 
     readonly property var habits: Habits.data.habits

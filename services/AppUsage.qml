@@ -41,10 +41,13 @@ Singleton {
     property double lastMs: Date.now()
     property bool ready: false
     property bool dirty: false
-    // the desktop widget and the focus widget show or hide through layout.json
-    // (`qs ipc call usage toggle` / `toggleFocus`, or the layout edit mode)
-    function toggleWidget() { WidgetLayout.toggle("usage") }
-    function toggleFocusWidget() { WidgetLayout.toggle("focus") }
+    // the desktop widget and the focus widget; the values come from settings.json
+    // and are flipped by `qs ipc call usage toggle` / `toggleFocus`
+    readonly property bool widgetShown: UserSettings.usageRing
+    readonly property bool focusWidgetShown: UserSettings.focusWidget
+
+    function toggleWidget() { UserSettings.usageRing = !UserSettings.usageRing }
+    function toggleFocusWidget() { UserSettings.focusWidget = !UserSettings.focusWidget }
 
     // the window list from the last event, re-checked on each tick
     property var lastWindows: []

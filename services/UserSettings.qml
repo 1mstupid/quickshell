@@ -12,9 +12,7 @@ import Quickshell.Io
 // (bluetooth and vpn also need an adapter and a VPN profile to show)
 // A missing file, a bad file or a missing key keeps the default (shown). The
 // file is read on start and whenever it changes. The IPC toggles change the
-// running value only, so the file stays the source of truth. The four corner
-// widgets are the exception: once layout.json has a `visible` for one, that
-// wins, and their toggles write it (see WidgetLayout).
+// running value only, so the file stays the source of truth.
 Singleton {
     id: root
 

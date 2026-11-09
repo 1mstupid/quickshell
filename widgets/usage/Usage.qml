@@ -35,8 +35,6 @@ PanelWindow {
     // the rest of the wallpaper stays clickable
     mask: Region { item: card }
 
-    Component.onCompleted: WidgetLayout.register("usage", root)
-
     // passing AppUsage.revision makes this re-evaluate when the numbers change
     readonly property var allRows: AppUsage.totals(AppUsage.dayKey(), AppUsage.revision)
     readonly property real totalSec: allRows.reduce((s, r) => s + r.sec, 0)
@@ -61,7 +59,7 @@ PanelWindow {
     property int hovered: -1
 
     // hidden while the overview is open, or when switched off
-    visible: WidgetLayout.shown("usage") && !Overview.open && allRows.length > 0
+    visible: AppUsage.widgetShown && !Overview.open && allRows.length > 0
 
     // a section's share of the full circle
     function shareOf(i) {
