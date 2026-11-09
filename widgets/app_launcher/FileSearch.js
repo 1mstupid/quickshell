@@ -87,5 +87,12 @@ function parseFd(out, home) {
     }
     const depth = p => p.split("/").length
     rows.sort((a, b) => depth(a.path) - depth(b.path) || a.path.localeCompare(b.path))
-    return rows.map(r => entry(r.path, r.dir, tilde(parentOf(r.path), home), ""))
-}
+    return rows.map(r => {
+    const path = r.path
+    return entry(
+        path,
+        r.dir,
+        tilde(parentOf(path), home),
+        r.dir ? tilde(path, home) + "/" : ""
+    )
+})}
