@@ -4,46 +4,54 @@ import Quickshell.Io
 import QtQuick
 import QtQuick.Effects
 import "../../../services"
-import "../../notch"
 
-// Media widget. It morphs out of the bar pill, like the other panels. Opened by
-// the wave (or `qs ipc call media toggle`), closed by Escape, and closed when the
-// track stops. The lyrics toggle shows synced lyrics from LRCLIB.
+// Media widget on the wallpaper layer, bottom centre, between the focus and
+// usage cards: cover art, title and artist, and the transport controls. It shows
+// while a track is loaded and the widget is on. The wave in the bar, or
+// `qs ipc call media toggle`, turns it on and off. The lyrics toggle opens a
+// block of synced lyrics (LRCLIB) above the card, which grows upward so the
+// controls stay under the pointer. Only the card takes pointer events.
 PanelWindow {
     id: root
 
     screen: PillState.originScreen
-    visible: false
 
+    // full width, so the card can be centred without relying on the compositor
+    // to centre a window that is anchored to the bottom edge only
     anchors {
-        top: true
         left: true
         right: true
+        bottom: true
     }
-    implicitHeight: PillState.pillTop + maxPanelH + 12
+    margins {
+        bottom: Theme.edgeInset
+    }
+
+    // always tall enough for the lyrics, so toggling them never resizes the
+    // window; the card grows inside it and the mask keeps the rest clickable
+    implicitHeight: mainH + lyricsH
 
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
 
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: root.visible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.layer: WlrLayer.Background
     WlrLayershell.namespace: "quickshell-media"
 
+    mask: Region { item: card }
+
+    visible: UserSettings.mediaWidget && media.present && !Overview.open
+
     readonly property int panelW: 340
-    // collapsed: pad 14 + art 56 + gap + progress 22 + gap + controls 36 + pad 14
-    // expanded adds the lyrics block
-    readonly property int collapsedH: 164
-    readonly property int lyricsH: 84
-    readonly property int maxPanelH: collapsedH + lyricsH + 12
+    // the art is a square the height of the main section
+    readonly property int mainH: 120
+    readonly property int lyricsH: 76
+    readonly property int pad: 14
 
     property bool lyricsOn: false
-    property int panelH: lyricsOn ? collapsedH + lyricsH + 12 : collapsedH
-    Behavior on panelH {
+    property real shownH: lyricsOn ? mainH + lyricsH : mainH
+    Behavior on shownH {
         NumberAnimation { duration: 250; easing.type: Easing.OutCubic }
     }
-
-    // 0 = the bar pill, 1 = the full widget
-    property real t: 0
 
     // ── Lyrics state ───────────────────────────────────────────────────────
     property var lyrics: []          // [{ t: seconds, text }]
@@ -53,84 +61,19 @@ PanelWindow {
     property string lyricStatus: ""  // "", "searching", "none"
     property int lyricIdx: -1
 
+    // nothing here reads the one-second position tick; the lyrics timer below
+    // reads the player directly
     MediaState {
         id: media
-        active: root.visible
+        active: false
     }
 
     IpcHandler {
         target: "media"
-        function toggle(): void { MediaWidgetState.toggle() }
-        function show(): void { MediaWidgetState.show() }
-        function hide(): void { MediaWidgetState.hide() }
+        function toggle(): void { UserSettings.mediaWidget = !UserSettings.mediaWidget }
+        function show(): void { UserSettings.mediaWidget = true }
+        function hide(): void { UserSettings.mediaWidget = false }
         function kill(): void { media.kill() }
-    }
-
-    // only the card takes clicks; everything around it passes through
-    mask: Region { item: outline }
-
-    onVisibleChanged: {
-        if (visible)
-            keyHost.forceActiveFocus()
-    }
-
-    function openWidget() {
-        PillState.owner = "media"
-        visible = true
-        morph.stop()
-        morph.from = root.t
-        morph.to = 1
-        morph.start()
-    }
-
-    function closeWidget() {
-        morph.stop()
-        morph.from = root.t
-        morph.to = 0
-        morph.start()
-    }
-
-    NumberAnimation {
-        id: morph
-        target: root
-        property: "t"
-        duration: 480
-        easing.type: Easing.InOutCubic
-        onFinished: {
-            if (root.t < 0.5) {
-                root.visible = false
-                if (PillState.owner === "media")
-                    PillState.owner = ""
-            }
-        }
-    }
-
-    Connections {
-        target: MediaWidgetState
-        function onOpenChanged() {
-            if (MediaWidgetState.open)
-                root.openWidget()
-            else
-                root.closeWidget()
-        }
-    }
-
-    // the track stopping or disappearing closes the widget; pausing does not
-    Connections {
-        target: media
-        function onPresentChanged() {
-            if (!media.present)
-                MediaWidgetState.hide()
-        }
-    }
-
-    // another panel took the pill, so this one gives way
-    Connections {
-        target: PillState
-        function onOwnerChanged() {
-            if (PillState.owner !== "media" && root.visible)
-                MediaWidgetState.hide()
-        }
     }
 
     // ── Lyrics ─────────────────────────────────────────────────────────────
@@ -222,7 +165,7 @@ PanelWindow {
         }
     }
 
-    // follows the player position, faster than MediaState's one-second tick
+    // follows the player position
     Timer {
         interval: 250
         repeat: true
@@ -231,125 +174,115 @@ PanelWindow {
         onTriggered: root.lyricIdx = root.lineAt(media.player?.position ?? 0)
     }
 
-    // ── Card ───────────────────────────────────────────────────────────────
+    // ── Transport buttons ──────────────────────────────────────────────────
+    component Btn: Text {
+        id: btn
+        property bool allowed: true
+        signal tapped()
+        anchors.verticalCenter: parent.verticalCenter
+        font.family: Theme.fontFamily
+        font.pixelSize: 20
+        color: !allowed ? Qt.alpha(Theme.fg, 0.25)
+             : ma.containsMouse ? Theme.accent : Theme.fg
+        Behavior on color { ColorAnimation { duration: 120 } }
 
-    // the outline is a notch, drawn behind the card and sized to it
-    Notch {
-        id: outline
-        bodyWidth: card.width
-        bodyHeight: card.height
-        x: card.x - bodyX
-        y: card.y
+        MouseArea {
+            id: ma
+            anchors.fill: parent
+            anchors.margins: -8
+            hoverEnabled: true
+            cursorShape: btn.allowed ? Qt.PointingHandCursor : Qt.ArrowCursor
+            onClicked: if (btn.allowed) btn.tapped()
+        }
     }
 
+    // ── Card ───────────────────────────────────────────────────────────────
     Rectangle {
         id: card
 
-        readonly property real fromW: PillState.pillWidth
-        readonly property real fromH: PillState.pillHeight
-
-        width: fromW + (root.panelW - fromW) * root.t
-        height: fromH + (root.panelH - fromH) * root.t
+        width: root.panelW
+        height: root.shownH
         x: (root.width - width) / 2
-        y: PillState.pillTop
-        color: "transparent"
+        y: root.height - height
+        radius: 16
+        color: Qt.alpha(Theme.bg, 0.92)
+        border.width: 1
+        border.color: Qt.alpha(Theme.border, 0.6)
         clip: true
 
+        // art, text and controls, pinned to the bottom so they stay put when the
+        // lyrics open above them
         Item {
-            id: keyHost
-            anchors.fill: parent
-            focus: true
-            Keys.onEscapePressed: MediaWidgetState.hide()
-        }
+            id: main
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            height: root.mainH
 
-        // content fades in during the second half of the morph
-        Column {
-            id: content
-            anchors.fill: parent
-            anchors.margins: 14
-            spacing: 10
-            opacity: Math.max(0, (root.t - 0.5) * 2)
+            // artwork, flush with the card inside its border. Only the left
+            // corners are rounded; the image is masked to the same shape, and a
+            // glyph shows while none is loaded.
+            Rectangle {
+                id: art
+                x: 1
+                y: 1
+                width: root.mainH - 2
+                height: root.mainH - 2
+                topLeftRadius: card.radius - 1
+                bottomLeftRadius: card.radius - 1
+                color: Qt.alpha(Theme.fg, 0.06)
 
-            // ── Header: art, title, artist, player, lyrics toggle ──────────
+                Item {
+                    id: artMask
+                    anchors.fill: parent
+                    visible: false
+                    layer.enabled: true
+                    Rectangle {
+                        anchors.fill: parent
+                        topLeftRadius: art.topLeftRadius
+                        bottomLeftRadius: art.bottomLeftRadius
+                        color: "white"
+                    }
+                }
+
+                Image {
+                    id: artImage
+                    anchors.fill: parent
+                    source: media.player?.trackArtUrl ?? ""
+                    fillMode: Image.PreserveAspectCrop
+                    visible: status === Image.Ready
+                    layer.enabled: true
+                    layer.effect: MultiEffect {
+                        maskEnabled: true
+                        maskSource: artMask
+                    }
+                }
+                Text {
+                    anchors.centerIn: parent
+                    visible: artImage.status !== Image.Ready
+                    text: "󰝚"
+                    color: Qt.alpha(Theme.fg, 0.3)
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 30
+                }
+            }
+
+            // title and artist on top, controls at the bottom right
             Item {
-                id: header
-                width: parent.width
-                height: 56
-
-                // artwork, rounded by masking the image; a glyph while none is loaded
-                Rectangle {
-                    id: art
-                    width: 56
-                    height: 56
-                    radius: 12
-                    color: Qt.alpha(Theme.fg, 0.06)
-
-                    Item {
-                        id: artMask
-                        anchors.fill: parent
-                        visible: false
-                        layer.enabled: true
-                        Rectangle { anchors.fill: parent; radius: art.radius; color: "white" }
-                    }
-
-                    Image {
-                        id: artImage
-                        anchors.fill: parent
-                        source: media.player?.trackArtUrl ?? ""
-                        fillMode: Image.PreserveAspectCrop
-                        visible: status === Image.Ready
-                        layer.enabled: true
-                        layer.effect: MultiEffect {
-                            maskEnabled: true
-                            maskSource: artMask
-                        }
-                    }
-                    Text {
-                        anchors.centerIn: parent
-                        visible: artImage.status !== Image.Ready
-                        text: "󰝚"
-                        color: Qt.alpha(Theme.fg, 0.3)
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 26
-                    }
-                }
-
-                // lyrics toggle, on the right of the header
-                Rectangle {
-                    id: lyricsPill
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    width: 50
-                    height: 20
-                    radius: 7
-                    color: root.lyricsOn ? Qt.alpha(Theme.accent, 0.25)
-                         : lyricsMa.containsMouse ? Qt.alpha(Theme.fg, 0.14)
-                         : Qt.alpha(Theme.fg, 0.08)
-                    Behavior on color { ColorAnimation { duration: 120 } }
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "lyrics"
-                        color: root.lyricsOn ? Theme.accent : Theme.fg
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 11
-                    }
-                    MouseArea {
-                        id: lyricsMa
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.lyricsOn = !root.lyricsOn
-                    }
-                }
+                id: side
+                anchors.left: art.right
+                anchors.leftMargin: root.pad
+                anchors.right: parent.right
+                anchors.rightMargin: root.pad
+                anchors.top: parent.top
+                anchors.topMargin: root.pad
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: root.pad
 
                 Column {
-                    anchors.left: art.right
-                    anchors.leftMargin: 12
-                    // stop short of the lyrics pill so titles never run under it
-                    anchors.right: lyricsPill.left
-                    anchors.rightMargin: 8
-                    anchors.verticalCenter: art.verticalCenter
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
                     spacing: 3
 
                     MarqueeText {
@@ -357,7 +290,7 @@ PanelWindow {
                         text: media.player?.trackTitle ?? ""
                         color: Theme.fg
                         font.family: Theme.fontFamily
-                        font.pixelSize: 14
+                        font.pixelSize: 15
                         font.bold: true
                     }
                     MarqueeText {
@@ -365,181 +298,148 @@ PanelWindow {
                         text: media.artistText
                         color: Qt.alpha(Theme.fg, 0.6)
                         font.family: Theme.fontFamily
-                        font.pixelSize: 12
-                    }
-                    Text {
-                        width: parent.width
-                        visible: text !== ""
-                        elide: Text.ElideRight
-                        text: media.player?.identity ?? ""
-                        color: Qt.alpha(Theme.fg, 0.35)
-                        font.family: Theme.fontFamilyAlt
-                        font.pixelSize: 10
+                        font.pixelSize: 13
                     }
                 }
-            }
 
-            // ── Progress with elapsed and remaining time ───────────────────
-            Column {
-                width: parent.width
-                spacing: 6
-
-                // progress line; click to seek, the hit area is taller than the line
-                Item {
-                    id: seek
-                    width: parent.width
-                    height: 4
+                Row {
+                    id: controls
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    spacing: 10
 
                     Rectangle {
-                        anchors.fill: parent
-                        radius: 2
-                        color: Qt.alpha(Theme.fg, 0.12)
+                        id: lyricsPill
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 50
+                        height: 22
+                        radius: 7
+                        color: root.lyricsOn ? Qt.alpha(Theme.accent, 0.25)
+                             : lyricsMa.containsMouse ? Qt.alpha(Theme.fg, 0.14)
+                             : Qt.alpha(Theme.fg, 0.08)
+                        Behavior on color { ColorAnimation { duration: 120 } }
 
-                        Rectangle {
-                            width: media.timed ? Math.min(media.pos / media.len, 1) * parent.width : 0
-                            height: parent.height
-                            radius: parent.radius
-                            color: Theme.accent
+                        Text {
+                            anchors.centerIn: parent
+                            text: "lyrics"
+                            color: root.lyricsOn ? Theme.accent : Theme.fg
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 11
+                        }
+                        MouseArea {
+                            id: lyricsMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.lyricsOn = !root.lyricsOn
                         }
                     }
 
-                    MouseArea {
-                        anchors.fill: parent
-                        anchors.margins: -6
-                        enabled: media.timed && (media.player?.canSeek ?? false)
-                        onClicked: m => {
-                            // the area reaches 6px past the track on each side
-                            const frac = Math.min(Math.max((m.x - 6) / seek.width, 0), 1)
-                            media.player.position = frac * media.len
+                    Btn {
+                        text: "󰒮"
+                        allowed: media.player?.canGoPrevious ?? false
+                        onTapped: media.player.previous()
+                    }
+
+                    // the one filled control, like START on the focus card
+                    Rectangle {
+                        id: playBtn
+                        readonly property bool allowed: media.player?.canTogglePlaying ?? false
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 40
+                        height: 40
+                        radius: 20
+                        color: !allowed ? Qt.alpha(Theme.fg, 0.15)
+                             : playMa.containsMouse ? Qt.lighter(Theme.accent, 1.1) : Theme.accent
+                        Behavior on color { ColorAnimation { duration: 120 } }
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: media.playing ? "󰏤" : "󰐊"
+                            color: Theme.bg
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 22
+                        }
+                        MouseArea {
+                            id: playMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: playBtn.allowed ? Qt.PointingHandCursor : Qt.ArrowCursor
+                            onClicked: if (playBtn.allowed) media.player.togglePlaying()
                         }
                     }
-                }
 
-                Item {
-                    width: parent.width
-                    height: 12
-                    visible: media.timed
-
-                    Text {
-                        anchors.left: parent.left
-                        text: media.fmt(media.pos)
-                        color: Qt.alpha(Theme.fg, 0.6)
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 10
-                    }
-                    Text {
-                        anchors.right: parent.right
-                        text: "-" + media.fmt(Math.max(0, media.len - media.pos))
-                        color: Qt.alpha(Theme.fg, 0.6)
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 10
+                    Btn {
+                        text: "󰒭"
+                        allowed: media.player?.canGoNext ?? false
+                        onTapped: media.player.next()
                     }
                 }
             }
+        }
 
-            // ── Transport controls ─────────────────────────────────────────
-            component Btn: Text {
-                id: btn
-                property bool allowed: true
-                signal tapped()
-                y: (parent.height - height) / 2
+        // ── Lyrics: previous, current, next. Sits on top of the main section,
+        // so it is clipped away while the card is short and slides in as it grows.
+        Item {
+            id: lyricsBlock
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: main.top
+            height: root.lyricsH
+            opacity: root.lyricsOn ? 1 : 0
+            visible: opacity > 0
+            Behavior on opacity { NumberAnimation { duration: 150 } }
+
+            // status line while there are no lines to show
+            Text {
+                anchors.centerIn: parent
+                visible: root.lyrics.length === 0
+                text: root.lyricStatus === "searching" ? "searching…"
+                    : root.lyricStatus === "none" ? "no synced lyrics" : ""
+                color: Qt.alpha(Theme.fg, 0.4)
                 font.family: Theme.fontFamily
-                font.pixelSize: 30
-                color: !allowed ? Qt.alpha(Theme.fg, 0.25)
-                     : ma.containsMouse ? Theme.accent : Theme.fg
-                Behavior on color { ColorAnimation { duration: 120 } }
-
-                MouseArea {
-                    id: ma
-                    anchors.fill: parent
-                    anchors.margins: -8
-                    hoverEnabled: true
-                    onClicked: if (btn.allowed) btn.tapped()
-                }
+                font.pixelSize: 11
             }
 
-            Row {
-                id: controls
-                height: 36
-                anchors.horizontalCenter: parent.horizontalCenter
-                spacing: 52
+            Column {
+                anchors.centerIn: parent
+                width: parent.width - 2 * root.pad
+                spacing: 4
+                visible: root.lyrics.length > 0
 
-                Btn {
-                    text: "󰒮"
-                    allowed: media.player?.canGoPrevious ?? false
-                    onTapped: media.player.previous()
-                }
-                Btn {
-                    text: media.playing ? "󰏤" : "󰐊"
-                    allowed: media.player?.canTogglePlaying ?? false
-                    onTapped: media.player.togglePlaying()
-                }
-                Btn {
-                    text: "󰒭"
-                    allowed: media.player?.canGoNext ?? false
-                    onTapped: media.player.next()
-                }
-            }
-
-            // ── Lyrics: previous, current, next; hidden while collapsed ────
-            Item {
-                id: lyricsBlock
-                width: parent.width
-                height: root.lyricsOn ? root.lyricsH : 0
-                visible: root.lyricsOn
-                clip: true
-
-                // status line while there are no lines to show
                 Text {
-                    anchors.centerIn: parent
-                    visible: root.lyrics.length === 0
-                    text: root.lyricStatus === "searching" ? "searching…"
-                        : root.lyricStatus === "none" ? "no synced lyrics" : ""
-                    color: Qt.alpha(Theme.fg, 0.4)
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    maximumLineCount: 1
+                    elide: Text.ElideRight
+                    text: root.lyrics[root.lyricIdx - 1]?.text ?? ""
+                    color: Qt.alpha(Theme.fg, 0.3)
                     font.family: Theme.fontFamily
                     font.pixelSize: 11
                 }
-
-                                Column {
-                    anchors.centerIn: parent
+                Text {
                     width: parent.width
-                    spacing: 4
-                    visible: root.lyrics.length > 0
-
-                    Text {
-                        width: parent.width
-                        horizontalAlignment: Text.AlignHCenter
-                        wrapMode: Text.WordWrap
-                        maximumLineCount: 1
-                        elide: Text.ElideRight
-                        text: root.lyrics[root.lyricIdx - 1]?.text ?? ""
-                        color: Qt.alpha(Theme.fg, 0.3)
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 11
-                    }
-                    Text {
-                        width: parent.width
-                        horizontalAlignment: Text.AlignHCenter
-                        wrapMode: Text.WordWrap
-                        maximumLineCount: 2
-                        elide: Text.ElideRight
-                        text: root.lyricIdx < 0 ? "…" : (root.lyrics[root.lyricIdx]?.text ?? "")
-                        color: Theme.fg
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 13
-                        font.bold: true
-                    }
-                    Text {
-                        width: parent.width
-                        horizontalAlignment: Text.AlignHCenter
-                        wrapMode: Text.WordWrap
-                        maximumLineCount: 1
-                        elide: Text.ElideRight
-                        text: root.lyrics[root.lyricIdx + 1]?.text ?? ""
-                        color: Qt.alpha(Theme.fg, 0.3)
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 11
-                    }
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    maximumLineCount: 2
+                    elide: Text.ElideRight
+                    text: root.lyricIdx < 0 ? "…" : (root.lyrics[root.lyricIdx]?.text ?? "")
+                    color: Theme.fg
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 13
+                    font.bold: true
+                }
+                Text {
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    maximumLineCount: 1
+                    elide: Text.ElideRight
+                    text: root.lyrics[root.lyricIdx + 1]?.text ?? ""
+                    color: Qt.alpha(Theme.fg, 0.3)
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 11
                 }
             }
         }

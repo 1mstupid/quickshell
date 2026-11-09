@@ -4,7 +4,8 @@ import Quickshell
 import Quickshell.Io
 
 // Widget visibility, read from ~/.local/xdg/config/settings.json:
-//   {"usageRing": true, "focusWidget": true, "todoWidget": true, "habitsWidget": true}
+//   {"usageRing": true, "focusWidget": true, "todoWidget": true, "habitsWidget": true,
+//    "mediaWidget": true}
 // and what the control drawer offers (brightness and powerProfile also need the
 // hardware, so a desktop shows neither whatever the file says):
 //   {"wifi": true, "bluetooth": true, "vpn": true, "brightness": true, "powerProfile": true,
@@ -22,6 +23,7 @@ Singleton {
     property bool focusWidget: true
     property bool todoWidget: true
     property bool habitsWidget: true
+    property bool mediaWidget: true
     property bool wifi: true
     property bool bluetooth: true
     property bool vpn: true
@@ -44,6 +46,7 @@ Singleton {
         focusWidget = typeof d.focusWidget === "boolean" ? d.focusWidget : true
         todoWidget = typeof d.todoWidget === "boolean" ? d.todoWidget : true
         habitsWidget = typeof d.habitsWidget === "boolean" ? d.habitsWidget : true
+        mediaWidget = typeof d.mediaWidget === "boolean" ? d.mediaWidget : true
         wifi = typeof d.wifi === "boolean" ? d.wifi : true
         bluetooth = typeof d.bluetooth === "boolean" ? d.bluetooth : true
         vpn = typeof d.vpn === "boolean" ? d.vpn : true
