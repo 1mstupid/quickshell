@@ -16,3 +16,4 @@ Recorder Recorder.qml
 
 
 singleton UserSettings UserSettings.qml
+singleton WidgetLayout WidgetLayout.qml

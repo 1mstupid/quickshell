@@ -14,12 +14,16 @@ PanelWindow {
 
     screen: PillState.originScreen
     anchors {
-        left: true
-        top: true
+        left: WidgetLayout.hasLeft("todo")
+        right: WidgetLayout.hasRight("todo")
+        top: WidgetLayout.hasTop("todo")
+        bottom: WidgetLayout.hasBottom("todo")
     }
     margins {
-        left: Theme.edgeInset
-        top: Theme.edgeInset
+        left: WidgetLayout.insetX("todo")
+        right: WidgetLayout.insetX("todo")
+        top: WidgetLayout.insetY("todo")
+        bottom: WidgetLayout.insetY("todo")
     }
     implicitWidth: 240
     implicitHeight: card.height

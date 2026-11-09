@@ -12,12 +12,16 @@ PanelWindow {
 
     screen: PillState.originScreen
     anchors {
-        left: true
-        bottom: true
+        left: WidgetLayout.hasLeft("focus")
+        right: WidgetLayout.hasRight("focus")
+        top: WidgetLayout.hasTop("focus")
+        bottom: WidgetLayout.hasBottom("focus")
     }
     margins {
-        left: Theme.edgeInset
-        bottom: Theme.edgeInset
+        left: WidgetLayout.insetX("focus")
+        right: WidgetLayout.insetX("focus")
+        top: WidgetLayout.insetY("focus")
+        bottom: WidgetLayout.insetY("focus")
     }
     implicitWidth: 240
     implicitHeight: card.height
