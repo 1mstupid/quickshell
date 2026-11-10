@@ -13,13 +13,13 @@ import "../bar/media"
 // far, and pause and done; with nothing in focus it offers the block the
 // schedule has on now. Click the strip (or run `qs ipc call focusnotch toggle`)
 // and it opens further:
-//   Home   the now-playing card, with play, pause and skip.
+//   Home   the now-playing card on the left, and the focus card for the task in
+//          hand on the right: its timer, and pause and done.
 //   Day    what is left to do: todo.md's tasks together with today's blocks from
 //          schedule.md. A click puts a row in focus (it does not tick it), the
 //          check on a hovered row ticks it, and the box at the bottom adds a task
 //          to today, typed the way todo.md has it.
 //   Week   the schedule's grid, with today and the block that is on now marked.
-//   Focus  the timer large, and the time tracked today and this week.
 // The strip closes when the pointer leaves it; the open panel closes on Escape
 // or a click outside.
 PanelWindow {
@@ -53,9 +53,9 @@ PanelWindow {
 
     // "" closed, "hover" the strip, "open" the full panel
     property string stage: ""
-    // the open panel's page: "home", "week" or "focus", remembered across openings
+    // the open panel's page: "home", "day" or "week", remembered across openings
     readonly property string tab: FocusNotchState.page
-    readonly property var pages: ["home", "day", "week", "focus"]
+    readonly property var pages: ["home", "day", "week"]
     readonly property int pageIndex: Math.max(0, pages.indexOf(tab))
     // wraps at both ends
     function stepPage(delta) {
@@ -477,7 +477,7 @@ PanelWindow {
 
                     Repeater {
                         // icons, not names: the buttons sit in a row across the top of the panel
-                        model: [{ key: "home", name: "󰋜" }, { key: "day", name: "󰸗" }, { key: "week", name: "󰃭" }, { key: "focus", name: "󰔛" }]
+                        model: [{ key: "home", name: "󰋜" }, { key: "day", name: "󰸗" }, { key: "week", name: "󰃭" }]
 
                         Rectangle {
                             id: tabButton
@@ -536,7 +536,7 @@ PanelWindow {
                 Item {
                     id: mediaCard
                     x: 12
-                    width: panel.width - 24
+                    width: Math.round((panel.width - 36) / 2)
                     height: parent.height - 12
 
                     // the same MPRIS state the bar's media wave reads
@@ -712,6 +712,122 @@ PanelWindow {
                             glyph: "󰒭"
                             allowed: media.player?.canGoNext ?? false
                             onTapped: media.player.next()
+                        }
+                    }
+                }
+
+                // the timer card
+                Rectangle {
+                    id: focusCard
+                    x: mediaCard.x + mediaCard.width + 12
+                    width: homeTab.width - x - 12
+                    height: parent.height - 12
+                    radius: 12
+                    color: Qt.alpha(Theme.fg, 0.06)
+
+                    Column {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: 14
+                        spacing: 10
+
+                        Row {
+                            spacing: 12
+
+                            Ring {
+                                fraction: root.ringFraction
+                                label: root.ringLabel
+                                size: 52
+                                tint: root.tint
+                            }
+                            Column {
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 2
+
+                                Text {
+                                    text: root.stateLabel
+                                    color: Qt.alpha(Theme.fg, 0.5)
+                                    font.family: Theme.fontFamilyAlt
+                                    font.pixelSize: 10
+                                    font.letterSpacing: 1
+                                }
+                                Text {
+                                    visible: root.focusOn
+                                    text: root.clockText
+                                    color: Theme.fg
+                                    font.family: Theme.fontFamilyAlt
+                                    font.pixelSize: 22
+                                    font.bold: true
+                                }
+                            }
+                        }
+
+                        Text {
+                            width: parent.width
+                            text: root.focusOn ? TaskFocus.title : "Pick a task from the list to start timing it."
+                            color: root.focusOn ? Theme.fg : Qt.alpha(Theme.fg, 0.5)
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 13
+                            font.bold: root.focusOn
+                            wrapMode: Text.WordWrap
+                            maximumLineCount: 2
+                            elide: Text.ElideRight
+                        }
+                        Text {
+                            visible: root.focusOn
+                            text: "total " + root.totalText + (TaskFocus.item && TaskFocus.item.time !== "" ? "  ·  due " + TaskFocus.item.time : "")
+                            color: Qt.alpha(Theme.fg, 0.5)
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 11
+                        }
+                    }
+
+                    // the block the schedule has on now
+                    Column {
+                        visible: !root.focusOn && root.nowText !== ""
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        anchors.margins: 14
+                        spacing: 3
+
+                        Text {
+                            text: "NOW"
+                            color: Qt.alpha(Theme.fg, 0.5)
+                            font.family: Theme.fontFamilyAlt
+                            font.pixelSize: 10
+                            font.letterSpacing: 1
+                        }
+                        Text {
+                            width: parent.width
+                            text: root.nowText
+                            color: Theme.fg
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 11
+                            elide: Text.ElideRight
+                        }
+                    }
+
+                    Row {
+                        visible: root.focusOn
+                        anchors.left: parent.left
+                        anchors.bottom: parent.bottom
+                        anchors.margins: 12
+                        spacing: 8
+
+                        PillButton {
+                            label: TaskFocus.running ? "PAUSE" : "RESUME"
+                            onClicked: TaskFocus.toggle()
+                        }
+                        PillButton {
+                            label: "STOP"
+                            onClicked: TaskFocus.stop()
+                        }
+                        PillButton {
+                            label: "DONE"
+                            main: true
+                            onClicked: TaskFocus.complete()
                         }
                     }
                 }
@@ -939,185 +1055,6 @@ PanelWindow {
                 y: 46
                 width: panel.width - 24
                 height: panel.height - y - 10
-            }
-
-            // ── Focus: the task in focus, and the time tracked ─────────────
-            Item {
-                id: focusTab
-                visible: root.tab === "focus"
-                x: 18
-                y: 46
-                width: panel.width - 36
-                height: panel.height - y - 12
-
-                Item {
-                    id: bigTimer
-                    width: parent.width
-                    height: 78
-
-                    Ring {
-                        id: bigRing
-                        anchors.verticalCenter: parent.verticalCenter
-                        size: 64
-                        fraction: root.ringFraction
-                        label: root.ringLabel
-                        tint: root.tint
-                    }
-                    Column {
-                        anchors.verticalCenter: parent.verticalCenter
-                        anchors.left: bigRing.right
-                        anchors.leftMargin: 16
-                        anchors.right: bigButtons.left
-                        anchors.rightMargin: 12
-                        spacing: 3
-
-                        Text {
-                            text: root.stateLabel
-                            color: Qt.alpha(Theme.fg, 0.5)
-                            font.family: Theme.fontFamilyAlt
-                            font.pixelSize: 10
-                            font.letterSpacing: 1
-                        }
-                        Text {
-                            visible: root.focusOn
-                            text: root.clockText
-                            color: Theme.fg
-                            font.family: Theme.fontFamilyAlt
-                            font.pixelSize: 30
-                            font.bold: true
-                        }
-                        Text {
-                            width: parent.width
-                            text: root.focusOn ? TaskFocus.title : root.nextRow !== null ? root.nextText : "Nothing left today"
-                            color: root.focusOn ? Theme.fg : Qt.alpha(Theme.fg, 0.7)
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 13
-                            font.bold: root.focusOn
-                            elide: Text.ElideRight
-                        }
-                    }
-                    Row {
-                        id: bigButtons
-                        anchors.verticalCenter: parent.verticalCenter
-                        anchors.right: parent.right
-                        spacing: 8
-
-                        PillButton {
-                            visible: root.focusOn
-                            label: TaskFocus.running ? "PAUSE" : "RESUME"
-                            onClicked: TaskFocus.toggle()
-                        }
-                        PillButton {
-                            visible: root.focusOn
-                            label: "STOP"
-                            onClicked: TaskFocus.stop()
-                        }
-                        PillButton {
-                            visible: root.focusOn
-                            label: "DONE"
-                            main: true
-                            onClicked: TaskFocus.complete()
-                        }
-                        PillButton {
-                            visible: !root.focusOn && root.nextRow !== null
-                            label: "FOCUS"
-                            main: true
-                            onClicked: root.focusRow(root.nextRow)
-                        }
-                    }
-                }
-
-                Item {
-                    id: trackHead
-                    y: bigTimer.height + 8
-                    width: parent.width
-                    height: 20
-
-                    Text {
-                        text: "TRACKED TODAY"
-                        color: Qt.alpha(Theme.fg, 0.5)
-                        font.family: Theme.fontFamilyAlt
-                        font.pixelSize: 10
-                        font.letterSpacing: 1
-                    }
-                    Text {
-                        anchors.right: parent.right
-                        text: "today " + root.fmtMin(root.tracked.today) + "  ·  week " + root.fmtMin(root.tracked.week)
-                        color: Qt.alpha(Theme.fg, 0.5)
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 11
-                    }
-                }
-
-                ListView {
-                    id: trackList
-                    y: trackHead.y + trackHead.height + 2
-                    width: parent.width
-                    height: parent.height - y
-                    clip: true
-                    boundsBehavior: Flickable.StopAtBounds
-                    model: root.tracked.rows
-
-                    delegate: Item {
-                        id: trackRow
-                        required property var modelData
-                        // against the block's planned time when it has one, else against the day's longest
-                        readonly property real share: modelData.planned > 0
-                            ? Math.min(1, modelData.spent / modelData.planned)
-                            : (root.tracked.rows[0].spent > 0 ? modelData.spent / root.tracked.rows[0].spent : 0)
-
-                        width: trackList.width
-                        height: 26
-
-                        Rectangle {
-                            anchors.fill: parent
-                            anchors.topMargin: 2
-                            anchors.bottomMargin: 2
-                            radius: 6
-                            color: Qt.alpha(Theme.fg, 0.05)
-
-                            Rectangle {
-                                width: parent.width * trackRow.share
-                                height: parent.height
-                                radius: parent.radius
-                                color: Qt.alpha(Theme.accent, trackRow.modelData.focused ? 0.35 : 0.22)
-                            }
-                        }
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            anchors.left: parent.left
-                            anchors.leftMargin: 10
-                            anchors.right: spentLabel.left
-                            anchors.rightMargin: 10
-                            text: trackRow.modelData.title
-                            color: trackRow.modelData.done ? Qt.alpha(Theme.fg, 0.6) : Theme.fg
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 12
-                            font.bold: trackRow.modelData.focused
-                            elide: Text.ElideRight
-                        }
-                        Text {
-                            id: spentLabel
-                            anchors.verticalCenter: parent.verticalCenter
-                            anchors.right: parent.right
-                            anchors.rightMargin: 10
-                            text: root.fmtMin(trackRow.modelData.spent)
-                                + (trackRow.modelData.planned > 0 ? " / " + root.fmtMin(trackRow.modelData.planned) : "")
-                            color: Qt.alpha(Theme.fg, 0.6)
-                            font.family: Theme.fontFamilyAlt
-                            font.pixelSize: 11
-                        }
-                    }
-                }
-
-                Text {
-                    visible: root.tracked.rows.length === 0
-                    y: trackHead.y + trackHead.height + 10
-                    text: "Nothing tracked yet today"
-                    color: Qt.alpha(Theme.fg, 0.5)
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 12
-                }
             }
         }
     }
