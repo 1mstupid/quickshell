@@ -713,16 +713,19 @@ PanelWindow {
                     }
                 }
 
-                // the timer card
+                // the focus card has two states: the timer while a task is in focus, and the
+                // free-time notice, as in the reference, while none is
                 Rectangle {
                     id: focusCard
                     x: mediaCard.x + mediaCard.width + 12
                     width: 200
                     height: parent.height - 12
                     radius: 12
-                    color: Qt.alpha(Theme.fg, 0.06)
+                    color: root.focusOn ? Qt.alpha(Theme.fg, 0.06) : Qt.alpha(Theme.accent, 0.1)
 
+                    // a task in focus: the timer, its title and the time it has had
                     Column {
+                        visible: root.focusOn
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.top: parent.top
@@ -750,7 +753,6 @@ PanelWindow {
                                     font.letterSpacing: 1
                                 }
                                 Text {
-                                    visible: root.focusOn
                                     text: root.clockText
                                     color: Theme.fg
                                     font.family: Theme.fontFamilyAlt
@@ -760,12 +762,10 @@ PanelWindow {
                             }
                         }
 
-                        // the task in focus, else the closest one; with no tasks, the free-time notice
                         Text {
                             width: parent.width
-                            text: root.focusOn ? TaskFocus.title
-                                : root.nextRow !== null ? root.nextRow.title : "You're clear for today"
-                            color: root.nextRow === null && !root.focusOn ? Theme.accent : Theme.fg
+                            text: TaskFocus.title
+                            color: Theme.fg
                             font.family: Theme.fontFamily
                             font.pixelSize: 13
                             font.bold: true
@@ -775,25 +775,54 @@ PanelWindow {
                         }
                         Text {
                             width: parent.width
-                            text: root.focusOn
-                                ? "total " + root.totalText + (TaskFocus.item && TaskFocus.item.time !== "" ? "  ·  due " + TaskFocus.item.time : "")
-                                : root.nextRow === null ? "Enjoy your free time"
-                                : root.nextRow.late ? "overdue"
-                                : root.nextRow.time !== "" ? "due " + root.nextRow.time : "no time set"
+                            text: "total " + root.totalText + (TaskFocus.item && TaskFocus.item.time !== "" ? "  ·  due " + TaskFocus.item.time : "")
                             color: Qt.alpha(Theme.fg, 0.5)
                             font.family: Theme.fontFamily
                             font.pixelSize: 11
                         }
                     }
 
-                    // nothing in focus: start the closest task
-                    Row {
-                        visible: !root.focusOn && root.nextRow !== null
+                    // nothing in focus: the free-time notice
+                    Column {
+                        visible: !root.focusOn
                         anchors.left: parent.left
-                        anchors.bottom: parent.bottom
-                        anchors.margins: 12
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.margins: 14
+                        spacing: 8
 
+                        Rectangle {
+                            width: 36
+                            height: 36
+                            radius: 10
+                            color: Qt.alpha(Theme.accent, 0.25)
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "󰃭"
+                                color: Theme.accent
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 18
+                            }
+                        }
+                        Text {
+                            width: parent.width
+                            text: root.nextRow !== null ? "Up next" : "You're clear for today"
+                            color: Theme.fg
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 13
+                            font.bold: true
+                        }
+                        Text {
+                            width: parent.width
+                            text: root.nextRow !== null ? root.nextRow.title : "Enjoy your free time"
+                            color: Qt.alpha(Theme.fg, 0.6)
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 11
+                            elide: Text.ElideRight
+                        }
                         PillButton {
+                            visible: root.nextRow !== null
                             label: "FOCUS"
                             main: true
                             onClicked: root.focusRow(root.nextRow)
