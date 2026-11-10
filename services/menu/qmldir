@@ -2,3 +2,4 @@ singleton Todo Todo.qml
 singleton Habits Habits.qml
 singleton Net Net.qml
 singleton TaskFocus TaskFocus.qml
+singleton Schedule Schedule.qml

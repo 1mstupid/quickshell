@@ -147,3 +147,39 @@ function upcoming(items, today) {
             return (rank(a) - rank(b)) || (a.line - b.line)
         })
 }
+
+// Adds task lines under the "## due" heading, after the day's last line, or in a
+// new section at the end of the file when the day has none. Existing lines are
+// left as they are; new ones follow the file's line endings.
+function add(text, due, taskLines) {
+    const cr = text.indexOf("\r\n") >= 0 ? "\r" : ""
+    const lines = text === "" ? [] : text.split("\n")
+    const fresh = taskLines.map(l => l + cr)
+    let at = -1
+    for (let i = 0; i < lines.length; i++) {
+        const h = lines[i].match(dateRe)
+        if (h && h[1] === due) {
+            at = i
+            break
+        }
+    }
+    if (at < 0) {
+        while (lines.length > 0 && lines[lines.length - 1].trim() === "")
+            lines.pop()
+        if (lines.length > 0)
+            lines.push(cr)
+        lines.push("## " + due + cr)
+        for (const l of fresh)
+            lines.push(l)
+        lines.push("")
+        return lines.join("\n")
+    }
+    let end = at + 1
+    while (end < lines.length && !headingRe.test(lines[end]))
+        end++
+    // after the last line with something on it, so blank lines between days stay
+    while (end > at + 1 && lines[end - 1].trim() === "")
+        end--
+    lines.splice.apply(lines, [end, 0].concat(fresh))
+    return lines.join("\n")
+}
