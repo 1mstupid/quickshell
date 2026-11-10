@@ -89,6 +89,25 @@ PanelWindow {
         }
         return best
     }
+    // the nearest open task after today, for the notice's second section
+    readonly property var nextLater: {
+        let best = null
+        for (const t of Todo.items) {
+            if (t.done || t.due === "" || t.due <= Todo.today)
+                continue
+            if (best === null || t.due < best.due
+                    || (t.due === best.due && t.time !== "" && (best.time === "" || t.time < best.time)))
+                best = t
+        }
+        return best
+    }
+    readonly property string laterText: {
+        if (nextLater === null)
+            return ""
+        const day = nextLater.due === Todo.addDays(Todo.today, 1) ? "Tomorrow"
+            : Qt.formatDate(Todo.toDate(nextLater.due), "ddd d MMM")
+        return nextLater.time !== "" ? day + " · " + nextLater.time : day
+    }
     function minutesOf(hhmm) {
         const p = hhmm.split(":")
         return parseInt(p[0]) * 60 + parseInt(p[1])
@@ -773,7 +792,9 @@ PanelWindow {
                         }
                     }
 
-                    // nothing in focus: the free-time notice
+                    // nothing in focus: the free-time notice, in two sections as in the
+                    // reference: today's nearest task or the clear notice, then the next
+                    // task after today
                     Column {
                         visible: !root.focusOn
                         anchors.left: parent.left
@@ -795,34 +816,114 @@ PanelWindow {
                                 font.letterSpacing: 1
                             }
                             Text {
-                                text: Qt.formatDate(Todo.toDate(Todo.today), "dd/MM")
+                                text: Qt.formatDate(Todo.toDate(Todo.today), "d MMM")
                                 color: Theme.fg
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 22
                                 font.bold: true
                             }
                         }
-                        Text {
+
+                        // today
+                        Rectangle {
                             width: parent.width
-                            text: root.nextRow !== null ? "Up next" : "You're clear for today"
-                            color: Theme.fg
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 13
-                            font.bold: true
-                        }
-                        Text {
-                            width: parent.width
-                            text: root.nextRow !== null ? root.nextRow.title : "Enjoy your free time"
-                            color: Qt.alpha(Theme.fg, 0.6)
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 11
-                            elide: Text.ElideRight
+                            height: 50
+                            radius: 10
+                            color: Qt.alpha(Theme.fg, 0.08)
+
+                            Row {
+                                anchors.fill: parent
+                                anchors.margins: 10
+                                spacing: 10
+
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: "󰃭"
+                                    color: Theme.accent
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 16
+                                }
+                                Column {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: parent.width - 26
+                                    spacing: 1
+
+                                    Text {
+                                        width: parent.width
+                                        text: root.nextRow !== null ? root.nextRow.title : "You're clear for today"
+                                        color: Theme.fg
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 12
+                                        font.bold: true
+                                        elide: Text.ElideRight
+                                    }
+                                    Text {
+                                        width: parent.width
+                                        text: root.nextRow !== null ? root.whenText(root.nextRow) : "Enjoy your free time"
+                                        color: Qt.alpha(Theme.fg, 0.6)
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 10
+                                        elide: Text.ElideRight
+                                    }
+                                }
+                            }
                         }
                         PillButton {
                             visible: root.nextRow !== null
                             label: "FOCUS"
                             main: true
                             onClicked: root.focusRow(root.nextRow)
+                        }
+
+                        // the next task after today
+                        Text {
+                            visible: root.nextLater !== null
+                            text: "Next event"
+                            color: Qt.alpha(Theme.fg, 0.5)
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 10
+                        }
+                        Rectangle {
+                            visible: root.nextLater !== null
+                            width: parent.width
+                            height: 46
+                            radius: 10
+                            color: Qt.alpha(Theme.fg, 0.06)
+
+                            Rectangle {
+                                x: 8
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 3
+                                height: 24
+                                radius: 2
+                                color: Theme.accent
+                            }
+                            Column {
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.leftMargin: 20
+                                anchors.rightMargin: 10
+                                spacing: 1
+
+                                Text {
+                                    width: parent.width
+                                    text: root.nextLater !== null ? root.nextLater.title : ""
+                                    color: Theme.fg
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 12
+                                    font.bold: true
+                                    elide: Text.ElideRight
+                                }
+                                Text {
+                                    width: parent.width
+                                    text: root.laterText
+                                    color: Qt.alpha(Theme.fg, 0.6)
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 10
+                                    elide: Text.ElideRight
+                                }
+                            }
                         }
                     }
 
