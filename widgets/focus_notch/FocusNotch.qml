@@ -782,33 +782,24 @@ PanelWindow {
                         anchors.margins: 14
                         spacing: 8
 
-                        // the date, as a pill at the top left; it is only shown here
-                        Rectangle {
-                            width: dateRow.width + 16
-                            height: 24
-                            radius: 12
-                            color: Qt.alpha(Theme.accent, 0.25)
+                        // the date, top left as in the reference: the weekday small, the date large
+                        Column {
+                            width: parent.width
 
-                            Row {
-                                id: dateRow
-                                anchors.centerIn: parent
-                                spacing: 6
-
-                                Text {
-                                    text: "󰃭"
-                                    color: Theme.accent
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 12
-                                    anchors.verticalCenter: parent.verticalCenter
-                                }
-                                Text {
-                                    text: Qt.formatDate(Todo.toDate(Todo.today), "ddd dd/MM")
-                                    color: Theme.accent
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 11
-                                    font.bold: true
-                                    anchors.verticalCenter: parent.verticalCenter
-                                }
+                            Text {
+                                text: Qt.formatDate(Todo.toDate(Todo.today), "dddd").toUpperCase()
+                                color: Theme.accent
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 10
+                                font.bold: true
+                                font.letterSpacing: 1
+                            }
+                            Text {
+                                text: Qt.formatDate(Todo.toDate(Todo.today), "dd/MM")
+                                color: Theme.fg
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 22
+                                font.bold: true
                             }
                         }
                         Text {
