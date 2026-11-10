@@ -760,12 +760,12 @@ PanelWindow {
                             }
                         }
 
-                        // the task in focus, else the closest one; with no tasks at all, a warning
+                        // the task in focus, else the closest one; with no tasks, the free-time notice
                         Text {
                             width: parent.width
                             text: root.focusOn ? TaskFocus.title
-                                : root.nextRow !== null ? root.nextRow.title : "No tasks today"
-                            color: root.nextRow === null && !root.focusOn ? Theme.alert : Theme.fg
+                                : root.nextRow !== null ? root.nextRow.title : "You're clear for today"
+                            color: root.nextRow === null && !root.focusOn ? Theme.accent : Theme.fg
                             font.family: Theme.fontFamily
                             font.pixelSize: 13
                             font.bold: true
@@ -777,7 +777,7 @@ PanelWindow {
                             width: parent.width
                             text: root.focusOn
                                 ? "total " + root.totalText + (TaskFocus.item && TaskFocus.item.time !== "" ? "  ·  due " + TaskFocus.item.time : "")
-                                : root.nextRow === null ? "add one on Day"
+                                : root.nextRow === null ? "Enjoy your free time"
                                 : root.nextRow.late ? "overdue"
                                 : root.nextRow.time !== "" ? "due " + root.nextRow.time : "no time set"
                             color: Qt.alpha(Theme.fg, 0.5)
