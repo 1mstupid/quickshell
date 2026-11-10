@@ -12,10 +12,11 @@ import "../bar/media"
 // far, and pause and done; with nothing in focus it offers the block the
 // schedule has on now. Click the strip (or run `qs ipc call focusnotch toggle`)
 // and it opens further:
-//   Home   the now-playing card, and what is left to do: todo.md's tasks together
-//          with today's blocks from schedule.md. A click puts a row in focus (it
-//          does not tick it), the check on a hovered row ticks it, and the box at
-//          the bottom adds a task to today, typed the way todo.md has it.
+//   Home   the now-playing card, with play, pause and skip.
+//   Day    what is left to do: todo.md's tasks together with today's blocks from
+//          schedule.md. A click puts a row in focus (it does not tick it), the
+//          check on a hovered row ticks it, and the box at the bottom adds a task
+//          to today, typed the way todo.md has it.
 //   Week   the schedule's grid, with today and the block that is on now marked.
 //   Focus  the timer large, and the time tracked today and this week.
 // The strip closes when the pointer leaves it; the open panel closes on Escape
@@ -53,7 +54,7 @@ PanelWindow {
     property string stage: ""
     // the open panel's page: "home", "week" or "focus", remembered across openings
     readonly property string tab: FocusNotchState.page
-    readonly property var pages: ["home", "week", "focus"]
+    readonly property var pages: ["home", "day", "week", "focus"]
     readonly property int pageIndex: Math.max(0, pages.indexOf(tab))
     // wraps at both ends
     function stepPage(delta) {
@@ -475,7 +476,7 @@ PanelWindow {
 
                     Repeater {
                         // icons, not names: the buttons sit in a row across the top of the panel
-                        model: [{ key: "home", name: "󰋜" }, { key: "week", name: "󰃭" }, { key: "focus", name: "󰔛" }]
+                        model: [{ key: "home", name: "󰋜" }, { key: "day", name: "󰸗" }, { key: "week", name: "󰃭" }, { key: "focus", name: "󰔛" }]
 
                         Rectangle {
                             id: tabButton
@@ -521,9 +522,9 @@ PanelWindow {
                 }
             }
 
-            // ── Home: the now-playing card, and what is left to do ─────────
+            // ── Home: now playing ──────────────────────────────────────────
             Item {
-                id: dayTab
+                id: homeTab
                 visible: root.tab === "home"
                 y: 46
                 width: panel.width
@@ -533,7 +534,7 @@ PanelWindow {
                 Rectangle {
                     id: mediaCard
                     x: 12
-                    width: 212
+                    width: panel.width - 24
                     height: parent.height - 12
                     radius: 12
                     color: Qt.alpha(Theme.fg, 0.06)
@@ -550,7 +551,7 @@ PanelWindow {
 
                         Rectangle {
                             width: parent.width
-                            height: 130
+                            height: 150
                             radius: 10
                             color: Qt.alpha(Theme.fg, 0.08)
                             clip: true
@@ -644,11 +645,20 @@ PanelWindow {
                         }
                     }
                 }
+            }
+
+            // ── Day: what is left to do ────────────────────────────────────
+            Item {
+                id: dayTab
+                visible: root.tab === "day"
+                y: 46
+                width: panel.width
+                height: panel.height - y
 
                 // what is left to do: tasks and the schedule's blocks, scrolling when long
                 Item {
                     id: todoList
-                    x: focusCard.x + focusCard.width + 16
+                    x: 12
                     width: panel.width - x - 18
                     height: parent.height - 12
 
