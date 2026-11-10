@@ -47,6 +47,10 @@ PanelWindow {
 
     // the card is square: the cover's half-disc is as wide as the card
     readonly property int panelW: 300
+    // the cover disc is smaller than the card and lowered, so its flat top edge
+    // sits inside the card's rounded corners instead of past them
+    readonly property int discD: 220
+    readonly property int discLower: 44  // the disc's centre, below the card's top edge
 
     property bool lyricsOn: false
 
@@ -217,18 +221,19 @@ PanelWindow {
 
         HoverHandler { id: hover }
 
-        // the cover as a half-disc: centred on the card's top edge, so only its lower half shows
+        // the cover disc, cut by the card's top edge; only its lower part shows
         Item {
             id: disc
             width: root.panelW
-            height: root.panelW / 2
+            height: root.discLower + root.discD / 2
             clip: true
 
             Rectangle {
                 id: face
-                width: root.panelW
-                height: root.panelW
-                y: -height / 2
+                width: root.discD
+                height: root.discD
+                x: (root.panelW - width) / 2
+                y: root.discLower - height / 2
                 radius: width / 2
                 color: Theme.altbg
 
@@ -249,7 +254,7 @@ PanelWindow {
                     source: media.player?.trackArtUrl ?? ""
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true
-                    sourceSize.width: root.panelW * 2
+                    sourceSize.width: root.discD * 2
                     layer.enabled: true
                     layer.effect: MultiEffect {
                         maskEnabled: true
@@ -272,10 +277,10 @@ PanelWindow {
                 }
             }
 
-            // the spindle hole, half cut off by the card's top edge; it stays still while the disc turns
+            // the spindle hole at the disc's centre; it stays still while the disc turns
             Rectangle {
                 anchors.horizontalCenter: parent.horizontalCenter
-                y: -8
+                y: root.discLower - 8
                 width: 16
                 height: 16
                 radius: 8
