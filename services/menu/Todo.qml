@@ -18,6 +18,8 @@ Singleton {
     property var items: []
     // true once the file has been read (or found missing), so an empty list means empty
     property bool loaded: false
+    // the file's text as last read or written; adding works from it because the file may not exist yet
+    property string fileText: ""
 
     // the minute clock rolls this over at midnight, so nothing has to poll
     readonly property string today: Qt.formatDate(clock.date, "yyyy-MM-dd")
@@ -43,7 +45,36 @@ Singleton {
         if (next === null)
             return
         file.setText(next)
+        fileText = next
         items = TodoMd.parse(next)
+    }
+
+    // adds task lines under the day's heading, which is created when it is missing
+    function addLines(due, lines) {
+        if (lines.length === 0)
+            return
+        const next = TodoMd.add(fileText, due, lines)
+        file.setText(next)
+        fileText = next
+        items = TodoMd.parse(next)
+    }
+
+    // adds a task typed by hand to today, in the file's own syntax ("Call mom @16:30 p2");
+    // false when there is nothing to add
+    function addTask(text) {
+        const title = text.trim()
+        if (title === "")
+            return false
+        const line = "- [ ] " + title
+        if (TodoMd.parse("## " + today + "\n" + line).length !== 1)
+            return false
+        addLines(today, [line])
+        return true
+    }
+
+    // a schedule slot becomes a task in its day, so it can be timed and ticked
+    function materialize(row, done) {
+        addLines(row.due, ["- [" + (done ? "x" : " ") + "] " + row.title + (row.time !== "" ? " @" + row.time : "")])
     }
 
     function toggle(item) {
@@ -83,10 +114,12 @@ Singleton {
         watchChanges: true
         onFileChanged: reload()
         onLoaded: {
-            root.items = TodoMd.parse(text())
+            root.fileText = text()
+            root.items = TodoMd.parse(root.fileText)
             root.loaded = true
         }
         onLoadFailed: {
+            root.fileText = ""
             root.items = []
             root.loaded = true
         }
