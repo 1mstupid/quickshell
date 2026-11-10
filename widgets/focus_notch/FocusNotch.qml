@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import Quickshell
 import Quickshell.Wayland
 import "../../services"
@@ -48,7 +49,7 @@ PanelWindow {
     readonly property int hoverW: 520
     readonly property int hoverH: 78
     readonly property int openW: 580
-    readonly property int openH: 280
+    readonly property int openH: 230
 
     // "" closed, "hover" the strip, "open" the full panel
     property string stage: ""
@@ -550,17 +551,30 @@ PanelWindow {
                         spacing: 14
 
                         Rectangle {
+                            id: art
                             width: 64
                             height: 64
-                            radius: 8
+                            radius: 10
                             color: Qt.alpha(Theme.fg, 0.08)
-                            clip: true
 
+                            // rounding by mask, since clip only cuts square corners
+                            Item {
+                                id: artMask
+                                anchors.fill: parent
+                                visible: false
+                                layer.enabled: true
+                                Rectangle { anchors.fill: parent; radius: art.radius; color: "white" }
+                            }
                             Image {
                                 anchors.fill: parent
                                 source: media.player?.trackArtUrl ?? ""
                                 fillMode: Image.PreserveAspectCrop
                                 visible: status === Image.Ready
+                                layer.enabled: true
+                                layer.effect: MultiEffect {
+                                    maskEnabled: true
+                                    maskSource: artMask
+                                }
                             }
                             Text {
                                 anchors.centerIn: parent
@@ -649,57 +663,55 @@ PanelWindow {
                         }
                     }
 
-                    // previous, play or pause, next
+                    // previous, play or pause, next: fixed cells, so the three share one centre line
                     Row {
                         anchors.horizontalCenter: parent.horizontalCenter
                         anchors.top: progress.bottom
-                        anchors.topMargin: 14
-                        spacing: 30
+                        anchors.topMargin: 12
+                        spacing: 10
 
-                        Text {
-                            readonly property bool allowed: media.player?.canGoPrevious ?? false
-                            text: "󰒮"
-                            color: !allowed ? Qt.alpha(Theme.fg, 0.25) : prevMa.containsMouse ? Theme.accent : Theme.fg
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 20
+                        component Transport: Item {
+                            id: cell
+                            property string glyph: ""
+                            property bool allowed: true
+                            property int glyphSize: 20
+                            signal tapped()
+
+                            width: 40
+                            height: 40
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: cell.glyph
+                                color: !cell.allowed ? Qt.alpha(Theme.fg, 0.25)
+                                     : ma.containsMouse ? Theme.accent : Theme.fg
+                                font.family: Theme.fontFamily
+                                font.pixelSize: cell.glyphSize
+                            }
                             MouseArea {
-                                id: prevMa
+                                id: ma
                                 anchors.fill: parent
-                                anchors.margins: -8
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: if (parent.allowed) media.player.previous()
+                                onClicked: if (cell.allowed) cell.tapped()
                             }
                         }
-                        Text {
-                            readonly property bool allowed: media.player?.canTogglePlaying ?? false
-                            text: media.playing ? "󰏤" : "󰐊"
-                            color: !allowed ? Qt.alpha(Theme.fg, 0.25) : playMa.containsMouse ? Theme.accent : Theme.fg
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 26
-                            MouseArea {
-                                id: playMa
-                                anchors.fill: parent
-                                anchors.margins: -8
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: if (parent.allowed) media.player.togglePlaying()
-                            }
+
+                        Transport {
+                            glyph: "󰒮"
+                            allowed: media.player?.canGoPrevious ?? false
+                            onTapped: media.player.previous()
                         }
-                        Text {
-                            readonly property bool allowed: media.player?.canGoNext ?? false
-                            text: "󰒭"
-                            color: !allowed ? Qt.alpha(Theme.fg, 0.25) : nextMa.containsMouse ? Theme.accent : Theme.fg
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 20
-                            MouseArea {
-                                id: nextMa
-                                anchors.fill: parent
-                                anchors.margins: -8
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: if (parent.allowed) media.player.next()
-                            }
+                        Transport {
+                            glyph: media.playing ? "󰏤" : "󰐊"
+                            glyphSize: 26
+                            allowed: media.player?.canTogglePlaying ?? false
+                            onTapped: media.player.togglePlaying()
+                        }
+                        Transport {
+                            glyph: "󰒭"
+                            allowed: media.player?.canGoNext ?? false
+                            onTapped: media.player.next()
                         }
                     }
                 }
