@@ -74,18 +74,24 @@ PanelWindow {
     // the blocks of today's schedule that have no task yet (see Schedule)
     readonly property var rows: Schedule.agenda
     readonly property bool focusOn: TaskFocus.active
-    // the row of the block that is on now, if it is still to do
-    readonly property var nowRow: {
-        const t = Schedule.currentTitle
-        const r = t === "" ? undefined : rows.find(x => x.due === Todo.today && x.title === t)
-        return r !== undefined ? r : null
-    }
-    // what the strip offers with nothing in focus: the block that is on now, else the first row
+    // what the strip and the focus card offer with nothing in focus
     readonly property var nextRow: {
-        if (nowRow !== null && !TaskFocus.sameTask(nowRow))
-            return nowRow
-        const r = rows.find(x => !TaskFocus.sameTask(x))
-        return r !== undefined ? r : null
+        let best = null
+        let bestGap = Infinity
+        for (const r of rows) {
+            if (TaskFocus.sameTask(r))
+                continue
+            const gap = r.late ? -1 : r.time === "" ? 100000 : Math.abs(minutesOf(r.time) - Schedule.nowMin)
+            if (gap < bestGap) {
+                bestGap = gap
+                best = r
+            }
+        }
+        return best
+    }
+    function minutesOf(hhmm) {
+        const p = hhmm.split(":")
+        return parseInt(p[0]) * 60 + parseInt(p[1])
     }
     readonly property int elapsedMin: Math.floor(TaskFocus.elapsedMs / 60000)
     // the ring goes round once an hour
@@ -100,15 +106,6 @@ PanelWindow {
     readonly property string nextText: nextRow !== null
         ? "Next: " + nextRow.title + (nextRow.time !== "" && !nextRow.late ? "  " + nextRow.time : "")
         : "Nothing else today"
-    // the block the schedule has on now, with its subject and when it ends
-    readonly property string nowText: {
-        const c = Schedule.current
-        if (c === null)
-            return ""
-        const what = c.planned && c.subject !== c.name ? c.name + " · " + c.subject : c.name
-        return what + " until " + Schedule.fmt(c.end)
-    }
-
     // The time tracked: tasks due today with time on them (and the one in focus,
     // live), against the minutes the schedule planned for them, and the total for
     // today and for this week, Sunday to Saturday like the usage dashboard. The
@@ -536,7 +533,7 @@ PanelWindow {
                 Item {
                     id: mediaCard
                     x: 12
-                    width: Math.round((panel.width - 36) / 2)
+                    width: panel.width - 36 - 200
                     height: parent.height - 12
 
                     // the same MPRIS state the bar's media wave reads
@@ -720,7 +717,7 @@ PanelWindow {
                 Rectangle {
                     id: focusCard
                     x: mediaCard.x + mediaCard.width + 12
-                    width: homeTab.width - x - 12
+                    width: 200
                     height: parent.height - 12
                     radius: 12
                     color: Qt.alpha(Theme.fg, 0.06)
@@ -763,49 +760,43 @@ PanelWindow {
                             }
                         }
 
+                        // the task in focus, else the closest one; with no tasks at all, a warning
                         Text {
                             width: parent.width
-                            text: root.focusOn ? TaskFocus.title : "Pick a task from the list to start timing it."
-                            color: root.focusOn ? Theme.fg : Qt.alpha(Theme.fg, 0.5)
+                            text: root.focusOn ? TaskFocus.title
+                                : root.nextRow !== null ? root.nextRow.title : "No tasks today"
+                            color: root.nextRow === null && !root.focusOn ? Theme.alert : Theme.fg
                             font.family: Theme.fontFamily
                             font.pixelSize: 13
-                            font.bold: root.focusOn
+                            font.bold: true
                             wrapMode: Text.WordWrap
                             maximumLineCount: 2
                             elide: Text.ElideRight
                         }
                         Text {
-                            visible: root.focusOn
-                            text: "total " + root.totalText + (TaskFocus.item && TaskFocus.item.time !== "" ? "  ·  due " + TaskFocus.item.time : "")
+                            width: parent.width
+                            text: root.focusOn
+                                ? "total " + root.totalText + (TaskFocus.item && TaskFocus.item.time !== "" ? "  ·  due " + TaskFocus.item.time : "")
+                                : root.nextRow === null ? "add one on Day"
+                                : root.nextRow.late ? "overdue"
+                                : root.nextRow.time !== "" ? "due " + root.nextRow.time : "no time set"
                             color: Qt.alpha(Theme.fg, 0.5)
                             font.family: Theme.fontFamily
                             font.pixelSize: 11
                         }
                     }
 
-                    // the block the schedule has on now
-                    Column {
-                        visible: !root.focusOn && root.nowText !== ""
+                    // nothing in focus: start the closest task
+                    Row {
+                        visible: !root.focusOn && root.nextRow !== null
                         anchors.left: parent.left
-                        anchors.right: parent.right
                         anchors.bottom: parent.bottom
-                        anchors.margins: 14
-                        spacing: 3
+                        anchors.margins: 12
 
-                        Text {
-                            text: "NOW"
-                            color: Qt.alpha(Theme.fg, 0.5)
-                            font.family: Theme.fontFamilyAlt
-                            font.pixelSize: 10
-                            font.letterSpacing: 1
-                        }
-                        Text {
-                            width: parent.width
-                            text: root.nowText
-                            color: Theme.fg
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 11
-                            elide: Text.ElideRight
+                        PillButton {
+                            label: "FOCUS"
+                            main: true
+                            onClicked: root.focusRow(root.nextRow)
                         }
                     }
 
