@@ -49,8 +49,15 @@ PanelWindow {
 
     // "" closed, "hover" the strip, "open" the full panel
     property string stage: ""
-    // the open panel's tab: "day", "week" or "focus"
-    property string tab: "day"
+    // the open panel's page: "day", "week" or "focus", remembered across openings
+    readonly property string tab: FocusNotchState.page
+    readonly property var pages: ["day", "week", "focus"]
+    readonly property int pageIndex: Math.max(0, pages.indexOf(tab))
+    // wraps at both ends
+    function stepPage(delta) {
+        const n = pages.length
+        FocusNotchState.setPage(pages[(pageIndex + delta + n) % n])
+    }
     // after a close the pointer has to leave the pill before it can open the strip again
     property bool armed: true
     onStageChanged: if (stage === "open") keyHost.forceActiveFocus()
@@ -174,8 +181,6 @@ PanelWindow {
     function show(next) {
         PillState.owner = "focus"
         visible = true
-        if (next === "open")
-            tab = "day"
         stage = next
         goTo(1, next === "open" ? 1 : 0)
     }
@@ -306,11 +311,49 @@ PanelWindow {
             onClicked: if (root.stage === "hover") root.show("open")
         }
 
+        // wheel over the strip steps the page; summed so a touchpad does not skip pages
+        WheelHandler {
+            enabled: root.stage === "hover"
+            property real sum: 0
+            onWheel: event => {
+                sum += event.angleDelta.y
+                if (Math.abs(sum) < 120)
+                    return
+                root.stepPage(sum < 0 ? 1 : -1)
+                sum = 0
+            }
+        }
+
         Item {
             id: keyHost
             anchors.fill: parent
             focus: true
             Keys.onEscapePressed: root.close()
+            Keys.onLeftPressed: root.stepPage(-1)
+            Keys.onRightPressed: root.stepPage(1)
+        }
+
+        // which page the strip would open on: one dot per page, the current one long
+        Row {
+            visible: root.stage === "hover"
+            anchors.horizontalCenter: card.horizontalCenter
+            anchors.bottom: card.bottom
+            anchors.bottomMargin: 5
+            spacing: 5
+
+            Repeater {
+                model: root.pages
+
+                Rectangle {
+                    required property int index
+                    width: index === root.pageIndex ? 12 : 4
+                    height: 4
+                    radius: 2
+                    color: index === root.pageIndex ? Theme.accent : Qt.alpha(Theme.fg, 0.25)
+                    Behavior on width { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                    Behavior on color { ColorAnimation { duration: 150 } }
+                }
+            }
         }
 
         // ── The strip ──────────────────────────────────────────────────────
@@ -457,7 +500,7 @@ PanelWindow {
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    root.tab = tabButton.modelData.key
+                                    FocusNotchState.setPage(tabButton.modelData.key)
                                     keyHost.forceActiveFocus()
                                 }
                             }
