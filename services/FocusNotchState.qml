@@ -15,6 +15,10 @@ Singleton {
     // asked open from outside (IPC); the panel follows and resets it when it closes
     property bool openRequested: false
 
+    // the page the open panel shows; kept across openings, reset on shell restart
+    property string page: "home"
+    function setPage(key) { page = key }
+
     function toggle() { openRequested = !openRequested }
     function show() { openRequested = true }
     function hide() { openRequested = false }
