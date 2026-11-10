@@ -461,7 +461,7 @@ PanelWindow {
             opacity: Math.max(0, (root.expand - 0.5) * 2)
             visible: opacity > 0
 
-            // header: the Day | Week | Focus switch, and the date
+            // header: the Home | Day | Week switch
             Item {
                 x: 18
                 y: 8
@@ -508,15 +508,6 @@ PanelWindow {
                             }
                         }
                     }
-                }
-
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.right: parent.right
-                    text: Qt.formatDate(Todo.toDate(Todo.today), "dddd d MMMM")
-                    color: Qt.alpha(Theme.fg, 0.7)
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 12
                 }
             }
 
@@ -787,22 +778,37 @@ PanelWindow {
                         visible: !root.focusOn
                         anchors.left: parent.left
                         anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.top: parent.top
                         anchors.margins: 14
                         spacing: 8
 
+                        // the date, as a pill at the top left; it is only shown here
                         Rectangle {
-                            width: 36
-                            height: 36
-                            radius: 10
+                            width: dateRow.width + 16
+                            height: 24
+                            radius: 12
                             color: Qt.alpha(Theme.accent, 0.25)
 
-                            Text {
+                            Row {
+                                id: dateRow
                                 anchors.centerIn: parent
-                                text: "󰃭"
-                                color: Theme.accent
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 18
+                                spacing: 6
+
+                                Text {
+                                    text: "󰃭"
+                                    color: Theme.accent
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 12
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+                                Text {
+                                    text: Qt.formatDate(Todo.toDate(Todo.today), "ddd d MMM")
+                                    color: Theme.accent
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 11
+                                    font.bold: true
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
                             }
                         }
                         Text {
