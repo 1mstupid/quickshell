@@ -182,7 +182,7 @@ PanelWindow {
     component Btn: Text {
         id: btn
         property bool allowed: true
-        property color tint: Theme.bg
+        property color tint: Theme.fg
         signal tapped()
         anchors.verticalCenter: parent.verticalCenter
         font.family: Theme.fontFamily
@@ -202,15 +202,17 @@ PanelWindow {
     }
 
     // ── Card ───────────────────────────────────────────────────────────────
-    // the card takes the foreground colour, so the text takes the background
-    // colour: a light card on a dark theme, and the reverse on a light one
+    // the same dark card as the other corner widgets (todo, habits, usage),
+    // with the cover rising from its top edge as a disc
     Rectangle {
         id: card
 
         width: root.panelW
         height: root.panelW
-        radius: 40
-        color: Theme.fg
+        radius: 12
+        color: Qt.alpha(Theme.bg, 0.92)
+        border.width: 1
+        border.color: Qt.alpha(Theme.border, 0.6)
         clip: true
 
         HoverHandler { id: hover }
@@ -228,8 +230,19 @@ PanelWindow {
                 height: root.panelW
                 y: -height / 2
                 radius: width / 2
-                color: Theme.bg
+                color: Theme.altbg
 
+                // the disc turns while the track plays and holds its angle on pause
+                NumberAnimation on rotation {
+                    running: media.playing
+                    loops: Animation.Infinite
+                    from: face.rotation
+                    to: face.rotation + 360
+                    duration: 12000
+                }
+
+                // the layer stays on, so the mask is applied from the first frame
+                // rather than only once the cover has loaded
                 Image {
                     id: art
                     anchors.fill: parent
@@ -237,7 +250,7 @@ PanelWindow {
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true
                     sourceSize.width: root.panelW * 2
-                    layer.enabled: status === Image.Ready
+                    layer.enabled: true
                     layer.effect: MultiEffect {
                         maskEnabled: true
                         maskSource: faceMask
@@ -259,19 +272,20 @@ PanelWindow {
                 }
             }
 
-            // the spindle hole, half cut off by the card's top edge
+            // the spindle hole, half cut off by the card's top edge; it stays still while the disc turns
             Rectangle {
                 anchors.horizontalCenter: parent.horizontalCenter
                 y: -8
                 width: 16
                 height: 16
                 radius: 8
-                color: Theme.fg
+                color: Theme.bg
                 border.width: 3
-                border.color: Qt.alpha(Theme.bg, 0.5)
+                border.color: Qt.alpha(Theme.fg, 0.35)
             }
         }
 
+        // a Column positions its children, so each centres with x rather than anchors
         Column {
             x: 24
             y: disc.height + 14
@@ -279,7 +293,6 @@ PanelWindow {
             spacing: 8
 
             // the wave the bar's indicator uses, here as a sign that a track is loaded
-            // a Column positions its children, so they centre with x, not anchors
             Row {
                 x: (parent.width - width) / 2
                 height: 14
@@ -295,7 +308,7 @@ PanelWindow {
                         width: 2
                         height: 6
                         radius: 1
-                        color: Qt.alpha(Theme.bg, 0.4)
+                        color: Qt.alpha(Theme.fg, 0.4)
 
                         SequentialAnimation on height {
                             running: media.playing
@@ -313,7 +326,7 @@ PanelWindow {
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
                 text: root.lyricsOn ? (root.lyrics[root.lyricIdx - 1]?.text ?? "") : media.artistText
-                color: Qt.alpha(Theme.bg, 0.5)
+                color: Qt.alpha(Theme.fg, 0.5)
                 font.family: Theme.fontFamily
                 font.pixelSize: 13
             }
@@ -324,7 +337,7 @@ PanelWindow {
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
                 text: root.lyricsOn ? root.currentLine() : (media.player?.trackTitle ?? "")
-                color: Theme.bg
+                color: Theme.fg
                 font.family: Theme.fontFamily
                 font.pixelSize: 16
                 font.bold: true
@@ -339,12 +352,12 @@ PanelWindow {
                 Rectangle {
                     anchors.fill: parent
                     radius: 1
-                    color: Qt.alpha(Theme.bg, 0.15)
+                    color: Qt.alpha(Theme.fg, 0.15)
                 }
                 Rectangle {
                     height: parent.height
                     radius: 1
-                    color: Theme.bg
+                    color: Theme.fg
                     width: parent.width * (media.timed ? Math.min(1, media.pos / media.len) : 0)
                 }
             }
@@ -361,7 +374,7 @@ PanelWindow {
 
                     Text {
                         text: media.fmt(media.pos)
-                        color: Theme.bg
+                        color: Theme.fg
                         font.family: Theme.fontFamilyAlt
                         font.pixelSize: 15
                         font.bold: true
@@ -369,7 +382,7 @@ PanelWindow {
                     Text {
                         visible: media.timed
                         text: " / " + media.fmt(media.len)
-                        color: Qt.alpha(Theme.bg, 0.4)
+                        color: Qt.alpha(Theme.fg, 0.4)
                         font.family: Theme.fontFamilyAlt
                         font.pixelSize: 15
                     }
@@ -393,14 +406,14 @@ PanelWindow {
                         width: 34
                         height: 34
                         radius: 17
-                        color: !allowed ? Qt.alpha(Theme.bg, 0.25)
-                             : playMa.containsMouse ? Qt.lighter(Theme.accent, 1.1) : Theme.bg
+                        color: !allowed ? Qt.alpha(Theme.fg, 0.25)
+                             : playMa.containsMouse ? Theme.accent : Theme.fg
                         Behavior on color { ColorAnimation { duration: 120 } }
 
                         Text {
                             anchors.centerIn: parent
                             text: media.playing ? "󰏤" : "󰐊"
-                            color: Theme.fg
+                            color: Theme.bg
                             font.family: Theme.fontFamily
                             font.pixelSize: 18
                         }
@@ -425,15 +438,15 @@ PanelWindow {
                         width: 44
                         height: 20
                         radius: 6
-                        color: root.lyricsOn ? Qt.alpha(Theme.bg, 0.25)
-                             : lyricsMa.containsMouse ? Qt.alpha(Theme.bg, 0.16)
-                             : Qt.alpha(Theme.bg, 0.08)
+                        color: root.lyricsOn ? Qt.alpha(Theme.fg, 0.25)
+                             : lyricsMa.containsMouse ? Qt.alpha(Theme.fg, 0.16)
+                             : Qt.alpha(Theme.fg, 0.08)
                         Behavior on color { ColorAnimation { duration: 120 } }
 
                         Text {
                             anchors.centerIn: parent
                             text: "lyrics"
-                            color: Theme.bg
+                            color: Theme.fg
                             font.family: Theme.fontFamily
                             font.pixelSize: 11
                         }
