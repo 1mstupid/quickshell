@@ -5,27 +5,32 @@ import QtQuick
 import QtQuick.Effects
 import "../../../services"
 
-// Media widget on the wallpaper layer, bottom centre, between the focus and
-// usage cards: cover art, title and artist, and the transport controls. It shows
-// while a track is loaded and the widget is on. The wave in the bar, or
-// `qs ipc call media toggle`, turns it on and off. The lyrics toggle opens a
-// block of synced lyrics (LRCLIB) above the card, which grows upward so the
-// controls stay under the pointer. Only the card takes pointer events.
+// Media widget on the wallpaper layer, bottom centre by default: cover art,
+// title and artist, and the transport controls. It shows while a track is
+// loaded and the widget is on. The layout editor places it and switches it on
+// and off; `qs ipc call media toggle` does the same. The bar's media wave opens
+// the now-playing strip instead. The lyrics toggle opens a block of synced
+// lyrics (LRCLIB) above the card, which grows upward so the controls stay under
+// the pointer. Only the card takes pointer events.
 PanelWindow {
     id: root
 
     screen: PillState.originScreen
 
-    // full width, so the card can be centred without relying on the compositor
-    // to centre a window that is anchored to the bottom edge only
+    // a centre anchor leaves left and right unset, so the compositor centres the window
     anchors {
-        left: true
-        right: true
-        bottom: true
+        left: WidgetLayout.hasLeft("media")
+        right: WidgetLayout.hasRight("media")
+        top: WidgetLayout.hasTop("media")
+        bottom: WidgetLayout.hasBottom("media")
     }
     margins {
-        bottom: Theme.edgeInset
+        left: WidgetLayout.insetX("media")
+        right: WidgetLayout.insetX("media")
+        top: WidgetLayout.insetY("media")
+        bottom: WidgetLayout.insetY("media")
     }
+    implicitWidth: panelW
 
     // always tall enough for the lyrics, so toggling them never resizes the
     // window; the card grows inside it and the mask keeps the rest clickable
@@ -39,7 +44,9 @@ PanelWindow {
 
     mask: Region { item: card }
 
-    visible: UserSettings.mediaWidget && media.present && !Overview.open
+    visible: WidgetLayout.shown("media") && media.present && !Overview.open
+
+    Component.onCompleted: WidgetLayout.register("media", root)
 
     readonly property int panelW: 340
     // the art is a square the height of the main section
@@ -70,9 +77,9 @@ PanelWindow {
 
     IpcHandler {
         target: "media"
-        function toggle(): void { UserSettings.mediaWidget = !UserSettings.mediaWidget }
-        function show(): void { UserSettings.mediaWidget = true }
-        function hide(): void { UserSettings.mediaWidget = false }
+        function toggle(): void { WidgetLayout.toggle("media") }
+        function show(): void { if (!WidgetLayout.shown("media")) WidgetLayout.toggle("media") }
+        function hide(): void { if (WidgetLayout.shown("media")) WidgetLayout.toggle("media") }
         function kill(): void { media.kill() }
     }
 

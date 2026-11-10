@@ -6,9 +6,10 @@ import Quickshell.Io
 // Where the corner widgets sit and whether they show, kept in
 // ~/.local/xdg/config/layout.json:
 //   {"todo": {"anchor": "top-left", "x": 0, "y": 0, "visible": true}}
-// anchor is one of top-left, top-right, bottom-left, bottom-right; x and y are
-// whole grid cells (20 px at scale 1) further in from that corner, on top of
-// the usual edge inset. A missing file, entry or key keeps the default place,
+// anchor is one of top-left, top-right, bottom-left, bottom-right, or
+// bottom-center (centred, with no side margin); x and y are whole grid cells
+// (20 px at scale 1) further in from that corner, on top of the usual edge
+// inset. A missing file, entry or key keeps the default place,
 // so with no file the widgets sit where they always did. `visible` wins over
 // the widget keys in settings.json once it is set. The edit mode writes this
 // file; it can also be edited by hand.
@@ -18,12 +19,21 @@ Singleton {
     readonly property string path: Quickshell.env("HOME") + "/.local/xdg/config/layout.json"
 
     readonly property int cell: Math.round(20 * Theme.autoScale)
-    readonly property var corners: ["top-left", "top-right", "bottom-left", "bottom-right"]
+    readonly property var corners: ["top-left", "top-right", "bottom-left", "bottom-right", "bottom-center"]
     readonly property var defaults: ({
         todo: "top-left",
         habits: "top-right",
         focus: "bottom-left",
-        usage: "bottom-right"
+        usage: "bottom-right",
+        media: "bottom-center"
+    })
+    // the glyph each widget is listed under in the layout bar
+    readonly property var glyphs: ({
+        todo: "󰄬",
+        habits: "󰄳",
+        focus: "󰔟",
+        usage: "󰄪",
+        media: "󰝚"
     })
 
     property var entries: ({})
@@ -36,7 +46,8 @@ Singleton {
         todo: UserSettings.todoWidget,
         habits: UserSettings.habitsWidget,
         focus: UserSettings.focusWidget,
-        usage: UserSettings.usageRing
+        usage: UserSettings.usageRing,
+        media: UserSettings.mediaWidget
     })
 
     function parse(t) {
@@ -85,6 +96,7 @@ Singleton {
 
     function hasLeft(id) { return anchor(id).endsWith("left") }
     function hasRight(id) { return anchor(id).endsWith("right") }
+    function hasCenter(id) { return anchor(id) === "bottom-center" }
     function hasTop(id) { return anchor(id).startsWith("top") }
     function hasBottom(id) { return anchor(id).startsWith("bottom") }
 

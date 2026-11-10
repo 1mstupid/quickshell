@@ -3,15 +3,15 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import "../../services"
-import "../menu"
 
 // Edit mode for the corner widgets: `qs ipc call layout toggle`. The screen
 // dims, each showing widget gets an outline to drag, and a small bar at the
-// bottom switches widgets on or off. While you drag, only the outline moves
-// and a second one shows the cell it will land in; on release the widget goes
-// to the nearest corner at that offset, and the choice is written to
-// layout.json. Nothing is written until a drop or a switch. Done or Escape
-// (after a click, since the panel takes keyboard focus on demand) leaves.
+// bottom holds a glyph button per widget to switch it on or off. While you
+// drag, only the outline moves and a second one shows the cell it will land
+// in; on release the widget goes to the nearest corner at that offset, and the
+// choice is written to layout.json. Nothing is written until a drop or a
+// button press. Done or Escape (after a click, since the panel takes keyboard
+// focus on demand) leaves.
 PanelWindow {
     id: root
 
@@ -67,7 +67,9 @@ PanelWindow {
 
                 readonly property real homeX: WidgetLayout.hasLeft(modelData)
                     ? WidgetLayout.insetX(modelData)
-                    : root.width - w - WidgetLayout.insetX(modelData)
+                    : WidgetLayout.hasCenter(modelData)
+                        ? (root.width - w) / 2
+                        : root.width - w - WidgetLayout.insetX(modelData)
                 readonly property real homeY: WidgetLayout.hasTop(modelData)
                     ? WidgetLayout.insetY(modelData)
                     : root.height - h - WidgetLayout.insetY(modelData)
@@ -183,15 +185,16 @@ PanelWindow {
             Row {
                 id: row
                 anchors.centerIn: parent
-                spacing: 18
+                spacing: 8
 
                 Repeater {
                     model: Object.keys(WidgetLayout.defaults)
 
-                    WidgetSwitch {
+                    WidgetGlyph {
                         required property string modelData
 
                         anchors.verticalCenter: parent.verticalCenter
+                        glyph: WidgetLayout.glyphs[modelData] ?? ""
                         label: modelData
                         checked: WidgetLayout.shown(modelData)
                         onToggled: WidgetLayout.toggle(modelData)
