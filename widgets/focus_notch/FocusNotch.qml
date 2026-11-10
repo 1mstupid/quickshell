@@ -4,16 +4,18 @@ import Quickshell.Wayland
 import "../../services"
 import "../../services/menu"
 import "../notch"
+import "../bar/media"
 
 // The focus notch: the bar's center pill grows into the task timer and, on a
-// click, into a panel with three tabs. Hover the pill and it widens into a strip
-// with the task in focus, the time spent on it so far, and pause and done; with
-// nothing in focus it offers the block the schedule has on now. Click the strip
-// (or run `qs ipc call focusnotch toggle`) and it opens further:
-//   Day    the timer card, and what is left to do: todo.md's tasks together with
-//          today's blocks from schedule.md. A click puts a row in focus (it does
-//          not tick it), the check on a hovered row ticks it, and the box at the
-//          bottom adds a task to today, typed the way todo.md has it.
+// click, into a panel with a row of page buttons along the top. Hover the pill
+// and it widens into a strip with the task in focus, the time spent on it so
+// far, and pause and done; with nothing in focus it offers the block the
+// schedule has on now. Click the strip (or run `qs ipc call focusnotch toggle`)
+// and it opens further:
+//   Home   the now-playing card, and what is left to do: todo.md's tasks together
+//          with today's blocks from schedule.md. A click puts a row in focus (it
+//          does not tick it), the check on a hovered row ticks it, and the box at
+//          the bottom adds a task to today, typed the way todo.md has it.
 //   Week   the schedule's grid, with today and the block that is on now marked.
 //   Focus  the timer large, and the time tracked today and this week.
 // The strip closes when the pointer leaves it; the open panel closes on Escape
@@ -49,9 +51,9 @@ PanelWindow {
 
     // "" closed, "hover" the strip, "open" the full panel
     property string stage: ""
-    // the open panel's page: "day", "week" or "focus", remembered across openings
+    // the open panel's page: "home", "week" or "focus", remembered across openings
     readonly property string tab: FocusNotchState.page
-    readonly property var pages: ["day", "week", "focus"]
+    readonly property var pages: ["home", "week", "focus"]
     readonly property int pageIndex: Math.max(0, pages.indexOf(tab))
     // wraps at both ends
     function stepPage(delta) {
@@ -472,14 +474,15 @@ PanelWindow {
                     spacing: 2
 
                     Repeater {
-                        model: [{ key: "day", name: "Day" }, { key: "week", name: "Week" }, { key: "focus", name: "Focus" }]
+                        // icons, not names: the buttons sit in a row across the top of the panel
+                        model: [{ key: "home", name: "󰋜" }, { key: "week", name: "󰃭" }, { key: "focus", name: "󰔛" }]
 
                         Rectangle {
                             id: tabButton
                             required property var modelData
                             readonly property bool on: root.tab === modelData.key
 
-                            width: 54
+                            width: 40
                             height: 24
                             radius: 7
                             color: on ? Qt.alpha(Theme.fg, 0.12)
@@ -518,22 +521,25 @@ PanelWindow {
                 }
             }
 
-            // ── Day: the timer card, and what is left to do ────────────────
+            // ── Home: the now-playing card, and what is left to do ─────────
             Item {
                 id: dayTab
-                visible: root.tab === "day"
+                visible: root.tab === "home"
                 y: 46
                 width: panel.width
                 height: panel.height - y
 
-                // the timer card
+                // now playing: art, title and artist, and the transport
                 Rectangle {
-                    id: focusCard
+                    id: mediaCard
                     x: 12
                     width: 212
                     height: parent.height - 12
                     radius: 12
                     color: Qt.alpha(Theme.fg, 0.06)
+
+                    // the same MPRIS state the bar's media wave reads
+                    MediaState { id: media }
 
                     Column {
                         anchors.left: parent.left
@@ -542,77 +548,43 @@ PanelWindow {
                         anchors.margins: 14
                         spacing: 10
 
-                        Row {
-                            spacing: 12
+                        Rectangle {
+                            width: parent.width
+                            height: 130
+                            radius: 10
+                            color: Qt.alpha(Theme.fg, 0.08)
+                            clip: true
 
-                            Ring {
-                                fraction: root.ringFraction
-                                label: root.ringLabel
-                                size: 52
-                                tint: root.tint
+                            Image {
+                                anchors.fill: parent
+                                source: media.player?.trackArtUrl ?? ""
+                                fillMode: Image.PreserveAspectCrop
+                                visible: status === Image.Ready
                             }
-                            Column {
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: 2
-
-                                Text {
-                                    text: root.stateLabel
-                                    color: Qt.alpha(Theme.fg, 0.5)
-                                    font.family: Theme.fontFamilyAlt
-                                    font.pixelSize: 10
-                                    font.letterSpacing: 1
-                                }
-                                Text {
-                                    visible: root.focusOn
-                                    text: root.clockText
-                                    color: Theme.fg
-                                    font.family: Theme.fontFamilyAlt
-                                    font.pixelSize: 22
-                                    font.bold: true
-                                }
+                            Text {
+                                anchors.centerIn: parent
+                                visible: !media.present
+                                text: "󰝚"
+                                color: Qt.alpha(Theme.fg, 0.3)
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 30
                             }
                         }
 
                         Text {
                             width: parent.width
-                            text: root.focusOn ? TaskFocus.title : "Pick a task from the list to start timing it."
-                            color: root.focusOn ? Theme.fg : Qt.alpha(Theme.fg, 0.5)
+                            text: media.present ? (media.player?.trackTitle ?? "") : "Nothing playing"
+                            color: media.present ? Theme.fg : Qt.alpha(Theme.fg, 0.5)
                             font.family: Theme.fontFamily
                             font.pixelSize: 13
-                            font.bold: root.focusOn
-                            wrapMode: Text.WordWrap
-                            maximumLineCount: 2
+                            font.bold: media.present
                             elide: Text.ElideRight
                         }
                         Text {
-                            visible: root.focusOn
-                            text: "total " + root.totalText + (TaskFocus.item && TaskFocus.item.time !== "" ? "  ·  due " + TaskFocus.item.time : "")
-                            color: Qt.alpha(Theme.fg, 0.5)
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 11
-                        }
-                    }
-
-                    // the block the schedule has on now
-                    Column {
-                        visible: !root.focusOn && root.nowText !== ""
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.bottom: parent.bottom
-                        anchors.margins: 14
-                        spacing: 3
-
-                        Text {
-                            text: "NOW"
-                            color: Qt.alpha(Theme.fg, 0.5)
-                            font.family: Theme.fontFamilyAlt
-                            font.pixelSize: 10
-                            font.letterSpacing: 1
-                        }
-                        Text {
                             width: parent.width
-                            text: root.nowText
-                            color: Theme.fg
+                            visible: media.present
+                            text: media.artistText
+                            color: Qt.alpha(Theme.fg, 0.6)
                             font.family: Theme.fontFamily
                             font.pixelSize: 11
                             elide: Text.ElideRight
@@ -620,24 +592,55 @@ PanelWindow {
                     }
 
                     Row {
-                        visible: root.focusOn
-                        anchors.left: parent.left
+                        anchors.horizontalCenter: parent.horizontalCenter
                         anchors.bottom: parent.bottom
-                        anchors.margins: 12
-                        spacing: 8
+                        anchors.bottomMargin: 14
+                        spacing: 18
 
-                        PillButton {
-                            label: TaskFocus.running ? "PAUSE" : "RESUME"
-                            onClicked: TaskFocus.toggle()
+                        Text {
+                            readonly property bool allowed: media.player?.canGoPrevious ?? false
+                            text: "󰒮"
+                            color: !allowed ? Qt.alpha(Theme.fg, 0.25) : prevMa.containsMouse ? Theme.accent : Theme.fg
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 20
+                            MouseArea {
+                                id: prevMa
+                                anchors.fill: parent
+                                anchors.margins: -8
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: if (parent.allowed) media.player.previous()
+                            }
                         }
-                        PillButton {
-                            label: "STOP"
-                            onClicked: TaskFocus.stop()
+                        Text {
+                            readonly property bool allowed: media.player?.canTogglePlaying ?? false
+                            text: media.playing ? "󰏤" : "󰐊"
+                            color: !allowed ? Qt.alpha(Theme.fg, 0.25) : playMa.containsMouse ? Theme.accent : Theme.fg
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 20
+                            MouseArea {
+                                id: playMa
+                                anchors.fill: parent
+                                anchors.margins: -8
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: if (parent.allowed) media.player.togglePlaying()
+                            }
                         }
-                        PillButton {
-                            label: "DONE"
-                            main: true
-                            onClicked: TaskFocus.complete()
+                        Text {
+                            readonly property bool allowed: media.player?.canGoNext ?? false
+                            text: "󰒭"
+                            color: !allowed ? Qt.alpha(Theme.fg, 0.25) : nextMa.containsMouse ? Theme.accent : Theme.fg
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 20
+                            MouseArea {
+                                id: nextMa
+                                anchors.fill: parent
+                                anchors.margins: -8
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: if (parent.allowed) media.player.next()
+                            }
                         }
                     }
                 }

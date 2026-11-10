@@ -16,7 +16,7 @@ Singleton {
     property bool openRequested: false
 
     // the page the open panel shows; kept across openings, reset on shell restart
-    property string page: "day"
+    property string page: "home"
     function setPage(key) { page = key }
 
     function toggle() { openRequested = !openRequested }
