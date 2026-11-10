@@ -802,7 +802,7 @@ PanelWindow {
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
                                 Text {
-                                    text: Qt.formatDate(Todo.toDate(Todo.today), "ddd d MMM")
+                                    text: Qt.formatDate(Todo.toDate(Todo.today), "ddd dd/MM")
                                     color: Theme.accent
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 11
