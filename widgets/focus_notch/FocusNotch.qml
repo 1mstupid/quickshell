@@ -530,29 +530,29 @@ PanelWindow {
                 width: panel.width
                 height: panel.height - y
 
-                // now playing: art, title and artist, and the transport
-                Rectangle {
+                // now playing, laid out like the reference: art and title on top, the
+                // progress under them, the transport centred at the bottom
+                Item {
                     id: mediaCard
                     x: 12
                     width: panel.width - 24
                     height: parent.height - 12
-                    radius: 12
-                    color: Qt.alpha(Theme.fg, 0.06)
 
                     // the same MPRIS state the bar's media wave reads
                     MediaState { id: media }
 
-                    Column {
+                    Row {
+                        id: mediaTop
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.top: parent.top
                         anchors.margins: 14
-                        spacing: 10
+                        spacing: 14
 
                         Rectangle {
-                            width: parent.width
-                            height: 150
-                            radius: 10
+                            width: 64
+                            height: 64
+                            radius: 8
                             color: Qt.alpha(Theme.fg, 0.08)
                             clip: true
 
@@ -568,35 +568,93 @@ PanelWindow {
                                 text: "󰝚"
                                 color: Qt.alpha(Theme.fg, 0.3)
                                 font.family: Theme.fontFamily
-                                font.pixelSize: 30
+                                font.pixelSize: 24
                             }
                         }
 
-                        Text {
-                            width: parent.width
-                            text: media.present ? (media.player?.trackTitle ?? "") : "Nothing playing"
-                            color: media.present ? Theme.fg : Qt.alpha(Theme.fg, 0.5)
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 13
-                            font.bold: media.present
-                            elide: Text.ElideRight
-                        }
-                        Text {
-                            width: parent.width
-                            visible: media.present
-                            text: media.artistText
-                            color: Qt.alpha(Theme.fg, 0.6)
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 11
-                            elide: Text.ElideRight
+                        Column {
+                            width: mediaTop.width - 64 - mediaTop.spacing
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 4
+
+                            Text {
+                                width: parent.width
+                                text: media.present ? (media.player?.trackTitle ?? "") : "Nothing playing"
+                                color: media.present ? Theme.fg : Qt.alpha(Theme.fg, 0.5)
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 15
+                                font.bold: media.present
+                                elide: Text.ElideRight
+                            }
+                            Text {
+                                width: parent.width
+                                visible: media.present
+                                text: media.artistText
+                                color: Qt.alpha(Theme.fg, 0.6)
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 12
+                                elide: Text.ElideRight
+                            }
                         }
                     }
 
+                    // elapsed, a thin track, and the time left
+                    Item {
+                        id: progress
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: mediaTop.bottom
+                        anchors.leftMargin: 14
+                        anchors.rightMargin: 14
+                        anchors.topMargin: 18
+                        height: 14
+
+                        Text {
+                            id: elapsed
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: media.present ? media.fmt(media.pos) : ""
+                            color: Qt.alpha(Theme.fg, 0.6)
+                            font.family: Theme.fontFamilyAlt
+                            font.pixelSize: 11
+                        }
+                        Text {
+                            id: remaining
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            visible: media.timed
+                            text: media.timed ? "-" + media.fmt(media.len - media.pos) : ""
+                            color: Qt.alpha(Theme.fg, 0.6)
+                            font.family: Theme.fontFamilyAlt
+                            font.pixelSize: 11
+                        }
+                        Rectangle {
+                            anchors.left: elapsed.right
+                            anchors.right: remaining.left
+                            anchors.leftMargin: 10
+                            anchors.rightMargin: 10
+                            anchors.verticalCenter: parent.verticalCenter
+                            height: 4
+                            radius: 2
+                            color: Qt.alpha(Theme.fg, 0.15)
+
+                            Rectangle {
+                                anchors.left: parent.left
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                radius: parent.radius
+                                color: Theme.fg
+                                width: parent.width * (media.timed ? Math.min(1, media.pos / media.len) : 0)
+                            }
+                        }
+                    }
+
+                    // previous, play or pause, next
                     Row {
                         anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.bottom: parent.bottom
-                        anchors.bottomMargin: 14
-                        spacing: 18
+                        anchors.top: progress.bottom
+                        anchors.topMargin: 14
+                        spacing: 30
 
                         Text {
                             readonly property bool allowed: media.player?.canGoPrevious ?? false
@@ -618,7 +676,7 @@ PanelWindow {
                             text: media.playing ? "󰏤" : "󰐊"
                             color: !allowed ? Qt.alpha(Theme.fg, 0.25) : playMa.containsMouse ? Theme.accent : Theme.fg
                             font.family: Theme.fontFamily
-                            font.pixelSize: 20
+                            font.pixelSize: 26
                             MouseArea {
                                 id: playMa
                                 anchors.fill: parent
