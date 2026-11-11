@@ -12,6 +12,20 @@ import "../../../services"
 // `qs ipc call media toggle` does the same. The bar's media wave opens the
 // now-playing strip instead. Lyrics (LRCLIB) take the place of the artist and
 // title while on. Only the card takes pointer events.
+import Quickshell
+import Quickshell.Wayland
+import Quickshell.Io
+import QtQuick
+import QtQuick.Effects
+import "../../../services"
+
+// Media widget on the wallpaper layer, bottom centre by default: a square card
+// with the cover as a half-disc across its top, then artist, title and
+// progress. Transport and the lyrics toggle appear while the pointer is over
+// the card. The layout editor places it and switches it on and off;
+// `qs ipc call media toggle` does the same. The bar's media wave opens the
+// now-playing strip instead. Lyrics (LRCLIB) take the place of the artist and
+// title while on. Only the card takes pointer events.
 PanelWindow {
     id: root
 
@@ -55,10 +69,10 @@ PanelWindow {
     property bool lyricsOn: false
 
     // ── Lyrics state ───────────────────────────────────────────────────────
-    property var lyrics: []         // [{ t: seconds, text }]
+    property var lyrics: []           // [{ t: seconds, text }]
     property string lyricsKey: ""    // artist|title the lyrics belong to
     property string fetchKey: ""     // key of the request in flight
-    property var cache: ({})         // key -> parsed lyrics (may be empty)
+    property var cache: ({})           // key -> parsed lyrics (may be empty)
     property string lyricStatus: ""  // "", "searching", "none"
     property int lyricIdx: -1
 
@@ -105,14 +119,6 @@ PanelWindow {
                 break
         }
         return i
-    }
-
-    // the line shown in the title row while lyrics are on
-    function currentLine() {
-        if (lyrics.length === 0)
-            return lyricStatus === "searching" ? "searching…"
-                : lyricStatus === "none" ? "no synced lyrics" : ""
-        return lyricIdx < 0 ? "…" : lyrics[lyricIdx].text
     }
 
     function loadLyrics() {
@@ -168,7 +174,7 @@ PanelWindow {
     Connections {
         target: media.player
         function onTrackTitleChanged() {
-            root.lyricsKey = root.lyricsKey // keep bindings simple; reload below
+            root.lyricsKey = root.lyricsKey
             root.loadLyrics()
         }
     }
@@ -235,7 +241,7 @@ PanelWindow {
                 id: discMask
                 anchors.fill: parent
                 visible: false
-                layer.enabled: true // <--- Fixed: Added layer.enabled so MultiEffect can read the mask
+                layer.enabled: true
 
                 Rectangle {
                     anchors.fill: parent
@@ -276,7 +282,6 @@ PanelWindow {
                     }
                 }
 
-                // hidden circle, used only to mask the cover art to a full circle
                 Item {
                     id: faceMask
                     anchors.fill: parent
@@ -291,7 +296,6 @@ PanelWindow {
                 }
             }
 
-            // the spindle hole at the disc's centre
             Rectangle {
                 anchors.horizontalCenter: parent.horizontalCenter
                 y: root.discLower - 8
@@ -338,25 +342,97 @@ PanelWindow {
                 }
             }
 
+            // --- Normal Mode: Artist Text ---
             Text {
+                visible: !root.lyricsOn
                 width: parent.width
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
-                text: root.lyricsOn ? (root.lyrics[root.lyricIdx - 1]?.text ?? "") : media.artistText
+                text: media.artistText
                 color: Qt.alpha(Theme.fg, 0.5)
                 font.family: Theme.fontFamily
                 font.pixelSize: 13
             }
 
+            // --- Normal Mode: Track Title ---
             Text {
+                visible: !root.lyricsOn
                 width: parent.width
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
-                text: root.lyricsOn ? root.currentLine() : (media.player?.trackTitle ?? "")
+                text: media.player?.trackTitle ?? ""
                 color: Theme.fg
                 font.family: Theme.fontFamily
                 font.pixelSize: 16
                 font.bold: true
+            }
+
+            // --- Lyrics Mode: Spotify-Style Vertical ListView ---
+            ListView {
+                id: lyricsView
+                visible: root.lyricsOn && root.lyrics.length > 0
+                width: parent.width
+                height: 48
+                clip: true
+                model: root.lyrics
+
+                currentIndex: root.lyricIdx
+                preferredHighlightBegin: height / 2 - 12
+                preferredHighlightEnd: height / 2 + 12
+                highlightRangeMode: ListView.ApplyRange
+                highlightMoveDuration: 200
+
+                delegate: Item {
+                    required property int index
+                    required property var modelData
+
+                    width: lyricsView.width
+                    height: 24
+
+                    // Use MarqueeText for the active line, standard Text for inactive lines
+                    Loader {
+                        anchors.fill: parent
+                        sourceComponent: index === root.lyricIdx ? activeLyricComp : normalLyricComp
+
+                        Component {
+                            id: activeLyricComp
+                            MarqueeText {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: parent.width
+                                text: modelData.text
+                                color: Theme.fg
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 15
+                                // font.bold: true // If your MarqueeText supports bold property
+                            }
+                        }
+
+                        Component {
+                            id: normalLyricComp
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: parent.width
+                                horizontalAlignment: Text.AlignHCenter
+                                elide: Text.ElideRight
+                                text: modelData.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 15
+                                color: Qt.alpha(Theme.fg, 0.35)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // --- Lyrics Mode: Status / Loading Message ---
+            Text {
+                visible: root.lyricsOn && (root.lyricStatus !== "" || root.lyrics.length === 0)
+                width: parent.width
+                horizontalAlignment: Text.AlignHCenter
+                text: root.lyricStatus === "searching" ? "searching…" : root.lyricStatus === "none" ? "no synced lyrics" : ""
+                color: Qt.alpha(Theme.fg, 0.5)
+                font.family: Theme.fontFamily
+                font.pixelSize: 13
             }
 
             Item {
