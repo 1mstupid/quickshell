@@ -55,12 +55,12 @@ PanelWindow {
     property int selectedIndex: 0
     readonly property bool isSearching: searchQuery.trim() !== ""
 
-    // "" is the app list; "calc", "file" come from a bang (Modes.js)
+    // "" is the app list; "calc", "file", "clipboard" come from a bang (Modes.js)
     property string mode: ""
     readonly property var modeInfo: Modes.find(mode)
 
     // what the list shows, whichever mode: plain objects, so every row looks
-    // alike. kind says what Enter does: "app", "mode", "calc" or "file".
+    // alike. kind says what Enter does: "app", "mode", "calc", "file", or "clipboard".
     property var results: {
         var q = searchQuery.trim();
 
@@ -76,6 +76,13 @@ PanelWindow {
                 return [];
             return Files.entries.map(function (e) {
                 return { kind: "file", title: e.name, subtitle: e.sub, icon: "", glyph: e.glyph, value: e.path, next: e.next };
+            });
+        }
+
+        if (mode === "clipboard") {
+            const all = ClipboardHistory.entries;
+            return all.filter(e => q === "" || e.preview.toLowerCase().indexOf(q.toLowerCase()) !== -1).map(function (e) {
+                return { kind: "clipboard", title: e.preview, subtitle: "Clipboard entry", icon: "", glyph: modeInfo ? modeInfo.glyph : "📋", value: e };
             });
         }
 
@@ -142,6 +149,9 @@ PanelWindow {
                 return "Type a name, or / or ~ to browse";
             return Files.busy ? "" : "Nothing found";
         }
+        if (mode === "clipboard") {
+            return ClipboardHistory.entries.length === 0 ? "Nothing copied yet" : "No matches";
+        }
         return "No apps found";
     }
 
@@ -159,6 +169,7 @@ PanelWindow {
         PillState.owner = "applauncher";
         mode = "";
         searchInput.text = "";
+        if (ClipboardHistory.reload) ClipboardHistory.reload();
         visible = true;
         morph.stop();
         morph.from = root.t;
@@ -216,6 +227,9 @@ PanelWindow {
     function enterMode(name) {
         mode = name;
         searchInput.text = "";
+        if (name === "clipboard" && ClipboardHistory.reload) {
+            ClipboardHistory.reload();
+        }
     }
 
     function activate(r) {
@@ -228,18 +242,24 @@ PanelWindow {
         } else if (r.kind === "mode") {
             enterMode(r.value);
         } else if (r.kind === "calc") {
-            // "--" so a negative answer is not read as an option
             Quickshell.execDetached(["wl-copy", "--", r.value]);
             AppLauncherState.hide();
         } else if (r.kind === "file") {
             if (r.next !== "") {
-                // a folder opens into the line, so browsing carries on
                 searchInput.text = r.next;
             } else {
-                // r.value is an absolute path, so it cannot be read as an option
                 Quickshell.execDetached(["xdg-open", r.value]);
                 AppLauncherState.hide();
             }
+        } else if (r.kind === "clipboard") {
+            ClipboardHistory.copy(r.value);
+            AppLauncherState.hide();
+        }
+    }
+
+    function forgetEntry(r) {
+        if (r && r.kind === "clipboard") {
+            ClipboardHistory.remove(r.value);
         }
     }
 
@@ -271,7 +291,6 @@ PanelWindow {
     mask: Region { item: outline }
 
     // ── Card ───────────────────────────────────────────────────────────────
-    // the outline is a notch, drawn behind the card and sized to it
     Notch {
         id: outline
         bodyWidth: card.width
@@ -293,7 +312,6 @@ PanelWindow {
         color: "transparent"
         clip: true
 
-        // content fades in during the second half of the morph
         Column {
             anchors {
                 top: parent.top
@@ -306,7 +324,7 @@ PanelWindow {
             spacing: 8
             opacity: Math.max(0, (root.t - 0.5) * 2)
 
-            // ── Search line, with the match count on the right ─────────────
+            // ── Search line ────────────────────────────────────────────────
             Item {
                 width: parent.width
                 height: 34
@@ -351,8 +369,6 @@ PanelWindow {
                     clip: true
 
                     onTextChanged: {
-                        // a bang plus space moves into its mode, and the text
-                        // carries on after it
                         if (root.mode === "") {
                             var p = Modes.parse(text);
                             if (p.mode !== "") {
@@ -365,7 +381,6 @@ PanelWindow {
                     }
 
                     Keys.onPressed: function (event) {
-                        // Shift+Tab arrives as Key_Backtab
                         if (event.key === Qt.Key_Up || event.key === Qt.Key_Backtab) {
                             root.navigate(-1);
                             event.accepted = true;
@@ -375,8 +390,10 @@ PanelWindow {
                         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                             root.activate(root.results[root.selectedIndex]);
                             event.accepted = true;
+                        } else if (event.key === Qt.Key_Delete && (event.modifiers & Qt.ControlModifier) && root.mode === "clipboard") {
+                            root.forgetEntry(root.results[root.selectedIndex]);
+                            event.accepted = true;
                         } else if (event.key === Qt.Key_Backspace && root.mode !== "" && text === "") {
-                            // Backspace on an empty line leaves the mode
                             root.mode = "";
                             event.accepted = true;
                         } else if (event.key === Qt.Key_Escape) {
@@ -391,7 +408,7 @@ PanelWindow {
                     anchors.right: parent.right
                     anchors.rightMargin: 14
                     anchors.verticalCenter: parent.verticalCenter
-                    text: root.mode !== "" ? "" : root.results.length + " / " + DesktopEntries.applications.values.length
+                    text: root.mode !== "" ? (root.mode === "clipboard" ? root.results.length + " / " + ClipboardHistory.entries.length : "") : root.results.length + " / " + DesktopEntries.applications.values.length
                     color: Theme.fg
                     opacity: 0.35
                     font.family: Theme.fontFamilyAlt
@@ -399,7 +416,7 @@ PanelWindow {
                 }
             }
 
-            // ── App list ───────────────────────────────────────────────────
+            // ── Result list ────────────────────────────────────────────────
             ListView {
                 id: listView
                 width: parent.width
@@ -408,7 +425,6 @@ PanelWindow {
                 clip: true
                 interactive: false
 
-                // says why the list is empty
                 Text {
                     anchors.centerIn: parent
                     visible: root.results.length === 0
@@ -419,7 +435,6 @@ PanelWindow {
                     font.pixelSize: 13
                 }
 
-                // wheel scrolls the selection, as before
                 MouseArea {
                     anchors.fill: parent
                     onWheel: function (wheel) {
@@ -443,7 +458,6 @@ PanelWindow {
 
                     readonly property bool sel: root.selectedIndex === index
 
-                    // icon, name and category
                     Row {
                         anchors {
                             left: parent.left
@@ -462,12 +476,11 @@ PanelWindow {
                             Image {
                                 id: appIcon
                                 anchors.fill: parent
-                                source: appRow.modelData.icon !== "" ? "image://icon/" + appRow.modelData.icon : ""
+                                source: appRow.modelData.icon && appRow.modelData.icon !== "" ? "image://icon/" + appRow.modelData.icon : ""
                                 smooth: true
                                 mipmap: true
                             }
 
-                            // the row's glyph, else a letter while there is no icon
                             Text {
                                 anchors.centerIn: parent
                                 visible: appIcon.status !== Image.Ready
@@ -508,7 +521,6 @@ PanelWindow {
                         }
                     }
 
-                    // return hint on the selected row
                     Text {
                         id: returnHint
                         anchors.right: parent.right
@@ -535,7 +547,10 @@ PanelWindow {
             Text {
                 width: parent.width
                 horizontalAlignment: Text.AlignHCenter
-                text: root.mode === "calc" ? "↵ copy   ⌫ back   esc close" : root.mode === "file" ? "↵ open   ⌫ back   esc close" : "↑↓ move   ↵ launch   esc close"
+                text: root.mode === "calc" ? "↵ copy    ⌫ back    esc close" : 
+                      root.mode === "file" ? "↵ open    ⌫ back    esc close" : 
+                      root.mode === "clipboard" ? "↵ copy    ^⌫ delete    ⌫ back    esc close" : 
+                      "↑↓ move    ↵ launch    esc close"
                 color: Theme.fg
                 opacity: 0.25
                 font.family: Theme.fontFamilyAlt
