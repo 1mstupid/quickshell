@@ -14,14 +14,15 @@ import "../bar/media"
 // and pause and done; with nothing in focus it offers the block the schedule
 // has on now. Click the strip (or run `qs ipc call focusnotch toggle`)
 // and it opens further. A header switches between Home and Work; Work holds the
-// Day and Week pages, and a small switch on a row under the tabs picks between them:
-//   Home   the now-playing card on the left, and the focus card for the task in
-//          hand on the right: its timer, and pause and done.
+// Day, Week and Focus pages, and a small switch on a row under the tabs picks between them:
+//   Home   the now-playing card on the left, and the day on the right: the date,
+//          what is on now and what comes next.
 //   Day    what is left to do: todo.md's tasks together with today's blocks from
 //          schedule.md. A click puts a row in focus (it does not tick it), the
 //          check on a hovered row ticks it, and the box at the bottom adds a task
 //          to today, typed the way todo.md has it.
 //   Week   the schedule's grid, with today and the block that is on now marked.
+//   Focus  the task in hand: its timer, pause, stop and done, and the time tracked today.
 // The strip closes when the pointer leaves it; the open panel closes on Escape
 // or a click outside.
 PanelWindow {
@@ -55,9 +56,9 @@ PanelWindow {
 
     // "" closed, "hover" the strip, "open" the full panel
     property string stage: ""
-    // the open panel's page: "home", "day" or "week", remembered across openings
+    // the open panel's page: "home", "day", "week" or "focus", remembered across openings
     readonly property string tab: FocusNotchState.page
-    readonly property var pages: ["home", "day", "week"]
+    readonly property var pages: ["home", "day", "week", "focus"]
     readonly property int pageIndex: Math.max(0, pages.indexOf(tab))
     // Work is Day or Week; the Work tab returns to the one last shown
     property string lastWork: "day"
@@ -122,7 +123,6 @@ PanelWindow {
     readonly property real ringFraction: focusOn ? (TaskFocus.elapsedMs % 3600000) / 3600000 : 0
     readonly property string ringLabel: !focusOn ? "" : elapsedMin < 60 ? String(elapsedMin) : Math.floor(elapsedMin / 60) + "h"
     readonly property color tint: TaskFocus.paused ? Theme.disabled : Theme.accent
-    readonly property string stateLabel: !focusOn ? "NOTHING IN FOCUS" : TaskFocus.paused ? "PAUSED" : "FOCUS"
     readonly property string stripLabel: !focusOn ? "Nothing in focus" : TaskFocus.paused ? "Paused" : "Focus"
     readonly property string clockText: fmtClock(TaskFocus.elapsedMs)
     // time banked on the task before this run, plus this run
@@ -172,6 +172,43 @@ PanelWindow {
         }
         out.sort((a, b) => b.spent - a.spent)
         return { rows: out, today: today, week: week }
+    }
+
+    // Free time: what is left before bedtime (the `bed` line of sleep-reminder) once the
+    // open rows are done. A block of the schedule counts what is left of its length after
+    // the time spent on it; a block that has run over counts nothing, so it never makes
+    // the total negative. No bedtime, or past it, and there is nothing to show.
+    readonly property int bedMin: SleepReminder.bedAt !== "" ? minutesOf(SleepReminder.bedAt) : -1
+    readonly property int plannedLeftMin: {
+        let sum = 0
+        for (const r of rows) {
+            if (r.end < 0)
+                continue
+            const spent = (r.task ? r.task.spent : 0) + (TaskFocus.sameTask(r) ? elapsedMin : 0)
+            sum += Math.max(0, r.end - r.start - spent)
+        }
+        return sum
+    }
+    readonly property string freeText: {
+        if (bedMin < 0 || Schedule.nowMin >= bedMin)
+            return ""
+        const m = bedMin - Schedule.nowMin - plannedLeftMin
+        return m <= 0 ? "no time free" : fmtHours(m) + " free"
+    }
+    readonly property string leftText: rows.length + " left" + (freeText !== "" ? "  ·  " + freeText : "")
+
+    function fmtHours(m) {
+        const h = Math.floor(m / 60)
+        return h > 0 ? h + " h" + (m % 60 > 0 ? " " + m % 60 + " m" : "") : m + " m"
+    }
+
+    // A colour of its own for a row without a priority: the hue comes from the title, so
+    // it stays the same from one refresh to the next, with the accent's saturation and lightness.
+    function titleTint(title) {
+        let h = 0
+        for (let i = 0; i < title.length; i++)
+            h = (h * 31 + title.charCodeAt(i)) % 360
+        return Qt.hsla(h / 360, Theme.accent.hslSaturation, Theme.accent.hslLightness, 1)
     }
 
     function fmtClock(ms) {
@@ -578,6 +615,93 @@ PanelWindow {
                         }
                     }
                 }
+
+                // on Work: what is playing, and a menu button that does nothing yet
+                Row {
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 6
+                    opacity: root.tab !== "home" ? 1 : 0
+                    visible: opacity > 0
+                    Behavior on opacity { NumberAnimation { duration: 150 } }
+
+                    Rectangle {
+                        visible: media.present
+                        anchors.verticalCenter: parent.verticalCenter
+                        height: 24
+                        width: chipRow.implicitWidth + 18
+                        radius: 12
+                        color: Qt.alpha(Theme.fg, 0.08)
+
+                        Row {
+                            id: chipRow
+                            anchors.centerIn: parent
+                            spacing: 7
+
+                            // the cover as a small dot, rounded by mask like the player's
+                            Item {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 14
+                                height: 14
+
+                                Rectangle { anchors.fill: parent; radius: 7; color: Qt.alpha(Theme.accent, 0.5) }
+                                Item {
+                                    id: chipMask
+                                    anchors.fill: parent
+                                    visible: false
+                                    layer.enabled: true
+                                    Rectangle { anchors.fill: parent; radius: 7; color: "white" }
+                                }
+                                Image {
+                                    anchors.fill: parent
+                                    source: media.player?.trackArtUrl ?? ""
+                                    fillMode: Image.PreserveAspectCrop
+                                    visible: status === Image.Ready
+                                    layer.enabled: true
+                                    layer.effect: MultiEffect {
+                                        maskEnabled: true
+                                        maskSource: chipMask
+                                    }
+                                }
+                            }
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: Math.min(implicitWidth, 120)
+                                text: media.player?.trackTitle ?? ""
+                                color: Theme.fg
+                                font.family: Theme.fontFamilySans
+                                font.pixelSize: 11
+                                elide: Text.ElideRight
+                            }
+                            EqBars {
+                                anchors.verticalCenter: parent.verticalCenter
+                                playing: media.playing
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 24
+                        height: 24
+                        radius: 12
+                        color: moreMouse.containsMouse ? Qt.alpha(Theme.fg, 0.2) : Qt.alpha(Theme.fg, 0.08)
+                        Behavior on color { ColorAnimation { duration: 120 } }
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "󰇘"
+                            color: Qt.alpha(Theme.fg, 0.7)
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 13
+                        }
+                        MouseArea {
+                            id: moreMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                        }
+                    }
+                }
             }
 
             // the two pages of Work, shown only there
@@ -600,7 +724,7 @@ PanelWindow {
                     spacing: 2
 
                     Repeater {
-                        model: [{ key: "day", name: "Day" }, { key: "week", name: "Week" }]
+                        model: [{ key: "day", name: "Day" }, { key: "week", name: "Week" }, { key: "focus", name: "Focus" }]
 
                         Rectangle {
                             id: segment
@@ -701,7 +825,8 @@ PanelWindow {
                         }
 
                         Column {
-                            width: mediaTop.width - 64 - mediaTop.spacing
+                            // leaves room on the right for the bars
+                            width: mediaTop.width - 64 - mediaTop.spacing - 24
                             anchors.verticalCenter: parent.verticalCenter
                             spacing: 4
 
@@ -709,9 +834,9 @@ PanelWindow {
                                 width: parent.width
                                 text: media.present ? (media.player?.trackTitle ?? "") : "Nothing playing"
                                 color: media.present ? Theme.fg : Qt.alpha(Theme.fg, 0.5)
-                                font.family: Theme.fontFamily
+                                font.family: Theme.fontFamilySans
                                 font.pixelSize: 15
-                                font.bold: media.present
+                                font.weight: media.present ? Font.DemiBold : Font.Normal
                                 elide: Text.ElideRight
                             }
                             Text {
@@ -719,11 +844,18 @@ PanelWindow {
                                 visible: media.present
                                 text: media.artistText
                                 color: Qt.alpha(Theme.fg, 0.6)
-                                font.family: Theme.fontFamily
+                                font.family: Theme.fontFamilySans
                                 font.pixelSize: 12
                                 elide: Text.ElideRight
                             }
                         }
+                    }
+
+                    EqBars {
+                        anchors.right: mediaTop.right
+                        anchors.verticalCenter: mediaTop.verticalCenter
+                        visible: media.present
+                        playing: media.playing
                     }
 
                     // elapsed, a thin track, and the time left
@@ -743,7 +875,7 @@ PanelWindow {
                             anchors.verticalCenter: parent.verticalCenter
                             text: media.present ? media.fmt(media.pos) : ""
                             color: Qt.alpha(Theme.fg, 0.6)
-                            font.family: Theme.fontFamilyAlt
+                            font.family: Theme.fontFamilyNum
                             font.pixelSize: 11
                         }
                         Text {
@@ -753,7 +885,7 @@ PanelWindow {
                             visible: media.timed
                             text: media.timed ? "-" + media.fmt(media.len - media.pos) : ""
                             color: Qt.alpha(Theme.fg, 0.6)
-                            font.family: Theme.fontFamilyAlt
+                            font.family: Theme.fontFamilyNum
                             font.pixelSize: 11
                         }
                         Rectangle {
@@ -788,7 +920,7 @@ PanelWindow {
                             id: cell
                             property string glyph: ""
                             property bool allowed: true
-                            property int glyphSize: 20
+                            property int glyphSize: 24
                             signal tapped()
 
                             width: 40
@@ -812,247 +944,217 @@ PanelWindow {
                         }
 
                         Transport {
-                            glyph: "󰒮"
+                            glyph: "󰑟"
                             allowed: media.player?.canGoPrevious ?? false
                             onTapped: media.player.previous()
                         }
                         Transport {
                             glyph: media.playing ? "󰏤" : "󰐊"
-                            glyphSize: 26
+                            glyphSize: 32
                             allowed: media.player?.canTogglePlaying ?? false
                             onTapped: media.player.togglePlaying()
                         }
                         Transport {
-                            glyph: "󰒭"
+                            glyph: "󰈑"
                             allowed: media.player?.canGoNext ?? false
                             onTapped: media.player.next()
                         }
                     }
                 }
 
-                // the focus card has two states: the timer while a task is in focus, and the
-                // free-time notice, as in the reference, while none is
+                // a thin line between the player and the day, as in the reference
                 Rectangle {
-                    id: focusCard
-                    x: mediaCard.x + mediaCard.width + 12
-                    width: 200
-                    height: parent.height - 12
-                    radius: 12
-                    color: root.focusOn ? Qt.alpha(Theme.fg, 0.06) : Qt.alpha(Theme.accent, 0.1)
+                    x: mediaCard.x + mediaCard.width + 6
+                    y: 6
+                    width: 1
+                    height: parent.height - 24
+                    color: Qt.alpha(Theme.fg, 0.1)
+                }
 
-                    // a task in focus: the timer, its title and the time it has had
-                    Column {
-                        visible: root.focusOn
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.top: parent.top
-                        anchors.margins: 14
-                        spacing: 10
+                // the day: the date, what is on now (or nearest) and the next task after today
+                Column {
+                    id: dayColumn
+                    x: mediaCard.x + mediaCard.width + 18
+                    width: 194
+                    spacing: 8
 
-                        Row {
-                            spacing: 12
+                    // the date, top left: the weekday small in red, the date large, and a
+                    // button that jumps to the Day page with the add box ready
+                    Item {
+                        width: parent.width
+                        height: dateText.height
 
-                            Ring {
-                                fraction: root.ringFraction
-                                label: root.ringLabel
-                                size: 52
-                                tint: root.tint
-                            }
-                            Column {
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: 2
-
-                                Text {
-                                    text: root.stateLabel
-                                    color: Qt.alpha(Theme.fg, 0.5)
-                                    font.family: Theme.fontFamilyAlt
-                                    font.pixelSize: 10
-                                    font.letterSpacing: 1
-                                }
-                                Text {
-                                    text: root.clockText
-                                    color: Theme.fg
-                                    font.family: Theme.fontFamilyAlt
-                                    font.pixelSize: 22
-                                    font.bold: true
-                                }
-                            }
-                        }
-
-                        Text {
-                            width: parent.width
-                            text: TaskFocus.title
-                            color: Theme.fg
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 13
-                            font.bold: true
-                            wrapMode: Text.WordWrap
-                            maximumLineCount: 2
-                            elide: Text.ElideRight
-                        }
-                        Text {
-                            width: parent.width
-                            text: "total " + root.totalText + (TaskFocus.item && TaskFocus.item.time !== "" ? "  ·  due " + TaskFocus.item.time : "")
-                            color: Qt.alpha(Theme.fg, 0.5)
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 11
-                        }
-                    }
-
-                    // nothing in focus: the free-time notice, in two sections as in the
-                    // reference: today's nearest task or the clear notice, then the next
-                    // task after today
-                    Column {
-                        visible: !root.focusOn
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.top: parent.top
-                        anchors.margins: 14
-                        spacing: 8
-
-                        // the date, top left as in the reference: the weekday small, the date large
                         Column {
-                            width: parent.width
+                            id: dateText
 
                             Text {
                                 text: Qt.formatDate(Todo.toDate(Todo.today), "dddd").toUpperCase()
-                                color: Theme.accent
-                                font.family: Theme.fontFamily
+                                color: Theme.red
+                                font.family: Theme.fontFamilySans
                                 font.pixelSize: 10
-                                font.bold: true
+                                font.weight: Font.DemiBold
                                 font.letterSpacing: 1
                             }
                             Text {
                                 text: Qt.formatDate(Todo.toDate(Todo.today), "d MMM")
                                 color: Theme.fg
-                                font.family: Theme.fontFamily
+                                font.family: Theme.fontFamilySans
                                 font.pixelSize: 22
-                                font.bold: true
+                                font.weight: Font.DemiBold
                             }
                         }
-
-                        // today
                         Rectangle {
-                            width: parent.width
-                            height: 50
-                            radius: 10
-                            color: Qt.alpha(Theme.fg, 0.08)
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            width: 26
+                            height: 26
+                            radius: 8
+                            color: plusMouse.containsMouse ? Qt.alpha(Theme.fg, 0.2) : Qt.alpha(Theme.fg, 0.1)
+                            Behavior on color { ColorAnimation { duration: 120 } }
 
-                            Row {
+                            Text {
+                                anchors.centerIn: parent
+                                text: "󰐕"
+                                color: Theme.fg
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 12
+                            }
+                            MouseArea {
+                                id: plusMouse
                                 anchors.fill: parent
-                                anchors.margins: 10
-                                spacing: 10
-
-                                Text {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: "󰃭"
-                                    color: Theme.accent
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 16
-                                }
-                                Column {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    width: parent.width - 26
-                                    spacing: 1
-
-                                    Text {
-                                        width: parent.width
-                                        text: root.nextRow !== null ? root.nextRow.title : "You're clear for today"
-                                        color: Theme.fg
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: 12
-                                        font.bold: true
-                                        elide: Text.ElideRight
-                                    }
-                                    Text {
-                                        width: parent.width
-                                        text: root.nextRow !== null ? root.whenText(root.nextRow) : "Enjoy your free time"
-                                        color: Qt.alpha(Theme.fg, 0.6)
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: 10
-                                        elide: Text.ElideRight
-                                    }
-                                }
-                            }
-                        }
-                        PillButton {
-                            visible: root.nextRow !== null
-                            label: "FOCUS"
-                            main: true
-                            onClicked: root.focusRow(root.nextRow)
-                        }
-
-                        // the next task after today
-                        Text {
-                            visible: root.nextLater !== null
-                            text: "Next event"
-                            color: Qt.alpha(Theme.fg, 0.5)
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 10
-                        }
-                        Rectangle {
-                            visible: root.nextLater !== null
-                            width: parent.width
-                            height: 46
-                            radius: 10
-                            color: Qt.alpha(Theme.fg, 0.06)
-
-                            Rectangle {
-                                x: 8
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: 3
-                                height: 24
-                                radius: 2
-                                color: Theme.accent
-                            }
-                            Column {
-                                anchors.verticalCenter: parent.verticalCenter
-                                anchors.left: parent.left
-                                anchors.right: parent.right
-                                anchors.leftMargin: 20
-                                anchors.rightMargin: 10
-                                spacing: 1
-
-                                Text {
-                                    width: parent.width
-                                    text: root.nextLater !== null ? root.nextLater.title : ""
-                                    color: Theme.fg
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 12
-                                    font.bold: true
-                                    elide: Text.ElideRight
-                                }
-                                Text {
-                                    width: parent.width
-                                    text: root.laterText
-                                    color: Qt.alpha(Theme.fg, 0.6)
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 10
-                                    elide: Text.ElideRight
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    FocusNotchState.setPage("day")
+                                    // the Day page is not visible yet, so focus waits a tick
+                                    Qt.callLater(() => input.forceActiveFocus())
                                 }
                             }
                         }
                     }
 
-                    Row {
-                        visible: root.focusOn
-                        anchors.left: parent.left
-                        anchors.bottom: parent.bottom
-                        anchors.margins: 12
-                        spacing: 8
+                    // today: what is nearest, with a button that puts it in focus
+                    Rectangle {
+                        width: parent.width
+                        height: 50
+                        radius: 10
+                        color: Qt.alpha(Theme.fg, 0.06)
 
-                        PillButton {
-                            label: TaskFocus.running ? "PAUSE" : "RESUME"
-                            onClicked: TaskFocus.toggle()
+                        Row {
+                            anchors.fill: parent
+                            anchors.margins: 10
+                            spacing: 10
+
+                            Rectangle {
+                                id: dayTile
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 30
+                                height: 30
+                                radius: 8
+                                color: Qt.alpha(Theme.accent, 0.18)
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "󰃭"
+                                    color: Theme.accent
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 14
+                                }
+                            }
+                            Column {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: parent.width - dayTile.width - parent.spacing
+                                       - (todayFocus.visible ? todayFocus.width + parent.spacing : 0)
+                                spacing: 1
+
+                                Text {
+                                    width: parent.width
+                                    text: root.nextRow !== null ? root.nextRow.title : "You're clear for today"
+                                    color: Theme.fg
+                                    font.family: Theme.fontFamilySans
+                                    font.pixelSize: 12
+                                    font.weight: Font.DemiBold
+                                    elide: Text.ElideRight
+                                }
+                                Text {
+                                    width: parent.width
+                                    text: root.nextRow !== null ? root.whenText(root.nextRow) : "Enjoy your free time"
+                                    color: Qt.alpha(Theme.fg, 0.6)
+                                    font.family: root.nextRow !== null ? Theme.fontFamilyNum : Theme.fontFamilySans
+                                    font.pixelSize: 10
+                                    elide: Text.ElideRight
+                                }
+                            }
+                            IconButton {
+                                id: todayFocus
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 28
+                                height: 28
+                                visible: !root.focusOn && root.nextRow !== null
+                                glyph: "󰐊"
+                                main: true
+                                onClicked: root.focusRow(root.nextRow)
+                            }
                         }
-                        PillButton {
-                            label: "STOP"
-                            onClicked: TaskFocus.stop()
+                    }
+
+                    // the next task after today
+                    Text {
+                        visible: root.nextLater !== null
+                        text: "Next event"
+                        color: Qt.alpha(Theme.fg, 0.5)
+                        font.family: Theme.fontFamilySans
+                        font.pixelSize: 10
+                    }
+                    Rectangle {
+                        visible: root.nextLater !== null
+                        width: parent.width
+                        height: 46
+                        radius: 10
+                        color: Qt.alpha(Theme.fg, 0.06)
+
+                        Rectangle {
+                            x: 8
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 3
+                            height: 24
+                            radius: 2
+                            color: Theme.accent
                         }
-                        PillButton {
-                            label: "DONE"
-                            main: true
-                            onClicked: TaskFocus.complete()
+                        Column {
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.leftMargin: 20
+                            anchors.rightMargin: 28
+                            spacing: 1
+
+                            Text {
+                                width: parent.width
+                                text: root.nextLater !== null ? root.nextLater.title : ""
+                                color: Theme.fg
+                                font.family: Theme.fontFamilySans
+                                font.pixelSize: 12
+                                font.weight: Font.DemiBold
+                                elide: Text.ElideRight
+                            }
+                            Text {
+                                width: parent.width
+                                text: root.laterText
+                                color: Qt.alpha(Theme.fg, 0.6)
+                                font.family: Theme.fontFamilySans
+                                font.pixelSize: 10
+                                elide: Text.ElideRight
+                            }
+                        }
+                        Text {
+                            anchors.right: parent.right
+                            anchors.rightMargin: 10
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "󰅂"
+                            color: Qt.alpha(Theme.fg, 0.4)
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 14
                         }
                     }
                 }
@@ -1079,17 +1181,16 @@ PanelWindow {
                         height: 20
 
                         Text {
-                            text: "NEXT"
+                            text: "Next"
                             color: Qt.alpha(Theme.fg, 0.5)
-                            font.family: Theme.fontFamilyAlt
-                            font.pixelSize: 10
-                            font.letterSpacing: 1
+                            font.family: Theme.fontFamilySans
+                            font.pixelSize: 11
                         }
                         Text {
                             anchors.right: parent.right
-                            text: root.rows.length + " left"
+                            text: root.leftText
                             color: Qt.alpha(Theme.fg, 0.5)
-                            font.family: Theme.fontFamily
+                            font.family: Theme.fontFamilySans
                             font.pixelSize: 11
                         }
                     }
@@ -1110,13 +1211,14 @@ PanelWindow {
                             readonly property bool isSlot: modelData.kind === "slot"
                             readonly property bool inFocus: TaskFocus.sameTask(modelData)
                             readonly property bool isNow: modelData.due === Todo.today && modelData.title === Schedule.currentTitle
+                            // p1, p2 and p3 keep their colours; the rest get one of their own
                             readonly property color tint: modelData.late || modelData.priority === 1 ? Theme.red
                                 : modelData.priority === 2 ? Theme.accent
                                 : modelData.priority === 3 ? Theme.secondary
-                                : Qt.alpha(Theme.fg, isSlot ? 0.35 : 0.5)
+                                : root.titleTint(modelData.title)
 
                             width: dayList.width
-                            height: 30
+                            height: 32
 
                             HoverHandler { id: rowHover }
 
@@ -1158,9 +1260,9 @@ PanelWindow {
                                 anchors.rightMargin: 10
                                 text: dayRowItem.modelData.title
                                 color: Theme.fg
-                                font.family: Theme.fontFamily
+                                font.family: Theme.fontFamilySans
                                 font.pixelSize: 12
-                                font.bold: dayRowItem.inFocus || dayRowItem.isNow
+                                font.weight: dayRowItem.inFocus || dayRowItem.isNow ? Font.DemiBold : Font.Normal
                                 elide: Text.ElideRight
                             }
                             Text {
@@ -1170,7 +1272,7 @@ PanelWindow {
                                 anchors.rightMargin: 6
                                 text: root.whenText(dayRowItem.modelData)
                                 color: dayRowItem.modelData.late ? Theme.red : Qt.alpha(Theme.fg, 0.5)
-                                font.family: Theme.fontFamilyAlt
+                                font.family: Theme.fontFamilyNum
                                 font.pixelSize: 11
                             }
                             // nf-md-check: ticks it, shown on a hovered row
@@ -1206,7 +1308,7 @@ PanelWindow {
                         y: listHead.height + 12
                         text: "Nothing left today"
                         color: Qt.alpha(Theme.fg, 0.5)
-                        font.family: Theme.fontFamily
+                        font.family: Theme.fontFamilySans
                         font.pixelSize: 12
                     }
 
@@ -1216,9 +1318,9 @@ PanelWindow {
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.bottom: parent.bottom
-                        height: 32
+                        height: 30
                         radius: 8
-                        color: input.activeFocus ? Qt.alpha(Theme.fg, 0.1) : Qt.alpha(Theme.fg, 0.05)
+                        color: input.activeFocus ? Qt.alpha(Theme.fg, 0.08) : "transparent"
                         Behavior on color { ColorAnimation { duration: 120 } }
 
                         MouseArea {
@@ -1227,21 +1329,24 @@ PanelWindow {
                             onClicked: input.forceActiveFocus()
                         }
 
+                        // the plus sits under the row dots
                         Text {
                             id: plus
                             anchors.verticalCenter: parent.verticalCenter
                             anchors.left: parent.left
-                            anchors.leftMargin: 11
-                            text: "+"
+                            anchors.leftMargin: 8
+                            width: 16
+                            horizontalAlignment: Text.AlignHCenter
+                            text: "󰐕"
                             color: Qt.alpha(Theme.fg, 0.5)
-                            font.family: Theme.fontFamilyAlt
-                            font.pixelSize: 16
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 14
                         }
                         TextInput {
                             id: input
                             anchors.verticalCenter: parent.verticalCenter
                             anchors.left: plus.right
-                            anchors.leftMargin: 10
+                            anchors.leftMargin: 12
                             anchors.right: parent.right
                             anchors.rightMargin: 10
                             clip: true
@@ -1249,7 +1354,7 @@ PanelWindow {
                             color: Theme.fg
                             selectionColor: Theme.accent
                             selectedTextColor: Theme.bg
-                            font.family: Theme.fontFamily
+                            font.family: Theme.fontFamilySans
                             font.pixelSize: 12
 
                             onAccepted: {
@@ -1264,11 +1369,247 @@ PanelWindow {
 
                             Text {
                                 visible: input.text === ""
-                                text: "Add a task  ·  @16:30 p2"
-                                color: Qt.alpha(Theme.fg, 0.35)
+                                text: "Add a task"
+                                color: Qt.alpha(Theme.fg, 0.4)
                                 font: input.font
                             }
                         }
+                        // the syntax, faint, while the box is empty
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.right: parent.right
+                            anchors.rightMargin: 10
+                            visible: input.text === ""
+                            text: "@16:30  p2"
+                            color: Qt.alpha(Theme.fg, 0.3)
+                            font.family: Theme.fontFamilyNum
+                            font.pixelSize: 11
+                        }
+                    }
+                }
+            }
+
+            // ── Focus: the task in hand and the time tracked today ──────────
+            Item {
+                id: focusTab
+                visible: root.tab === "focus"
+                y: 72
+                width: panel.width
+                height: panel.height - y
+
+                // the task in focus: its timer and controls; with none, what the schedule offers
+                Rectangle {
+                    id: focusCard
+                    x: 12
+                    width: 232
+                    height: parent.height - 12
+                    radius: 12
+                    color: Qt.alpha(Theme.fg, 0.06)
+
+                    Column {
+                        visible: root.focusOn
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: 14
+                        spacing: 8
+
+                        Row {
+                            spacing: 12
+
+                            Ring {
+                                fraction: root.ringFraction
+                                label: root.ringLabel
+                                size: 52
+                                tint: root.tint
+                            }
+                            Column {
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 2
+
+                                Row {
+                                    spacing: 6
+
+                                    Text {
+                                        text: root.stripLabel
+                                        color: Qt.alpha(Theme.fg, 0.55)
+                                        font.family: Theme.fontFamilySans
+                                        font.pixelSize: 11
+                                    }
+                                    Rectangle {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: 6
+                                        height: 6
+                                        radius: 3
+                                        color: TaskFocus.running ? Theme.green : Theme.disabled
+                                    }
+                                }
+                                Text {
+                                    text: root.clockText
+                                    color: Theme.fg
+                                    font.family: Theme.fontFamilyNum
+                                    font.pixelSize: 22
+                                    font.bold: true
+                                }
+                            }
+                        }
+
+                        Text {
+                            width: parent.width
+                            text: TaskFocus.title
+                            color: Theme.fg
+                            font.family: Theme.fontFamilySans
+                            font.pixelSize: 13
+                            font.weight: Font.DemiBold
+                            wrapMode: Text.WordWrap
+                            maximumLineCount: 2
+                            elide: Text.ElideRight
+                        }
+                        // a block of the schedule counts down, any other task shows its total
+                        Text {
+                            width: parent.width
+                            text: root.plannedMin > 0 ? root.timeText
+                                : "total " + root.totalText + (TaskFocus.item && TaskFocus.item.time !== "" ? "  ·  due " + TaskFocus.item.time : "")
+                            color: Qt.alpha(Theme.fg, 0.5)
+                            font.family: root.plannedMin > 0 ? Theme.fontFamilyNum : Theme.fontFamilySans
+                            font.pixelSize: 11
+                            elide: Text.ElideRight
+                        }
+                    }
+
+                    Row {
+                        visible: root.focusOn
+                        anchors.left: parent.left
+                        anchors.bottom: parent.bottom
+                        anchors.margins: 12
+                        spacing: 8
+
+                        PillButton {
+                            label: TaskFocus.running ? "Pause" : "Resume"
+                            glyph: TaskFocus.running ? "󰏤" : "󰐊"
+                            onClicked: TaskFocus.toggle()
+                        }
+                        PillButton {
+                            label: "Done"
+                            glyph: "󰄬"
+                            main: true
+                            onClicked: TaskFocus.complete()
+                        }
+                        IconButton {
+                            width: 28
+                            height: 28
+                            glyph: "󰓛"
+                            onClicked: TaskFocus.stop()
+                        }
+                    }
+
+                    // nothing in focus
+                    Column {
+                        visible: !root.focusOn
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: 14
+                        spacing: 8
+
+                        Text {
+                            text: "Nothing in focus"
+                            color: Theme.fg
+                            font.family: Theme.fontFamilySans
+                            font.pixelSize: 13
+                            font.weight: Font.DemiBold
+                        }
+                        Text {
+                            width: parent.width
+                            text: root.nextRow !== null ? "Next: " + root.nextRow.title : "Nothing left today"
+                            color: Qt.alpha(Theme.fg, 0.6)
+                            font.family: Theme.fontFamilySans
+                            font.pixelSize: 12
+                            wrapMode: Text.WordWrap
+                            maximumLineCount: 2
+                            elide: Text.ElideRight
+                        }
+                        PillButton {
+                            visible: root.nextRow !== null
+                            label: "Focus"
+                            glyph: "󰐊"
+                            main: true
+                            onClicked: root.focusRow(root.nextRow)
+                        }
+                    }
+                }
+
+                // the time tracked today, most first, against the planned minutes where there are any
+                Item {
+                    id: trackedList
+                    x: focusCard.x + focusCard.width + 14
+                    width: panel.width - x - 18
+                    height: parent.height - 12
+
+                    Item {
+                        id: trackedHead
+                        width: parent.width
+                        height: 20
+
+                        Text {
+                            text: "Tracked today"
+                            color: Qt.alpha(Theme.fg, 0.5)
+                            font.family: Theme.fontFamilySans
+                            font.pixelSize: 11
+                        }
+                        Text {
+                            anchors.right: parent.right
+                            text: root.fmtMin(root.tracked.today) + " today  ·  " + root.fmtMin(root.tracked.week) + " this week"
+                            color: Qt.alpha(Theme.fg, 0.5)
+                            font.family: Theme.fontFamilyNum
+                            font.pixelSize: 11
+                        }
+                    }
+
+                    Column {
+                        y: trackedHead.height + 4
+                        width: parent.width
+
+                        Repeater {
+                            model: root.tracked.rows.slice(0, 5)
+
+                            Item {
+                                id: trackedRow
+                                required property var modelData
+                                width: parent.width
+                                height: 28
+
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: parent.width - amount.implicitWidth - 12
+                                    text: trackedRow.modelData.title
+                                    color: trackedRow.modelData.focused ? Theme.fg : Qt.alpha(Theme.fg, 0.8)
+                                    font.family: Theme.fontFamilySans
+                                    font.pixelSize: 12
+                                    font.weight: trackedRow.modelData.focused ? Font.DemiBold : Font.Normal
+                                    elide: Text.ElideRight
+                                }
+                                Text {
+                                    id: amount
+                                    anchors.right: parent.right
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: root.fmtMin(trackedRow.modelData.spent)
+                                        + (trackedRow.modelData.planned > 0 ? " / " + root.fmtMin(trackedRow.modelData.planned) : "")
+                                    color: Qt.alpha(Theme.fg, 0.6)
+                                    font.family: Theme.fontFamilyNum
+                                    font.pixelSize: 11
+                                }
+                            }
+                        }
+                    }
+
+                    Text {
+                        visible: root.tracked.rows.length === 0
+                        y: trackedHead.height + 12
+                        text: "No time tracked today"
+                        color: Qt.alpha(Theme.fg, 0.4)
+                        font.family: Theme.fontFamilySans
+                        font.pixelSize: 12
                     }
                 }
             }
