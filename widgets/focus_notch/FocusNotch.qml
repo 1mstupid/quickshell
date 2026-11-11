@@ -174,6 +174,43 @@ PanelWindow {
         return { rows: out, today: today, week: week }
     }
 
+    // Free time: what is left before bedtime (the `bed` line of sleep-reminder) once the
+    // open rows are done. A block of the schedule counts what is left of its length after
+    // the time spent on it; a block that has run over counts nothing, so it never makes
+    // the total negative. No bedtime, or past it, and there is nothing to show.
+    readonly property int bedMin: SleepReminder.bedAt !== "" ? minutesOf(SleepReminder.bedAt) : -1
+    readonly property int plannedLeftMin: {
+        let sum = 0
+        for (const r of rows) {
+            if (r.end < 0)
+                continue
+            const spent = (r.task ? r.task.spent : 0) + (TaskFocus.sameTask(r) ? elapsedMin : 0)
+            sum += Math.max(0, r.end - r.start - spent)
+        }
+        return sum
+    }
+    readonly property string freeText: {
+        if (bedMin < 0 || Schedule.nowMin >= bedMin)
+            return ""
+        const m = bedMin - Schedule.nowMin - plannedLeftMin
+        return m <= 0 ? "no time free" : fmtHours(m) + " free"
+    }
+    readonly property string leftText: rows.length + " left" + (freeText !== "" ? "  ·  " + freeText : "")
+
+    function fmtHours(m) {
+        const h = Math.floor(m / 60)
+        return h > 0 ? h + " h" + (m % 60 > 0 ? " " + m % 60 + " m" : "") : m + " m"
+    }
+
+    // A colour of its own for a row without a priority: the hue comes from the title, so
+    // it stays the same from one refresh to the next, with the accent's saturation and lightness.
+    function titleTint(title) {
+        let h = 0
+        for (let i = 0; i < title.length; i++)
+            h = (h * 31 + title.charCodeAt(i)) % 360
+        return Qt.hsla(h / 360, Theme.accent.hslSaturation, Theme.accent.hslLightness, 1)
+    }
+
     function fmtClock(ms) {
         const secs = Math.floor(ms / 1000)
         const h = Math.floor(secs / 3600)
@@ -575,6 +612,93 @@ PanelWindow {
                                     keyHost.forceActiveFocus()
                                 }
                             }
+                        }
+                    }
+                }
+
+                // on Work: what is playing, and a menu button that does nothing yet
+                Row {
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 6
+                    opacity: root.tab !== "home" ? 1 : 0
+                    visible: opacity > 0
+                    Behavior on opacity { NumberAnimation { duration: 150 } }
+
+                    Rectangle {
+                        visible: media.present
+                        anchors.verticalCenter: parent.verticalCenter
+                        height: 24
+                        width: chipRow.implicitWidth + 18
+                        radius: 12
+                        color: Qt.alpha(Theme.fg, 0.08)
+
+                        Row {
+                            id: chipRow
+                            anchors.centerIn: parent
+                            spacing: 7
+
+                            // the cover as a small dot, rounded by mask like the player's
+                            Item {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 14
+                                height: 14
+
+                                Rectangle { anchors.fill: parent; radius: 7; color: Qt.alpha(Theme.accent, 0.5) }
+                                Item {
+                                    id: chipMask
+                                    anchors.fill: parent
+                                    visible: false
+                                    layer.enabled: true
+                                    Rectangle { anchors.fill: parent; radius: 7; color: "white" }
+                                }
+                                Image {
+                                    anchors.fill: parent
+                                    source: media.player?.trackArtUrl ?? ""
+                                    fillMode: Image.PreserveAspectCrop
+                                    visible: status === Image.Ready
+                                    layer.enabled: true
+                                    layer.effect: MultiEffect {
+                                        maskEnabled: true
+                                        maskSource: chipMask
+                                    }
+                                }
+                            }
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: Math.min(implicitWidth, 120)
+                                text: media.player?.trackTitle ?? ""
+                                color: Theme.fg
+                                font.family: Theme.fontFamilySans
+                                font.pixelSize: 11
+                                elide: Text.ElideRight
+                            }
+                            EqBars {
+                                anchors.verticalCenter: parent.verticalCenter
+                                playing: media.playing
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 24
+                        height: 24
+                        radius: 12
+                        color: moreMouse.containsMouse ? Qt.alpha(Theme.fg, 0.2) : Qt.alpha(Theme.fg, 0.08)
+                        Behavior on color { ColorAnimation { duration: 120 } }
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "󰇘"
+                            color: Qt.alpha(Theme.fg, 0.7)
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 13
+                        }
+                        MouseArea {
+                            id: moreMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
                         }
                     }
                 }
@@ -1057,17 +1181,16 @@ PanelWindow {
                         height: 20
 
                         Text {
-                            text: "NEXT"
+                            text: "Next"
                             color: Qt.alpha(Theme.fg, 0.5)
-                            font.family: Theme.fontFamilyAlt
-                            font.pixelSize: 10
-                            font.letterSpacing: 1
+                            font.family: Theme.fontFamilySans
+                            font.pixelSize: 11
                         }
                         Text {
                             anchors.right: parent.right
-                            text: root.rows.length + " left"
+                            text: root.leftText
                             color: Qt.alpha(Theme.fg, 0.5)
-                            font.family: Theme.fontFamily
+                            font.family: Theme.fontFamilySans
                             font.pixelSize: 11
                         }
                     }
@@ -1088,13 +1211,14 @@ PanelWindow {
                             readonly property bool isSlot: modelData.kind === "slot"
                             readonly property bool inFocus: TaskFocus.sameTask(modelData)
                             readonly property bool isNow: modelData.due === Todo.today && modelData.title === Schedule.currentTitle
+                            // p1, p2 and p3 keep their colours; the rest get one of their own
                             readonly property color tint: modelData.late || modelData.priority === 1 ? Theme.red
                                 : modelData.priority === 2 ? Theme.accent
                                 : modelData.priority === 3 ? Theme.secondary
-                                : Qt.alpha(Theme.fg, isSlot ? 0.35 : 0.5)
+                                : root.titleTint(modelData.title)
 
                             width: dayList.width
-                            height: 30
+                            height: 32
 
                             HoverHandler { id: rowHover }
 
@@ -1136,9 +1260,9 @@ PanelWindow {
                                 anchors.rightMargin: 10
                                 text: dayRowItem.modelData.title
                                 color: Theme.fg
-                                font.family: Theme.fontFamily
+                                font.family: Theme.fontFamilySans
                                 font.pixelSize: 12
-                                font.bold: dayRowItem.inFocus || dayRowItem.isNow
+                                font.weight: dayRowItem.inFocus || dayRowItem.isNow ? Font.DemiBold : Font.Normal
                                 elide: Text.ElideRight
                             }
                             Text {
@@ -1148,7 +1272,7 @@ PanelWindow {
                                 anchors.rightMargin: 6
                                 text: root.whenText(dayRowItem.modelData)
                                 color: dayRowItem.modelData.late ? Theme.red : Qt.alpha(Theme.fg, 0.5)
-                                font.family: Theme.fontFamilyAlt
+                                font.family: Theme.fontFamilyNum
                                 font.pixelSize: 11
                             }
                             // nf-md-check: ticks it, shown on a hovered row
@@ -1184,7 +1308,7 @@ PanelWindow {
                         y: listHead.height + 12
                         text: "Nothing left today"
                         color: Qt.alpha(Theme.fg, 0.5)
-                        font.family: Theme.fontFamily
+                        font.family: Theme.fontFamilySans
                         font.pixelSize: 12
                     }
 
@@ -1194,9 +1318,9 @@ PanelWindow {
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.bottom: parent.bottom
-                        height: 32
+                        height: 30
                         radius: 8
-                        color: input.activeFocus ? Qt.alpha(Theme.fg, 0.1) : Qt.alpha(Theme.fg, 0.05)
+                        color: input.activeFocus ? Qt.alpha(Theme.fg, 0.08) : "transparent"
                         Behavior on color { ColorAnimation { duration: 120 } }
 
                         MouseArea {
@@ -1205,21 +1329,24 @@ PanelWindow {
                             onClicked: input.forceActiveFocus()
                         }
 
+                        // the plus sits under the row dots
                         Text {
                             id: plus
                             anchors.verticalCenter: parent.verticalCenter
                             anchors.left: parent.left
-                            anchors.leftMargin: 11
-                            text: "+"
+                            anchors.leftMargin: 8
+                            width: 16
+                            horizontalAlignment: Text.AlignHCenter
+                            text: "󰐕"
                             color: Qt.alpha(Theme.fg, 0.5)
-                            font.family: Theme.fontFamilyAlt
-                            font.pixelSize: 16
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 14
                         }
                         TextInput {
                             id: input
                             anchors.verticalCenter: parent.verticalCenter
                             anchors.left: plus.right
-                            anchors.leftMargin: 10
+                            anchors.leftMargin: 12
                             anchors.right: parent.right
                             anchors.rightMargin: 10
                             clip: true
@@ -1227,7 +1354,7 @@ PanelWindow {
                             color: Theme.fg
                             selectionColor: Theme.accent
                             selectedTextColor: Theme.bg
-                            font.family: Theme.fontFamily
+                            font.family: Theme.fontFamilySans
                             font.pixelSize: 12
 
                             onAccepted: {
@@ -1242,10 +1369,21 @@ PanelWindow {
 
                             Text {
                                 visible: input.text === ""
-                                text: "Add a task  ·  @16:30 p2"
-                                color: Qt.alpha(Theme.fg, 0.35)
+                                text: "Add a task"
+                                color: Qt.alpha(Theme.fg, 0.4)
                                 font: input.font
                             }
+                        }
+                        // the syntax, faint, while the box is empty
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.right: parent.right
+                            anchors.rightMargin: 10
+                            visible: input.text === ""
+                            text: "@16:30  p2"
+                            color: Qt.alpha(Theme.fg, 0.3)
+                            font.family: Theme.fontFamilyNum
+                            font.pixelSize: 11
                         }
                     }
                 }
