@@ -12,6 +12,20 @@ import "../../../services"
 // `qs ipc call media toggle` does the same. The bar's media wave opens the
 // now-playing strip instead. Lyrics (LRCLIB) take the place of the artist and
 // title while on. Only the card takes pointer events.
+import Quickshell
+import Quickshell.Wayland
+import Quickshell.Io
+import QtQuick
+import QtQuick.Effects
+import "../../../services"
+
+// Media widget on the wallpaper layer, bottom centre by default: a square card
+// with the cover as a half-disc across its top, then artist, title and
+// progress. Transport and the lyrics toggle appear while the pointer is over
+// the card. The layout editor places it and switches it on and off;
+// `qs ipc call media toggle` does the same. The bar's media wave opens the
+// now-playing strip instead. Lyrics (LRCLIB) take the place of the artist and
+// title while on. Only the card takes pointer events.
 PanelWindow {
     id: root
 
@@ -49,16 +63,16 @@ PanelWindow {
     readonly property int panelW: 300
     // the cover disc is smaller than the card and lowered, so its flat top edge
     // sits inside the card's rounded corners instead of past them
-    readonly property int discD: 220
-    readonly property int discLower: 44  // the disc's centre, below the card's top edge
+    readonly property int discD: 300
+    readonly property int discLower: 0  // the disc's centre, below the card's top edge
 
     property bool lyricsOn: false
 
     // ── Lyrics state ───────────────────────────────────────────────────────
-    property var lyrics: []          // [{ t: seconds, text }]
+    property var lyrics: []           // [{ t: seconds, text }]
     property string lyricsKey: ""    // artist|title the lyrics belong to
     property string fetchKey: ""     // key of the request in flight
-    property var cache: ({})         // key -> parsed lyrics (may be empty)
+    property var cache: ({})           // key -> parsed lyrics (may be empty)
     property string lyricStatus: ""  // "", "searching", "none"
     property int lyricIdx: -1
 
@@ -105,14 +119,6 @@ PanelWindow {
                 break
         }
         return i
-    }
-
-    // the line shown in the title row while lyrics are on
-    function currentLine() {
-        if (lyrics.length === 0)
-            return lyricStatus === "searching" ? "searching…"
-                : lyricStatus === "none" ? "no synced lyrics" : ""
-        return lyricIdx < 0 ? "…" : lyrics[lyricIdx].text
     }
 
     function loadLyrics() {
@@ -168,7 +174,7 @@ PanelWindow {
     Connections {
         target: media.player
         function onTrackTitleChanged() {
-            root.lyricsKey = root.lyricsKey // keep bindings simple; reload below
+            root.lyricsKey = root.lyricsKey
             root.loadLyrics()
         }
     }
@@ -192,7 +198,7 @@ PanelWindow {
         font.family: Theme.fontFamily
         font.pixelSize: 20
         color: !allowed ? Qt.alpha(tint, 0.25)
-             : ma.containsMouse ? Theme.accent : tint
+               : ma.containsMouse ? Theme.accent : tint
         Behavior on color { ColorAnimation { duration: 120 } }
 
         MouseArea {
@@ -206,8 +212,6 @@ PanelWindow {
     }
 
     // ── Card ───────────────────────────────────────────────────────────────
-    // the same dark card as the other corner widgets (todo, habits, usage),
-    // with the cover rising from its top edge as a disc
     Rectangle {
         id: card
 
@@ -221,12 +225,30 @@ PanelWindow {
 
         HoverHandler { id: hover }
 
-        // the cover disc, cut by the card's top edge; only its lower part shows
+        // the cover disc container with a top-corner rounding mask matching the card
         Item {
             id: disc
             width: root.panelW
             height: root.discLower + root.discD / 2
-            clip: true
+
+            layer.enabled: true
+            layer.effect: MultiEffect {
+                maskEnabled: true
+                maskSource: discMask
+            }
+
+            Item {
+                id: discMask
+                anchors.fill: parent
+                visible: false
+                layer.enabled: true
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: card.radius
+                    color: "white"
+                }
+            }
 
             Rectangle {
                 id: face
@@ -246,8 +268,6 @@ PanelWindow {
                     duration: 12000
                 }
 
-                // the layer stays on, so the mask is applied from the first frame
-                // rather than only once the cover has loaded
                 Image {
                     id: art
                     anchors.fill: parent
@@ -262,7 +282,6 @@ PanelWindow {
                     }
                 }
 
-                // hidden circle, used only to mask the cover
                 Item {
                     id: faceMask
                     anchors.fill: parent
@@ -277,7 +296,6 @@ PanelWindow {
                 }
             }
 
-            // the spindle hole at the disc's centre; it stays still while the disc turns
             Rectangle {
                 anchors.horizontalCenter: parent.horizontalCenter
                 y: root.discLower - 8
@@ -290,14 +308,13 @@ PanelWindow {
             }
         }
 
-        // a Column positions its children, so each centres with x rather than anchors
+        // a Column positions its children
         Column {
             x: 24
             y: disc.height + 14
             width: card.width - 48
             spacing: 8
 
-            // the wave the bar's indicator uses, here as a sign that a track is loaded
             Row {
                 x: (parent.width - width) / 2
                 height: 14
@@ -325,30 +342,99 @@ PanelWindow {
                 }
             }
 
-            // the artist, or the lyric before the current one
+            // --- Normal Mode: Artist Text ---
             Text {
+                visible: !root.lyricsOn
                 width: parent.width
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
-                text: root.lyricsOn ? (root.lyrics[root.lyricIdx - 1]?.text ?? "") : media.artistText
+                text: media.artistText
                 color: Qt.alpha(Theme.fg, 0.5)
                 font.family: Theme.fontFamily
                 font.pixelSize: 13
             }
 
-            // the title, or the current lyric
+            // --- Normal Mode: Track Title ---
             Text {
+                visible: !root.lyricsOn
                 width: parent.width
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
-                text: root.lyricsOn ? root.currentLine() : (media.player?.trackTitle ?? "")
+                text: media.player?.trackTitle ?? ""
                 color: Theme.fg
                 font.family: Theme.fontFamily
                 font.pixelSize: 16
                 font.bold: true
             }
 
-            // progress: a short centred track, so it reads as a marker rather than a bar
+            // --- Lyrics Mode: Spotify-Style Vertical ListView ---
+            ListView {
+                id: lyricsView
+                visible: root.lyricsOn && root.lyrics.length > 0
+                width: parent.width
+                height: 48
+                clip: true
+                model: root.lyrics
+
+                currentIndex: root.lyricIdx
+                preferredHighlightBegin: height / 2 - 12
+                preferredHighlightEnd: height / 2 + 12
+                highlightRangeMode: ListView.ApplyRange
+                highlightMoveDuration: 200
+
+                delegate: Item {
+                    required property int index
+                    required property var modelData
+
+                    width: lyricsView.width
+                    height: 24
+
+                    // Use MarqueeText for the active line, standard Text for inactive lines
+                    Loader {
+                        anchors.fill: parent
+                        sourceComponent: index === root.lyricIdx ? activeLyricComp : normalLyricComp
+
+                        Component {
+                            id: activeLyricComp
+                            MarqueeText {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: parent.width
+                                text: modelData.text
+                                color: Theme.fg
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 15
+                                // font.bold: true // If your MarqueeText supports bold property
+                            }
+                        }
+
+                        Component {
+                            id: normalLyricComp
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: parent.width
+                                horizontalAlignment: Text.AlignHCenter
+                                elide: Text.ElideRight
+                                text: modelData.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 15
+                                color: Qt.alpha(Theme.fg, 0.35)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // --- Lyrics Mode: Status / Loading Message ---
+            Text {
+                visible: root.lyricsOn && (root.lyricStatus !== "" || root.lyrics.length === 0)
+                width: parent.width
+                horizontalAlignment: Text.AlignHCenter
+                text: root.lyricStatus === "searching" ? "searching…" : root.lyricStatus === "none" ? "no synced lyrics" : ""
+                color: Qt.alpha(Theme.fg, 0.5)
+                font.family: Theme.fontFamily
+                font.pixelSize: 13
+            }
+
             Item {
                 x: (parent.width - width) / 2
                 width: 40
@@ -367,7 +453,6 @@ PanelWindow {
                 }
             }
 
-            // elapsed and total at rest; the transport and lyrics toggle on hover
             Item {
                 width: parent.width
                 height: 24
@@ -412,7 +497,7 @@ PanelWindow {
                         height: 34
                         radius: 17
                         color: !allowed ? Qt.alpha(Theme.fg, 0.25)
-                             : playMa.containsMouse ? Theme.accent : Theme.fg
+                               : playMa.containsMouse ? Theme.accent : Theme.fg
                         Behavior on color { ColorAnimation { duration: 120 } }
 
                         Text {
@@ -444,8 +529,8 @@ PanelWindow {
                         height: 20
                         radius: 6
                         color: root.lyricsOn ? Qt.alpha(Theme.fg, 0.25)
-                             : lyricsMa.containsMouse ? Qt.alpha(Theme.fg, 0.16)
-                             : Qt.alpha(Theme.fg, 0.08)
+                               : lyricsMa.containsMouse ? Qt.alpha(Theme.fg, 0.16)
+                               : Qt.alpha(Theme.fg, 0.08)
                         Behavior on color { ColorAnimation { duration: 120 } }
 
                         Text {
