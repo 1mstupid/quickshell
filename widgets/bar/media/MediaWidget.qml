@@ -49,13 +49,13 @@ PanelWindow {
     readonly property int panelW: 300
     // the cover disc is smaller than the card and lowered, so its flat top edge
     // sits inside the card's rounded corners instead of past them
-    readonly property int discD: 220
-    readonly property int discLower: 44  // the disc's centre, below the card's top edge
+    readonly property int discD: 300
+    readonly property int discLower: 0  // the disc's centre, below the card's top edge
 
     property bool lyricsOn: false
 
     // ── Lyrics state ───────────────────────────────────────────────────────
-    property var lyrics: []          // [{ t: seconds, text }]
+    property var lyrics: []         // [{ t: seconds, text }]
     property string lyricsKey: ""    // artist|title the lyrics belong to
     property string fetchKey: ""     // key of the request in flight
     property var cache: ({})         // key -> parsed lyrics (may be empty)
@@ -192,7 +192,7 @@ PanelWindow {
         font.family: Theme.fontFamily
         font.pixelSize: 20
         color: !allowed ? Qt.alpha(tint, 0.25)
-             : ma.containsMouse ? Theme.accent : tint
+               : ma.containsMouse ? Theme.accent : tint
         Behavior on color { ColorAnimation { duration: 120 } }
 
         MouseArea {
@@ -206,8 +206,6 @@ PanelWindow {
     }
 
     // ── Card ───────────────────────────────────────────────────────────────
-    // the same dark card as the other corner widgets (todo, habits, usage),
-    // with the cover rising from its top edge as a disc
     Rectangle {
         id: card
 
@@ -221,12 +219,30 @@ PanelWindow {
 
         HoverHandler { id: hover }
 
-        // the cover disc, cut by the card's top edge; only its lower part shows
+        // the cover disc container with a top-corner rounding mask matching the card
         Item {
             id: disc
             width: root.panelW
             height: root.discLower + root.discD / 2
-            clip: true
+
+            layer.enabled: true
+            layer.effect: MultiEffect {
+                maskEnabled: true
+                maskSource: discMask
+            }
+
+            Item {
+                id: discMask
+                anchors.fill: parent
+                visible: false
+                layer.enabled: true // <--- Fixed: Added layer.enabled so MultiEffect can read the mask
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: card.radius
+                    color: "white"
+                }
+            }
 
             Rectangle {
                 id: face
@@ -246,8 +262,6 @@ PanelWindow {
                     duration: 12000
                 }
 
-                // the layer stays on, so the mask is applied from the first frame
-                // rather than only once the cover has loaded
                 Image {
                     id: art
                     anchors.fill: parent
@@ -262,7 +276,7 @@ PanelWindow {
                     }
                 }
 
-                // hidden circle, used only to mask the cover
+                // hidden circle, used only to mask the cover art to a full circle
                 Item {
                     id: faceMask
                     anchors.fill: parent
@@ -277,7 +291,7 @@ PanelWindow {
                 }
             }
 
-            // the spindle hole at the disc's centre; it stays still while the disc turns
+            // the spindle hole at the disc's centre
             Rectangle {
                 anchors.horizontalCenter: parent.horizontalCenter
                 y: root.discLower - 8
@@ -290,14 +304,13 @@ PanelWindow {
             }
         }
 
-        // a Column positions its children, so each centres with x rather than anchors
+        // a Column positions its children
         Column {
             x: 24
             y: disc.height + 14
             width: card.width - 48
             spacing: 8
 
-            // the wave the bar's indicator uses, here as a sign that a track is loaded
             Row {
                 x: (parent.width - width) / 2
                 height: 14
@@ -325,7 +338,6 @@ PanelWindow {
                 }
             }
 
-            // the artist, or the lyric before the current one
             Text {
                 width: parent.width
                 horizontalAlignment: Text.AlignHCenter
@@ -336,7 +348,6 @@ PanelWindow {
                 font.pixelSize: 13
             }
 
-            // the title, or the current lyric
             Text {
                 width: parent.width
                 horizontalAlignment: Text.AlignHCenter
@@ -348,7 +359,6 @@ PanelWindow {
                 font.bold: true
             }
 
-            // progress: a short centred track, so it reads as a marker rather than a bar
             Item {
                 x: (parent.width - width) / 2
                 width: 40
@@ -367,7 +377,6 @@ PanelWindow {
                 }
             }
 
-            // elapsed and total at rest; the transport and lyrics toggle on hover
             Item {
                 width: parent.width
                 height: 24
@@ -412,7 +421,7 @@ PanelWindow {
                         height: 34
                         radius: 17
                         color: !allowed ? Qt.alpha(Theme.fg, 0.25)
-                             : playMa.containsMouse ? Theme.accent : Theme.fg
+                               : playMa.containsMouse ? Theme.accent : Theme.fg
                         Behavior on color { ColorAnimation { duration: 120 } }
 
                         Text {
@@ -444,8 +453,8 @@ PanelWindow {
                         height: 20
                         radius: 6
                         color: root.lyricsOn ? Qt.alpha(Theme.fg, 0.25)
-                             : lyricsMa.containsMouse ? Qt.alpha(Theme.fg, 0.16)
-                             : Qt.alpha(Theme.fg, 0.08)
+                               : lyricsMa.containsMouse ? Qt.alpha(Theme.fg, 0.16)
+                               : Qt.alpha(Theme.fg, 0.08)
                         Behavior on color { ColorAnimation { duration: 120 } }
 
                         Text {
