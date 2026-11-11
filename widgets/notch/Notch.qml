@@ -26,6 +26,8 @@ Canvas {
     onWidthChanged: requestPaint()
     onHeightChanged: requestPaint()
     onFillColorChanged: requestPaint()
+    // a panel can animate its corner while it morphs
+    onCornerChanged: requestPaint()
 
     onPaint: {
         const ctx = getContext("2d")
