@@ -13,7 +13,7 @@ import "../bar/media"
 // far, and pause and done; with nothing in focus it offers the block the
 // schedule has on now. Click the strip (or run `qs ipc call focusnotch toggle`)
 // and it opens further. A header switches between Home and Work; Work holds the
-// Day and Week pages, and a small switch beside the tabs picks between them:
+// Day and Week pages, and a small switch on a row under the tabs picks between them:
 //   Home   the now-playing card on the left, and the focus card for the task in
 //          hand on the right: its timer, and pause and done.
 //   Day    what is left to do: todo.md's tasks together with today's blocks from
@@ -50,7 +50,7 @@ PanelWindow {
     readonly property int hoverW: 520
     readonly property int hoverH: 78
     readonly property int openW: 580
-    readonly property int openH: 230
+    readonly property int openH: 260
 
     // "" closed, "hover" the strip, "open" the full panel
     property string stage: ""
@@ -496,121 +496,117 @@ PanelWindow {
 
                 Row {
                     anchors.verticalCenter: parent.verticalCenter
-                    spacing: 14
+                    spacing: 2
 
-                    Row {
-                        anchors.verticalCenter: parent.verticalCenter
-                        spacing: 2
+                    Repeater {
+                        model: [{ key: "home", glyph: "󰋜", name: "Home" },
+                                { key: "work", glyph: "󰸗", name: "Work" }]
 
-                        Repeater {
-                            model: [{ key: "home", glyph: "󰋜", name: "Home" },
-                                    { key: "work", glyph: "󰸗", name: "Work" }]
+                        Rectangle {
+                            id: tabButton
+                            required property var modelData
+                            // Work is on for both of its pages
+                            readonly property bool on: modelData.key === "home"
+                                ? root.tab === "home" : root.tab !== "home"
 
-                            Rectangle {
-                                id: tabButton
-                                required property var modelData
-                                // Work is on for both of its pages
-                                readonly property bool on: modelData.key === "home"
-                                    ? root.tab === "home" : root.tab !== "home"
+                            // a square slot for the icon, then the name while the tab is on
+                            width: on ? 32 + tabName.implicitWidth + 12 : 32
+                            height: 24
+                            radius: height / 2
+                            clip: true
+                            color: on ? Qt.alpha(Theme.fg, 0.12)
+                                 : tabMouse.containsMouse ? Qt.alpha(Theme.fg, 0.06) : "transparent"
+                            Behavior on width { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                            Behavior on color { ColorAnimation { duration: 120 } }
 
-                                // a square slot for the icon, then the name while the tab is on
-                                width: on ? 32 + tabName.implicitWidth + 12 : 32
-                                height: 24
-                                radius: height / 2
-                                clip: true
-                                color: on ? Qt.alpha(Theme.fg, 0.12)
-                                     : tabMouse.containsMouse ? Qt.alpha(Theme.fg, 0.06) : "transparent"
-                                Behavior on width { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-                                Behavior on color { ColorAnimation { duration: 120 } }
-
-                                Text {
-                                    width: 32
-                                    height: parent.height
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                    text: tabButton.modelData.glyph
-                                    color: tabButton.on ? Theme.fg : Qt.alpha(Theme.fg, 0.55)
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 12
-                                }
-                                Text {
-                                    id: tabName
-                                    x: 32
-                                    height: parent.height
-                                    verticalAlignment: Text.AlignVCenter
-                                    text: tabButton.modelData.name
-                                    opacity: tabButton.on ? 1 : 0
-                                    color: Theme.fg
-                                    font.family: Theme.fontFamilySans
-                                    font.pixelSize: 12
-                                    font.weight: Font.DemiBold
-                                    Behavior on opacity { NumberAnimation { duration: 150 } }
-                                }
-                                MouseArea {
-                                    id: tabMouse
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        FocusNotchState.setPage(tabButton.modelData.key === "home" ? "home" : root.lastWork)
-                                        keyHost.forceActiveFocus()
-                                    }
+                            Text {
+                                width: 32
+                                height: parent.height
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                text: tabButton.modelData.glyph
+                                color: tabButton.on ? Theme.fg : Qt.alpha(Theme.fg, 0.55)
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 12
+                            }
+                            Text {
+                                id: tabName
+                                x: 32
+                                height: parent.height
+                                verticalAlignment: Text.AlignVCenter
+                                text: tabButton.modelData.name
+                                opacity: tabButton.on ? 1 : 0
+                                color: Theme.fg
+                                font.family: Theme.fontFamilySans
+                                font.pixelSize: 12
+                                font.weight: Font.DemiBold
+                                Behavior on opacity { NumberAnimation { duration: 150 } }
+                            }
+                            MouseArea {
+                                id: tabMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    FocusNotchState.setPage(tabButton.modelData.key === "home" ? "home" : root.lastWork)
+                                    keyHost.forceActiveFocus()
                                 }
                             }
                         }
                     }
+                }
+            }
 
-                    // the two pages of Work, shown only there
-                    Rectangle {
-                        id: workSwitch
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: segments.implicitWidth + 4
-                        height: 24
-                        radius: 7
-                        color: Qt.alpha(Theme.fg, 0.08)
-                        opacity: root.tab !== "home" ? 1 : 0
-                        visible: opacity > 0
-                        Behavior on opacity { NumberAnimation { duration: 150 } }
+            // the two pages of Work, shown only there
+            Rectangle {
+                id: workSwitch
+                x: 18
+                y: 40
+                width: segments.implicitWidth + 4
+                height: 24
+                radius: 7
+                color: Qt.alpha(Theme.fg, 0.08)
+                opacity: root.tab !== "home" ? 1 : 0
+                visible: opacity > 0
+                Behavior on opacity { NumberAnimation { duration: 150 } }
 
-                        Row {
-                            id: segments
-                            x: 2
-                            y: 2
-                            spacing: 2
+                Row {
+                    id: segments
+                    x: 2
+                    y: 2
+                    spacing: 2
 
-                            Repeater {
-                                model: [{ key: "day", name: "Day" }, { key: "week", name: "Week" }]
+                    Repeater {
+                        model: [{ key: "day", name: "Day" }, { key: "week", name: "Week" }]
 
-                                Rectangle {
-                                    id: segment
-                                    required property var modelData
-                                    readonly property bool on: root.tab === modelData.key
+                        Rectangle {
+                            id: segment
+                            required property var modelData
+                            readonly property bool on: root.tab === modelData.key
 
-                                    width: segName.implicitWidth + 20
-                                    height: 20
-                                    radius: 5
-                                    color: on ? Qt.alpha(Theme.fg, 0.14)
-                                         : segMouse.containsMouse ? Qt.alpha(Theme.fg, 0.06) : "transparent"
-                                    Behavior on color { ColorAnimation { duration: 120 } }
+                            width: segName.implicitWidth + 20
+                            height: 20
+                            radius: 5
+                            color: on ? Qt.alpha(Theme.fg, 0.14)
+                                 : segMouse.containsMouse ? Qt.alpha(Theme.fg, 0.06) : "transparent"
+                            Behavior on color { ColorAnimation { duration: 120 } }
 
-                                    Text {
-                                        id: segName
-                                        anchors.centerIn: parent
-                                        text: segment.modelData.name
-                                        color: segment.on ? Theme.fg : Qt.alpha(Theme.fg, 0.6)
-                                        font.family: Theme.fontFamilySans
-                                        font.pixelSize: 11
-                                    }
-                                    MouseArea {
-                                        id: segMouse
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            FocusNotchState.setPage(segment.modelData.key)
-                                            keyHost.forceActiveFocus()
-                                        }
-                                    }
+                            Text {
+                                id: segName
+                                anchors.centerIn: parent
+                                text: segment.modelData.name
+                                color: segment.on ? Theme.fg : Qt.alpha(Theme.fg, 0.6)
+                                font.family: Theme.fontFamilySans
+                                font.pixelSize: 11
+                            }
+                            MouseArea {
+                                id: segMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    FocusNotchState.setPage(segment.modelData.key)
+                                    keyHost.forceActiveFocus()
                                 }
                             }
                         }
@@ -1043,7 +1039,7 @@ PanelWindow {
             Item {
                 id: dayTab
                 visible: root.tab === "day"
-                y: 46
+                y: 72
                 width: panel.width
                 height: panel.height - y
 
@@ -1258,7 +1254,7 @@ PanelWindow {
             WeekGrid {
                 visible: root.tab === "week"
                 x: 12
-                y: 46
+                y: 72
                 width: panel.width - 24
                 height: panel.height - y - 10
             }
