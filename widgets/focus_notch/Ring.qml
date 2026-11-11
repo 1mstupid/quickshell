@@ -45,7 +45,7 @@ Item {
         anchors.centerIn: parent
         text: ring.label
         color: Theme.fg
-        font.family: Theme.fontFamilyAlt
+        font.family: Theme.fontFamilyNum
         font.pixelSize: Math.round(ring.size * 0.34)
         font.bold: true
     }

@@ -10,8 +10,9 @@ import "../bar/media"
 // The focus notch: the bar's center pill grows into the task timer and, on a
 // click, into a panel with a row of page buttons along the top. Hover the pill
 // and it widens into a strip with the task in focus, the time spent on it so
-// far, and pause and done; with nothing in focus it offers the block the
-// schedule has on now. Click the strip (or run `qs ipc call focusnotch toggle`)
+// far (or, for a block of the schedule, what is left of it and when it ends),
+// and pause and done; with nothing in focus it offers the block the schedule
+// has on now. Click the strip (or run `qs ipc call focusnotch toggle`)
 // and it opens further. A header switches between Home and Work; Work holds the
 // Day and Week pages, and a small switch on a row under the tabs picks between them:
 //   Home   the now-playing card on the left, and the focus card for the task in
@@ -122,10 +123,28 @@ PanelWindow {
     readonly property string ringLabel: !focusOn ? "" : elapsedMin < 60 ? String(elapsedMin) : Math.floor(elapsedMin / 60) + "h"
     readonly property color tint: TaskFocus.paused ? Theme.disabled : Theme.accent
     readonly property string stateLabel: !focusOn ? "NOTHING IN FOCUS" : TaskFocus.paused ? "PAUSED" : "FOCUS"
+    readonly property string stripLabel: !focusOn ? "Nothing in focus" : TaskFocus.paused ? "Paused" : "Focus"
     readonly property string clockText: fmtClock(TaskFocus.elapsedMs)
     // time banked on the task before this run, plus this run
-    readonly property int totalMin: Math.floor(((TaskFocus.item ? TaskFocus.item.spent * 60000 : 0) + TaskFocus.elapsedMs) / 60000)
+    readonly property double totalMs: (TaskFocus.item ? TaskFocus.item.spent * 60000 : 0) + TaskFocus.elapsedMs
+    readonly property int totalMin: Math.floor(totalMs / 60000)
     readonly property string totalText: fmtMin(totalMin)
+    // The minutes the schedule planned for the task in focus: 0 when it is not
+    // a block of the schedule, and then the strip counts up instead of down.
+    readonly property int plannedMin: focusOn ? Schedule.minutesFor(TaskFocus.title) : 0
+    readonly property double leftMs: plannedMin * 60000 - totalMs
+    readonly property real planFraction: plannedMin > 0 ? Math.min(1, totalMs / (plannedMin * 60000)) : 0
+    // the strip's time line; the end time only means something while the clock runs
+    readonly property string timeText: {
+        if (!focusOn)
+            return ""
+        if (plannedMin <= 0)
+            return clockText + "  ·  total " + totalText
+        if (leftMs <= 0)
+            return fmtMin(Math.ceil(-leftMs / 60000)) + " over"
+        return fmtClock(leftMs) + " left" + (TaskFocus.running
+            ? "  ·  ends " + Qt.formatTime(new Date(TaskFocus.now + leftMs), "HH:mm") : "")
+    }
     readonly property string nextText: nextRow !== null
         ? "Next: " + nextRow.title + (nextRow.time !== "" && !nextRow.late ? "  " + nextRow.time : "")
         : "Nothing else today"
@@ -359,29 +378,6 @@ PanelWindow {
             Keys.onRightPressed: root.stepPage(1)
         }
 
-        // which page the strip would open on: one dot per page, the current one long
-        Row {
-            visible: root.stage === "hover"
-            anchors.horizontalCenter: card.horizontalCenter
-            anchors.bottom: card.bottom
-            anchors.bottomMargin: 5
-            spacing: 5
-
-            Repeater {
-                model: root.pages
-
-                Rectangle {
-                    required property int index
-                    width: index === root.pageIndex ? 12 : 4
-                    height: 4
-                    radius: 2
-                    color: index === root.pageIndex ? Theme.accent : Qt.alpha(Theme.fg, 0.25)
-                    Behavior on width { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-                    Behavior on color { ColorAnimation { duration: 150 } }
-                }
-            }
-        }
-
         // ── The strip ──────────────────────────────────────────────────────
         Item {
             id: strip
@@ -409,21 +405,48 @@ PanelWindow {
                     width: strip.width - 36 - 48 - 14 - 14 - buttons.width
                     spacing: 4
 
-                    Text {
-                        text: root.stateLabel
-                        color: Qt.alpha(Theme.fg, 0.5)
-                        font.family: Theme.fontFamilyAlt
-                        font.pixelSize: 10
-                        font.letterSpacing: 1
+                    Row {
+                        spacing: 6
+
+                        Text {
+                            text: root.stripLabel
+                            color: Qt.alpha(Theme.fg, 0.55)
+                            font.family: Theme.fontFamilySans
+                            font.pixelSize: 11
+                        }
+                        // live dot: lit while the clock runs, grey while it is paused
+                        Rectangle {
+                            visible: root.focusOn
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 6
+                            height: 6
+                            radius: 3
+                            color: TaskFocus.running ? Theme.green : Theme.disabled
+                        }
                     }
                     Text {
                         width: parent.width
                         text: root.focusOn ? TaskFocus.title : root.nextRow !== null ? root.nextRow.title : "Nothing left today"
                         color: Theme.fg
-                        font.family: Theme.fontFamily
+                        font.family: Theme.fontFamilySans
                         font.pixelSize: 14
-                        font.bold: true
+                        font.weight: Font.DemiBold
                         elide: Text.ElideRight
+                    }
+                    // progress through the planned time, only for a block of the schedule
+                    Rectangle {
+                        visible: root.plannedMin > 0
+                        width: parent.width
+                        height: 3
+                        radius: 1.5
+                        color: Qt.alpha(Theme.fg, 0.15)
+
+                        Rectangle {
+                            width: parent.width * root.planFraction
+                            height: parent.height
+                            radius: parent.radius
+                            color: root.tint
+                        }
                     }
                     Item {
                         width: parent.width
@@ -432,9 +455,9 @@ PanelWindow {
                         Text {
                             id: spentLine
                             anchors.left: parent.left
-                            text: root.focusOn ? root.clockText + "  ·  total " + root.totalText : ""
+                            text: root.timeText
                             color: Qt.alpha(Theme.fg, 0.5)
-                            font.family: Theme.fontFamilyAlt
+                            font.family: Theme.fontFamilyNum
                             font.pixelSize: 11
                         }
                         Text {
@@ -444,7 +467,7 @@ PanelWindow {
                             horizontalAlignment: root.focusOn ? Text.AlignRight : Text.AlignLeft
                             text: root.focusOn ? root.nextText : root.nextRow !== null ? root.whenText(root.nextRow) : ""
                             color: Qt.alpha(Theme.fg, 0.5)
-                            font.family: Theme.fontFamily
+                            font.family: root.focusOn ? Theme.fontFamilySans : Theme.fontFamilyNum
                             font.pixelSize: 11
                             elide: Text.ElideRight
                         }
@@ -456,20 +479,20 @@ PanelWindow {
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 8
 
-                    PillButton {
+                    IconButton {
                         visible: root.focusOn
-                        label: TaskFocus.running ? "PAUSE" : "RESUME"
+                        glyph: TaskFocus.running ? "󰏤" : "󰐊"
                         onClicked: TaskFocus.toggle()
                     }
-                    PillButton {
+                    IconButton {
                         visible: root.focusOn
-                        label: "DONE"
+                        glyph: "󰄬"
                         main: true
                         onClicked: TaskFocus.complete()
                     }
-                    PillButton {
+                    IconButton {
                         visible: !root.focusOn && root.nextRow !== null
-                        label: "FOCUS"
+                        glyph: "󰐊"
                         main: true
                         onClicked: root.focusRow(root.nextRow)
                     }
