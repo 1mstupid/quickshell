@@ -5,33 +5,11 @@ import QtQuick
 import QtQuick.Effects
 import "../../../services"
 
-// Media widget on the wallpaper layer, bottom centre by default: a square card
-// with the cover as a half-disc across its top, then artist, title and
-// progress. Transport and the lyrics toggle appear while the pointer is over
-// the card. The layout editor places it and switches it on and off;
-// `qs ipc call media toggle` does the same. The bar's media wave opens the
-// now-playing strip instead. Lyrics (LRCLIB) take the place of the artist and
-// title while on. Only the card takes pointer events.
-import Quickshell
-import Quickshell.Wayland
-import Quickshell.Io
-import QtQuick
-import QtQuick.Effects
-import "../../../services"
-
-// Media widget on the wallpaper layer, bottom centre by default: a square card
-// with the cover as a half-disc across its top, then artist, title and
-// progress. Transport and the lyrics toggle appear while the pointer is over
-// the card. The layout editor places it and switches it on and off;
-// `qs ipc call media toggle` does the same. The bar's media wave opens the
-// now-playing strip instead. Lyrics (LRCLIB) take the place of the artist and
-// title while on. Only the card takes pointer events.
 PanelWindow {
     id: root
 
     screen: PillState.originScreen
 
-    // a centre anchor leaves left and right unset, so the compositor centres the window
     anchors {
         left: WidgetLayout.hasLeft("media")
         right: WidgetLayout.hasRight("media")
@@ -59,27 +37,42 @@ PanelWindow {
 
     Component.onCompleted: WidgetLayout.register("media", root)
 
-    // the card is square: the cover's half-disc is as wide as the card
     readonly property int panelW: 300
-    // the cover disc is smaller than the card and lowered, so its flat top edge
-    // sits inside the card's rounded corners instead of past them
     readonly property int discD: 300
-    readonly property int discLower: 0  // the disc's centre, below the card's top edge
+    readonly property int discLower: 0
 
     property bool lyricsOn: false
 
     // ── Lyrics state ───────────────────────────────────────────────────────
-    property var lyrics: []           // [{ t: seconds, text }]
-    property string lyricsKey: ""    // artist|title the lyrics belong to
-    property string fetchKey: ""     // key of the request in flight
-    property var cache: ({})           // key -> parsed lyrics (may be empty)
-    property string lyricStatus: ""  // "", "searching", "none"
+    property var lyrics: []
+    property string lyricsKey: ""
+    property string fetchKey: ""
+    property var cache: ({})
+    property string lyricStatus: ""
     property int lyricIdx: -1
 
-    // the position ticks only while the card shows
+    // Local smooth position tracker for live updating during playback
+    property real livePos: 0.0
+
     MediaState {
         id: media
         active: root.visible
+    }
+
+    Connections {
+        target: media
+        function onPosChanged() {
+            root.livePos = media.pos
+        }
+    }
+
+    Timer {
+        interval: 50
+        repeat: true
+        running: media.playing && root.lyricsOn && root.visible
+        onTriggered: {
+            root.livePos += 0.05
+        }
     }
 
     IpcHandler {
@@ -92,7 +85,6 @@ PanelWindow {
 
     // ── Lyrics ─────────────────────────────────────────────────────────────
 
-    // LRC lines: "[mm:ss.xx] text"; the JSON's syncedLyrics holds them
     function parseLrc(json) {
         let synced = ""
         try {
@@ -109,7 +101,6 @@ PanelWindow {
         return out
     }
 
-    // index of the last line whose time has passed, or -1 before the first
     function lineAt(pos) {
         let i = -1
         for (let k = 0; k < lyrics.length; k++) {
@@ -119,6 +110,20 @@ PanelWindow {
                 break
         }
         return i
+    }
+
+    function activeLineProgress() {
+        if (lyricIdx < 0 || lyricIdx >= lyrics.length) return 0.0
+        let currentLine = lyrics[lyricIdx]
+        let nextLine = lyrics[lyricIdx + 1]
+        
+        if (!nextLine) return 1.0 
+        
+        let duration = nextLine.t - currentLine.t
+        if (duration <= 0) return 0.0
+        
+        let elapsed = root.livePos - currentLine.t
+        return Math.max(0.0, Math.min(1.0, elapsed / duration))
     }
 
     function loadLyrics() {
@@ -170,7 +175,6 @@ PanelWindow {
 
     onLyricsOnChanged: loadLyrics()
 
-    // a new track in the same player
     Connections {
         target: media.player
         function onTrackTitleChanged() {
@@ -179,13 +183,58 @@ PanelWindow {
         }
     }
 
-    // follows the player position
     Timer {
-        interval: 250
+        id: lyricTimer
+        interval: 50
         repeat: true
         running: root.lyricsOn && root.visible
         triggeredOnStart: true
-        onTriggered: root.lyricIdx = root.lineAt(media.player?.position ?? 0)
+        onTriggered: root.lyricIdx = root.lineAt(root.livePos)
+    }
+
+    // ── Custom Karaoke Fill Component (Fixed for Long Strings) ─────────────
+    component KaraokeFillText: Item {
+        id: kText
+        property string text: ""
+        property real progress: 0.0
+        property color restingColor: Qt.alpha(Theme.fg, 0.35)
+        property color activeColor: Theme.fg
+        property int fontSize: 15
+        property font customFont: Qt.font({ family: Theme.fontFamily, pixelSize: fontSize })
+
+        implicitHeight: baseText.implicitHeight
+
+        Text {
+            id: baseText
+            anchors.verticalCenter: parent.verticalCenter
+            width: parent.width
+            horizontalAlignment: Text.AlignHCenter
+            elide: Text.ElideRight
+            text: kText.text
+            color: kText.restingColor
+            font: kText.customFont
+        }
+
+        Item {
+            id: fillMask
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.left: parent.left
+            width: baseText.width * Math.max(0.0, Math.min(1.0, kText.progress))
+            height: baseText.height
+            clip: true
+
+            Text {
+                id: activeText
+                x: 0
+                y: (fillMask.height - height) / 2
+                width: baseText.width
+                horizontalAlignment: Text.AlignHCenter
+                elide: Text.ElideRight
+                text: kText.text
+                color: kText.activeColor
+                font: kText.customFont
+            }
+        }
     }
 
     // ── Transport buttons ──────────────────────────────────────────────────
@@ -225,7 +274,6 @@ PanelWindow {
 
         HoverHandler { id: hover }
 
-        // the cover disc container with a top-corner rounding mask matching the card
         Item {
             id: disc
             width: root.panelW
@@ -259,7 +307,6 @@ PanelWindow {
                 radius: width / 2
                 color: Theme.altbg
 
-                // the disc turns while the track plays and holds its angle on pause
                 NumberAnimation on rotation {
                     running: media.playing
                     loops: Animation.Infinite
@@ -308,7 +355,6 @@ PanelWindow {
             }
         }
 
-        // a Column positions its children
         Column {
             x: 24
             y: disc.height + 14
@@ -342,7 +388,6 @@ PanelWindow {
                 }
             }
 
-            // --- Normal Mode: Artist Text ---
             Text {
                 visible: !root.lyricsOn
                 width: parent.width
@@ -354,20 +399,18 @@ PanelWindow {
                 font.pixelSize: 13
             }
 
-            // --- Normal Mode: Track Title ---
-            Text {
+            // --- Normal Mode: Track Title (Upgraded to MarqueeText) ---
+            MarqueeText {
                 visible: !root.lyricsOn
                 width: parent.width
-                horizontalAlignment: Text.AlignHCenter
-                elide: Text.ElideRight
+                height: 20
                 text: media.player?.trackTitle ?? ""
                 color: Theme.fg
                 font.family: Theme.fontFamily
                 font.pixelSize: 16
-                font.bold: true
+                // font.bold: true // Uncomment if MarqueeText supports bold property in your setup
             }
 
-            // --- Lyrics Mode: Spotify-Style Vertical ListView ---
             ListView {
                 id: lyricsView
                 visible: root.lyricsOn && root.lyrics.length > 0
@@ -389,42 +432,21 @@ PanelWindow {
                     width: lyricsView.width
                     height: 24
 
-                    // Use MarqueeText for the active line, standard Text for inactive lines
-                    Loader {
-                        anchors.fill: parent
-                        sourceComponent: index === root.lyricIdx ? activeLyricComp : normalLyricComp
+                    readonly property bool isActive: index === root.lyricIdx
 
-                        Component {
-                            id: activeLyricComp
-                            MarqueeText {
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: parent.width
-                                text: modelData.text
-                                color: Theme.fg
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 15
-                                // font.bold: true // If your MarqueeText supports bold property
-                            }
-                        }
-
-                        Component {
-                            id: normalLyricComp
-                            Text {
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: parent.width
-                                horizontalAlignment: Text.AlignHCenter
-                                elide: Text.ElideRight
-                                text: modelData.text
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 15
-                                color: Qt.alpha(Theme.fg, 0.35)
-                            }
-                        }
+                    KaraokeFillText {
+                        anchors.centerIn: parent
+                        width: parent.width
+                        text: modelData.text
+                        fontSize: isActive ? 15 : 14
+                        customFont: Qt.font({ family: Theme.fontFamily, pixelSize: fontSize, bold: isActive })
+                        progress: isActive ? root.activeLineProgress() : (index < root.lyricIdx ? 1.0 : 0.0)
+                        restingColor: Qt.alpha(Theme.fg, 0.35)
+                        activeColor: Theme.fg
                     }
                 }
             }
 
-            // --- Lyrics Mode: Status / Loading Message ---
             Text {
                 visible: root.lyricsOn && (root.lyricStatus !== "" || root.lyrics.length === 0)
                 width: parent.width
@@ -449,7 +471,7 @@ PanelWindow {
                     height: parent.height
                     radius: 1
                     color: Theme.fg
-                    width: parent.width * (media.timed ? Math.min(1, media.pos / media.len) : 0)
+                    width: parent.width * (media.timed ? Math.min(1, root.livePos / media.len) : 0)
                 }
             }
 
@@ -463,7 +485,7 @@ PanelWindow {
                     spacing: 0
 
                     Text {
-                        text: media.fmt(media.pos)
+                        text: media.fmt(root.livePos)
                         color: Theme.fg
                         font.family: Theme.fontFamilyAlt
                         font.pixelSize: 15
