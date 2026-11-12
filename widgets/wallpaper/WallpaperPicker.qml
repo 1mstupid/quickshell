@@ -6,8 +6,13 @@ import Quickshell.Wayland
 import "../../services"
 import "../../services/WallpaperPalette.js" as Palette
 import "../notch"
+import "Fuzzy.js" as Fuzzy
 
-
+// The wallpaper picker: a carousel of the images in ~/.local/share/wallpapers, in the
+// band that grows out of the bar pill. Left and Right (or h and l) move, Enter applies,
+// Escape closes. "/" starts a fuzzy find on the file names: type to narrow the carousel,
+// Enter applies the best match, Escape leaves the find on the one you are on. It opens
+// on the wallpaper in use, which is remembered in ~/.local/xdg/config/wallpaper-current.
 PanelWindow {
     id: root
 
@@ -30,7 +35,9 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell-wallpapers"
 
     // the panel, and the layout inside it: pad, header, gap, carousel, gap, name, pad
-    property int bandWidth: 900
+    // wide enough for five cards: the centre one and two each side. On a narrower
+    // screen the outer ones are cut off by the carousel's clip.
+    property int bandWidth: Math.min(1360, (root.screen ? root.screen.width : 1920) - 48)
     property int bandHeight: 260
     property int pad: 14
     property int headerH: 22
@@ -50,7 +57,19 @@ PanelWindow {
     property real t: 0
 
     property var wallpapers: []
+    // the fuzzy find: typed after "/"
+    property string query: ""
+    property bool finding: false
+    // what the carousel shows: all of them, or the matches of the query, best first
+    readonly property var shown: query === "" ? wallpapers : Fuzzy.rank(wallpapers, query, nameOf)
+    // an index into `shown`
     property int currentIndex: 0
+    onQueryChanged: currentIndex = 0
+
+    // the wallpaper in use. It is written to a file when one is applied, so that it
+    // survives a reboot and the picker opens on it and not on the first of the list.
+    property string currentPath: ""
+    readonly property string stateFile: Quickshell.env("HOME") + "/.local/xdg/config/wallpaper-current"
     property string applyingPath: ""
     property bool randomPending: false
 
@@ -79,6 +98,27 @@ PanelWindow {
         return path.split("/").pop().replace(/\.[^.]+$/, "")
     }
 
+    // the whole list, on the wallpaper in use
+    function focusCurrent() {
+        query = ""
+        finding = false
+        const i = wallpapers.indexOf(currentPath)
+        currentIndex = i >= 0 ? i : Math.min(currentIndex, Math.max(0, wallpapers.length - 1))
+    }
+
+    // the list and the wallpaper in use are read at start, so the first opening is not
+    // the one that has to load them
+    Component.onCompleted: lister.running = true
+
+    FileView {
+        path: root.stateFile
+        onLoaded: {
+            root.currentPath = text().trim()
+            if (!root.visible)
+                root.focusCurrent()
+        }
+    }
+
     onVisibleChanged: {
         if (visible) {
             lister.running = true
@@ -96,6 +136,7 @@ PanelWindow {
     }
 
     function openPicker() {
+        focusCurrent()
         PillState.owner = "wallpapers"
         visible = true
         morph.stop()
@@ -168,8 +209,17 @@ PanelWindow {
             if (running) {
                 root._found = []
             } else {
-                root.wallpapers = root._found
-                root.currentIndex = Math.min(root.currentIndex, Math.max(0, root.wallpapers.length - 1))
+                // a new array rebuilds every card and reloads every thumbnail, so the list
+                // is only replaced when the folder changed, and the selection stays on its file
+                if (root._found.join("\n") !== root.wallpapers.join("\n")) {
+                    const keep = root.shown[root.currentIndex]
+                    root.wallpapers = root._found
+                    const at = root.shown.indexOf(keep)
+                    root.currentIndex = at >= 0 ? at : 0
+                }
+                root.currentIndex = Math.min(root.currentIndex, Math.max(0, root.shown.length - 1))
+                if (!root.visible)
+                    root.focusCurrent()
                 if (root.randomPending) {
                     root.randomPending = false
                     if (root.wallpapers.length > 0)
@@ -180,27 +230,62 @@ PanelWindow {
         }
     }
 
-    // Keyboard & Vim navigation; Esc closes
+    // Keyboard & Vim navigation; Esc closes. "/" starts the find: then the keys type
+    // into the query, and only the arrows move.
     Item {
         id: keyHost
         anchors.fill: parent
         focus: true
 
         Keys.onPressed: event => {
+            const enter = event.key === Qt.Key_Return || event.key === Qt.Key_Enter
+            if (root.finding) {
+                if (event.key === Qt.Key_Escape) {
+                    if (root.query !== "") {
+                        // back to the whole list, still on the wallpaper that was picked
+                        const keep = root.shown[root.currentIndex]
+                        root.query = ""
+                        root.currentIndex = Math.max(0, root.wallpapers.indexOf(keep))
+                    } else {
+                        root.finding = false
+                    }
+                } else if (event.key === Qt.Key_Backspace) {
+                    root.query = root.query.slice(0, -1)
+                } else if (event.key === Qt.Key_Left) {
+                    if (root.currentIndex > 0)
+                        root.currentIndex--
+                } else if (event.key === Qt.Key_Right) {
+                    if (root.currentIndex < root.shown.length - 1)
+                        root.currentIndex++
+                } else if (enter) {
+                    if (root.shown.length > 0)
+                        root.apply(root.shown[root.currentIndex])
+                } else if (event.text.length > 0 && event.text.charCodeAt(0) >= 0x20) {
+                    root.query += event.text
+                } else {
+                    return
+                }
+                event.accepted = true
+                return
+            }
+
             if (event.key === Qt.Key_Escape) {
                 root.close()
+                event.accepted = true
+            } else if (event.text === "/") {
+                root.finding = true
                 event.accepted = true
             } else if (event.key === Qt.Key_Left || event.text === "h") {
                 if (root.currentIndex > 0)
                     root.currentIndex--
                 event.accepted = true
             } else if (event.key === Qt.Key_Right || event.text === "l") {
-                if (root.currentIndex < root.wallpapers.length - 1)
+                if (root.currentIndex < root.shown.length - 1)
                     root.currentIndex++
                 event.accepted = true
-            } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                if (root.currentIndex >= 0 && root.wallpapers.length > 0)
-                    root.apply(root.wallpapers[root.currentIndex])
+            } else if (enter) {
+                if (root.shown.length > 0)
+                    root.apply(root.shown[root.currentIndex])
                 event.accepted = true
             }
         }
@@ -248,9 +333,9 @@ PanelWindow {
             anchors.right: actions.left
             anchors.rightMargin: 12
             anchors.verticalCenter: parent.verticalCenter
-            text: root.dirPath
-            elide: Text.ElideLeft
-            color: Qt.alpha(Theme.fg, 0.5)
+            text: root.finding ? "/" + root.query : root.dirPath
+            elide: root.finding ? Text.ElideRight : Text.ElideLeft
+            color: root.finding ? Theme.fg : Qt.alpha(Theme.fg, 0.5)
             font.family: Theme.fontFamilyAlt
             font.pixelSize: 11
         }
@@ -261,6 +346,14 @@ PanelWindow {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 14
 
+            Text {
+                visible: !root.finding
+                anchors.verticalCenter: parent.verticalCenter
+                text: "/ find"
+                color: Qt.alpha(Theme.fg, 0.35)
+                font.family: Theme.fontFamilyAlt
+                font.pixelSize: 11
+            }
             Text {
                 text: "󰑐"
                 color: refreshMa.containsMouse ? Theme.accent : Qt.alpha(Theme.fg, 0.6)
@@ -314,7 +407,7 @@ PanelWindow {
         }
 
         Repeater {
-            model: root.wallpapers
+            model: root.shown
 
             Item {
                 id: cell
@@ -325,6 +418,9 @@ PanelWindow {
                 readonly property real d: cell.index - carousel.pos
                 readonly property bool busy: root.applyingPath === modelData
                 readonly property bool current: root.currentIndex === cell.index
+                // only the cards near the centre load their image: a folder of large files
+                // decoded all at once is what made the thumbnails slow to appear
+                readonly property bool near: Math.abs(cell.index - root.currentIndex) <= 5
 
                 width: root.cardWidth
                 height: root.cardHeight
@@ -332,6 +428,8 @@ PanelWindow {
                 y: (carousel.height - height) / 2
                 scale: root.scaleAt(d)
                 opacity: Math.abs(d) > 3 ? 0 : Math.max(0.35, 1 - 0.25 * Math.abs(d))
+                // a card that cannot be seen is not drawn
+                visible: opacity > 0
 
                 Rectangle {
                     anchors.fill: parent
@@ -354,10 +452,13 @@ PanelWindow {
 
                     Image {
                         anchors.fill: parent
-                        source: "file://" + cell.modelData
+                        source: cell.near ? "file://" + cell.modelData : ""
                         sourceSize.width: root.cardWidth * 2
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
+                        // fades in instead of popping in
+                        opacity: status === Image.Ready ? 1 : 0
+                        Behavior on opacity { NumberAnimation { duration: 160 } }
                         layer.enabled: true
                         layer.effect: MultiEffect {
                             maskEnabled: true
@@ -403,7 +504,8 @@ PanelWindow {
         height: root.nameH
         horizontalAlignment: Text.AlignHCenter
         elide: Text.ElideRight
-        text: root.wallpapers.length > 0 ? root.nameOf(root.wallpapers[root.currentIndex]) : ""
+        text: root.shown.length > 0 ? root.nameOf(root.shown[root.currentIndex])
+            : root.finding ? "Nothing matches" : ""
         color: Qt.alpha(Theme.fg, 0.7)
         font.family: Theme.fontFamilyAlt
         font.pixelSize: 12
@@ -450,6 +552,11 @@ PanelWindow {
         Quickshell.execDetached(
             ["wallpaper-theme", root.applyingPath]
                 .concat(result.palette).concat(result.ansi))
+        // remembered for the next start; >| because the shell's noclobber would refuse to
+        // overwrite the file
+        root.currentPath = root.applyingPath
+        Quickshell.execDetached(["sh", "-c", "printf '%s\\n' \"$1\" >| \"$2\"",
+                                 "sh", root.applyingPath, root.stateFile])
         root.applyingPath = ""
         root.close()
     }
