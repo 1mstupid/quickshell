@@ -596,7 +596,7 @@ PanelWindow {
                                 text: tabButton.modelData.glyph
                                 color: tabButton.on ? Theme.fg : Qt.alpha(Theme.fg, 0.55)
                                 font.family: Theme.fontFamily
-                                font.pixelSize: 12
+                                font.pixelSize: 16
                             }
                             Text {
                                 id: tabName
