@@ -34,12 +34,12 @@ Singleton {
     readonly property color cyan: secondary
     readonly property color magenta: secondary
 
-    readonly property string fontFamily: "Berkeley Mono"
-    readonly property string fontFamilyAlt: "UAV OSD Sans Mono"
+    readonly property string fontFamily: "SFProDisplay Nerd Font"
+    readonly property string fontFamilyAlt: "SFProDisplay Nerd Font"
     // proportional face for titles and labels; glyph icons stay on fontFamily
-    readonly property string fontFamilySans: "Work Sans"
+    readonly property string fontFamilySans: "SFProDisplay Nerd Font"
     // numbers, times and Japanese text (it is monospaced, so digits line up)
-    readonly property string fontFamilyNum: "PlemolJP Console NF"
+    readonly property string fontFamilyNum: "SFProDisplay Nerd Font"
     readonly property real autoScale: {
         const s = Quickshell.screens.length > 0 ? Quickshell.screens[0] : null
         const h = s ? s.height : 1080
