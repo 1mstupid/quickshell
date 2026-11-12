@@ -42,6 +42,11 @@ function addressOf(row) {
     return host + ":" + row.port
 }
 
+// only tcp can be opened in a browser; a udp port in one is nothing
+function isWeb(row) {
+    return String(row.proto).indexOf("tcp") === 0
+}
+
 // Rows, exposed ones first and then by port. The same service listening on IPv4 and
 // IPv6 is one row, exposed if either side is; `conns` counts the live tcp connections
 // to its port.

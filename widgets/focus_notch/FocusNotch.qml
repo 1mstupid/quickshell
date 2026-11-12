@@ -1665,7 +1665,7 @@ PanelWindow {
                     }
                 }
 
-                // a click copies the address
+                // a click copies the address; the buttons on a hovered row open it or close its process
                 ListView {
                     id: portsList
                     x: 12
@@ -1679,6 +1679,8 @@ PanelWindow {
                     delegate: Item {
                         id: portRow
                         required property var modelData
+                        // waiting for the second tap that closes its process
+                        readonly property bool armed: Ports.armed === modelData.key
 
                         width: portsList.width
                         height: 34
@@ -1690,7 +1692,8 @@ PanelWindow {
                             anchors.topMargin: 1
                             anchors.bottomMargin: 1
                             radius: 8
-                            color: portHover.hovered ? Qt.alpha(Theme.fg, 0.06) : "transparent"
+                            color: portRow.armed ? Qt.alpha(Theme.red, 0.16)
+                                 : portHover.hovered ? Qt.alpha(Theme.fg, 0.06) : "transparent"
                             Behavior on color { ColorAnimation { duration: 120 } }
                         }
                         MouseArea {
@@ -1755,14 +1758,45 @@ PanelWindow {
                         Text {
                             id: portDetail
                             anchors.verticalCenter: parent.verticalCenter
-                            anchors.right: parent.right
-                            anchors.rightMargin: 12
-                            text: portRow.modelData.proto
-                                + (portRow.modelData.pid > 0 ? "  ·  pid " + portRow.modelData.pid : "")
-                                + (portRow.modelData.exposed ? "  ·  " + portRow.modelData.host : "")
-                            color: Qt.alpha(Theme.fg, 0.5)
+                            anchors.right: portActions.left
+                            anchors.rightMargin: 8
+                            // armed, the detail stops describing and asks
+                            text: portRow.armed ? "press again to close  ·  pid " + portRow.modelData.pid
+                                : portRow.modelData.proto
+                                  + (portRow.modelData.pid > 0 ? "  ·  pid " + portRow.modelData.pid : "")
+                                  + (portRow.modelData.exposed ? "  ·  " + portRow.modelData.host : "")
+                            color: portRow.armed ? Theme.red : Qt.alpha(Theme.fg, 0.5)
                             font.family: Theme.fontFamilyNum
                             font.pixelSize: 10
+                        }
+                        // open and close, only under the pointer (or armed): fixed buttons on every
+                        // row would be noise. Without a pid there is nothing to close.
+                        Row {
+                            id: portActions
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.right: parent.right
+                            anchors.rightMargin: 8
+                            spacing: 4
+                            opacity: portHover.hovered || portRow.armed ? 1 : 0
+                            Behavior on opacity { NumberAnimation { duration: 120 } }
+
+                            IconButton {
+                                width: 26
+                                height: 26
+                                visible: Ports.isWeb(portRow.modelData) && !portRow.armed
+                                enabled: portActions.opacity > 0
+                                glyph: "󰏌"
+                                onClicked: Ports.openWeb(portRow.modelData)
+                            }
+                            IconButton {
+                                width: 26
+                                height: 26
+                                visible: portRow.modelData.pid > 0
+                                enabled: portActions.opacity > 0
+                                danger: portRow.armed
+                                glyph: "󰙦"
+                                onClicked: portRow.armed ? Ports.close(portRow.modelData) : Ports.arm(portRow.modelData)
+                            }
                         }
                     }
                 }

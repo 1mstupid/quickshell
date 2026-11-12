@@ -7,7 +7,7 @@ const assert = require("assert")
 
 const src = fs.readFileSync(path.join(__dirname, "PortsParse.js"), "utf8")
     .replace(/^\.pragma library\s*$/m, "")
-const { parse, portOf, hostOf, isExposed, addressOf } = new Function(src + "\nreturn { parse, portOf, hostOf, isExposed, addressOf };")()
+const { parse, portOf, hostOf, isExposed, addressOf, isWeb } = new Function(src + "\nreturn { parse, portOf, hostOf, isExposed, addressOf, isWeb };")()
 
 let failures = 0
 function test(name, fn) {
@@ -92,6 +92,11 @@ test("the address to copy", () => {
     assert.strictEqual(addressOf(find(3000)), "localhost:3000")
     assert.strictEqual(addressOf(find(5173)), "localhost:5173")
     assert.strictEqual(addressOf(find(8080)), "192.168.1.5:8080")
+})
+
+test("only tcp rows open in a browser", () => {
+    assert.strictEqual(isWeb(find(3000)), true)
+    assert.strictEqual(isWeb(find(5353, "udp")), false)
 })
 
 test("empty, garbage and ss missing give no rows", () => {
