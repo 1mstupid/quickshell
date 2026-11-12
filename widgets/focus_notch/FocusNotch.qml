@@ -64,7 +64,9 @@ PanelWindow {
     // Work is Day or Week; the Work tab returns to the one last shown
     property string lastWork: "day"
     readonly property bool onWork: tab === "day" || tab === "week" || tab === "focus"
-    onTabChanged: if (onWork) lastWork = tab
+    // reads `tab` itself and not `onWork`: this handler can run before onWork has been
+    // re-evaluated, and then leaving Work for Home would store "home" as the Work page
+    onTabChanged: if (tab === "day" || tab === "week" || tab === "focus") lastWork = tab
     // wraps at both ends
     function stepPage(delta) {
         const n = pages.length
