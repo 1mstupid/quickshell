@@ -12,6 +12,7 @@ singleton DashboardState DashboardState.qml
 singleton DrawerState DrawerState.qml
 singleton MediaNotchState MediaNotchState.qml
 singleton FocusNotchState FocusNotchState.qml
+singleton Ports Ports.qml
 singleton Locks Locks.qml
 Recorder Recorder.qml
 

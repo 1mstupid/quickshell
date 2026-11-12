@@ -13,7 +13,7 @@ import "../bar/media"
 // far (or, for a block of the schedule, what is left of it and when it ends),
 // and pause and done; with nothing in focus it offers the block the schedule
 // has on now. Click the strip (or run `qs ipc call focusnotch toggle`)
-// and it opens further. A header switches between Home and Work; Work holds the
+// and it opens further. A header switches between Home, Work and Ports; Work holds the
 // Day, Week and Focus pages, and a small switch on a row under the tabs picks between them:
 //   Home   the now-playing card on the left, and the day on the right: the date,
 //          what is on now and what comes next.
@@ -23,6 +23,7 @@ import "../bar/media"
 //          to today, typed the way todo.md has it.
 //   Week   the schedule's grid, with today and the block that is on now marked.
 //   Focus  the task in hand: its timer, pause, stop and done, and the time tracked today.
+//   Ports  what is listening on this machine, and which of it the network can reach.
 // The strip closes when the pointer leaves it; the open panel closes on Escape
 // or a click outside.
 PanelWindow {
@@ -56,17 +57,24 @@ PanelWindow {
 
     // "" closed, "hover" the strip, "open" the full panel
     property string stage: ""
-    // the open panel's page: "home", "day", "week" or "focus", remembered across openings
+    // the open panel's page: "home", "day", "week", "focus" or "ports", remembered across openings
     readonly property string tab: FocusNotchState.page
-    readonly property var pages: ["home", "day", "week", "focus"]
+    readonly property var pages: ["home", "day", "week", "focus", "ports"]
     readonly property int pageIndex: Math.max(0, pages.indexOf(tab))
     // Work is Day or Week; the Work tab returns to the one last shown
     property string lastWork: "day"
-    onTabChanged: if (tab !== "home") lastWork = tab
+    readonly property bool onWork: tab === "day" || tab === "week" || tab === "focus"
+    onTabChanged: if (onWork) lastWork = tab
     // wraps at both ends
     function stepPage(delta) {
         const n = pages.length
         FocusNotchState.setPage(pages[(pageIndex + delta + n) % n])
+    }
+    // ss only runs while the Ports page is on screen
+    Binding {
+        target: Ports
+        property: "watching"
+        value: root.stage === "open" && root.tab === "ports"
     }
     // after a close the pointer has to leave the pill before it can open the strip again
     property bool armed: true
@@ -560,14 +568,15 @@ PanelWindow {
 
                     Repeater {
                         model: [{ key: "home", glyph: "󰋜", name: "Home" },
-                                { key: "work", glyph: "󰸗", name: "Work" }]
+                                { key: "work", glyph: "󰸗", name: "Work" },
+                                { key: "ports", glyph: "󰈀", name: "Ports" }]
 
                         Rectangle {
                             id: tabButton
                             required property var modelData
-                            // Work is on for both of its pages
-                            readonly property bool on: modelData.key === "home"
-                                ? root.tab === "home" : root.tab !== "home"
+                            // Work is on for all three of its pages
+                            readonly property bool on: modelData.key === "work"
+                                ? root.onWork : root.tab === modelData.key
 
                             // a square slot for the icon, then the name while the tab is on
                             width: on ? 32 + tabName.implicitWidth + 12 : 32
@@ -608,7 +617,7 @@ PanelWindow {
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    FocusNotchState.setPage(tabButton.modelData.key === "home" ? "home" : root.lastWork)
+                                    FocusNotchState.setPage(tabButton.modelData.key === "work" ? root.lastWork : tabButton.modelData.key)
                                     keyHost.forceActiveFocus()
                                 }
                             }
@@ -621,7 +630,7 @@ PanelWindow {
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 6
-                    opacity: root.tab !== "home" ? 1 : 0
+                    opacity: root.onWork ? 1 : 0
                     visible: opacity > 0
                     Behavior on opacity { NumberAnimation { duration: 150 } }
 
@@ -713,7 +722,7 @@ PanelWindow {
                 height: 24
                 radius: 7
                 color: Qt.alpha(Theme.fg, 0.08)
-                opacity: root.tab !== "home" ? 1 : 0
+                opacity: root.onWork ? 1 : 0
                 visible: opacity > 0
                 Behavior on opacity { NumberAnimation { duration: 150 } }
 
@@ -1611,6 +1620,161 @@ PanelWindow {
                         font.family: Theme.fontFamilySans
                         font.pixelSize: 12
                     }
+                }
+            }
+
+            // ── Ports: what is listening, and what the network can reach ───
+            Item {
+                id: portsTab
+                visible: root.tab === "ports"
+                y: 46
+                width: panel.width
+                height: panel.height - y
+
+                // the headline: how many, and how many are open to the network
+                Item {
+                    id: portsHead
+                    x: 18
+                    width: panel.width - 36
+                    height: 38
+
+                    Column {
+                        spacing: 2
+
+                        Text {
+                            text: Ports.ports.length + " listening"
+                            color: Theme.fg
+                            font.family: Theme.fontFamilySans
+                            font.pixelSize: 15
+                            font.weight: Font.DemiBold
+                        }
+                        Text {
+                            text: Ports.exposedCount > 0 ? Ports.exposedCount + " open to the network"
+                                                         : "None reachable from the network"
+                            color: Ports.exposedCount > 0 ? Theme.red : Theme.green
+                            font.family: Theme.fontFamilySans
+                            font.pixelSize: 11
+                        }
+                    }
+                    Text {
+                        anchors.right: parent.right
+                        text: Ports.note !== "" ? Ports.note : Ports.loaded ? "" : "looking…"
+                        color: Ports.note !== "" ? Theme.green : Qt.alpha(Theme.fg, 0.4)
+                        font.family: Theme.fontFamilySans
+                        font.pixelSize: 11
+                    }
+                }
+
+                // a click copies the address
+                ListView {
+                    id: portsList
+                    x: 12
+                    y: portsHead.height + 6
+                    width: panel.width - 30
+                    height: parent.height - y - 12
+                    clip: true
+                    boundsBehavior: Flickable.StopAtBounds
+                    model: Ports.ports
+
+                    delegate: Item {
+                        id: portRow
+                        required property var modelData
+
+                        width: portsList.width
+                        height: 34
+
+                        HoverHandler { id: portHover }
+
+                        Rectangle {
+                            anchors.fill: parent
+                            anchors.topMargin: 1
+                            anchors.bottomMargin: 1
+                            radius: 8
+                            color: portHover.hovered ? Qt.alpha(Theme.fg, 0.06) : "transparent"
+                            Behavior on color { ColorAnimation { duration: 120 } }
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: Ports.copy(portRow.modelData)
+                        }
+
+                        // red when the network can reach it, grey when only this machine can
+                        Rectangle {
+                            id: portDot
+                            anchors.verticalCenter: parent.verticalCenter
+                            x: 10
+                            width: 8
+                            height: 8
+                            radius: 4
+                            color: portRow.modelData.exposed ? Theme.red : Qt.alpha(Theme.fg, 0.25)
+                        }
+                        Text {
+                            id: portNumber
+                            anchors.verticalCenter: parent.verticalCenter
+                            x: 28
+                            width: 56
+                            text: ":" + portRow.modelData.port
+                            color: Theme.fg
+                            font.family: Theme.fontFamilyNum
+                            font.pixelSize: 13
+                            font.bold: true
+                        }
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.left: portNumber.right
+                            anchors.right: portConns.visible ? portConns.left : portDetail.left
+                            anchors.rightMargin: 10
+                            text: portRow.modelData.process !== "" ? portRow.modelData.process : "unknown owner"
+                            color: portRow.modelData.process !== "" ? Theme.fg : Qt.alpha(Theme.fg, 0.4)
+                            font.family: Theme.fontFamilySans
+                            font.pixelSize: 12
+                            elide: Text.ElideRight
+                        }
+                        // live connections to it: what turns "open" into "in use"
+                        Rectangle {
+                            id: portConns
+                            visible: portRow.modelData.conns > 0
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.right: portDetail.left
+                            anchors.rightMargin: 8
+                            width: connCount.implicitWidth + 12
+                            height: 20
+                            radius: 10
+                            color: Qt.alpha(Theme.fg, 0.1)
+
+                            Text {
+                                id: connCount
+                                anchors.centerIn: parent
+                                text: portRow.modelData.conns
+                                color: Theme.fg
+                                font.family: Theme.fontFamilyNum
+                                font.pixelSize: 11
+                            }
+                        }
+                        Text {
+                            id: portDetail
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.right: parent.right
+                            anchors.rightMargin: 12
+                            text: portRow.modelData.proto
+                                + (portRow.modelData.pid > 0 ? "  ·  pid " + portRow.modelData.pid : "")
+                                + (portRow.modelData.exposed ? "  ·  " + portRow.modelData.host : "")
+                            color: Qt.alpha(Theme.fg, 0.5)
+                            font.family: Theme.fontFamilyNum
+                            font.pixelSize: 10
+                        }
+                    }
+                }
+
+                Text {
+                    visible: Ports.loaded && Ports.ports.length === 0
+                    y: portsHead.height + 14
+                    x: 18
+                    text: "Nothing is listening, or ss is not installed"
+                    color: Qt.alpha(Theme.fg, 0.5)
+                    font.family: Theme.fontFamilySans
+                    font.pixelSize: 12
                 }
             }
 
