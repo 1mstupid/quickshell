@@ -20,6 +20,7 @@ import "./widgets/power_menu"
 import "./widgets/todo"
 import "./widgets/usage"
 import "./widgets/wallpaper"
+import "./widgets/colorscheme"
 
 ShellRoot {
 
@@ -29,6 +30,7 @@ ShellRoot {
     ControlDrawer {}
 
     WallpaperPicker {}
+    ColorschemePicker {}
 
     AppLauncher {}
 

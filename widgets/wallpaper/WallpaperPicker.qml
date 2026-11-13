@@ -70,6 +70,8 @@ PanelWindow {
     // survives a reboot and the picker opens on it and not on the first of the list.
     property string currentPath: ""
     readonly property string stateFile: Quickshell.env("HOME") + "/.local/xdg/config/wallpaper-current"
+    // the colorscheme in use; applying a wallpaper makes it "wallpaper"
+    readonly property string schemeFile: Quickshell.env("HOME") + "/.local/xdg/config/colorscheme-current"
     property string applyingPath: ""
     property bool randomPending: false
 
@@ -557,6 +559,9 @@ PanelWindow {
         root.currentPath = root.applyingPath
         Quickshell.execDetached(["sh", "-c", "printf '%s\\n' \"$1\" >| \"$2\"",
                                  "sh", root.applyingPath, root.stateFile])
+        // its colours are derived from it, which is the colorscheme picker's "Wallpaper"
+        Quickshell.execDetached(["sh", "-c", "printf 'wallpaper\\n' >| \"$1\"",
+                                 "sh", root.schemeFile])
         root.applyingPath = ""
         root.close()
     }
