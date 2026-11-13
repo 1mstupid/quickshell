@@ -2,13 +2,13 @@ pragma Singleton
 import QtQuick
 import Quickshell
 
-// Shared state for the bar pill and the morphing panels (wallpaper picker,
+// Shared state for the bar pill and the morphing panels (wallpaper and colorscheme pickers,
 // app launcher). The bar fades its pill from `progress` while a panel owns
 // it, and the owning panel grows out of the origin pill.
 QtObject {
     id: root
 
-    // which panel owns the pill: "", "wallpapers", "applauncher" or "clipboard"
+    // which panel owns the pill: "", "wallpapers", "colorschemes", "applauncher" or "clipboard"
     property string owner: ""
     readonly property bool active: owner !== ""
 
