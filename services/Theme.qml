@@ -52,6 +52,8 @@ Singleton {
     readonly property int iconSize: Math.round(15 * barScale)
     readonly property int moduleHeight: Math.round(26 * barScale)
     readonly property int effectiveBarHeight: 30
+    readonly property int cardRadius: 20
+
 
     FileView {
         path: root.configDir + "/../.local/state/colors.ini"

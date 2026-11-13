@@ -38,7 +38,7 @@ PanelWindow {
 
         onPaint: {
             const ctx = getContext("2d")
-            const inset = 2, r = 12
+            const inset = 2, r = 20
             const x = inset, y = inset
             const W = width - 2 * inset, H = height - 2 * inset
             ctx.reset()

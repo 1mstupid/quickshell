@@ -72,7 +72,7 @@ PanelWindow {
 
         width: root.width
         height: col.implicitHeight + 2 * pad
-        radius: 12
+        radius: Theme.cardRadius
         color: Qt.alpha(Theme.bg, 0.92)
         border.width: 1
         border.color: Qt.alpha(Theme.border, 0.6)
