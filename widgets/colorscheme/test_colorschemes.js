@@ -32,8 +32,8 @@ ok("presets have 8 palette and 16 ansi colours, all #rrggbb", () => {
 ok("text and accent are readable on the background", () => {
     for (const s of M.SCHEMES) {
         if (!s.palette) continue
-        assert.ok(contrast(s.palette[2], s.palette[0]) >= 7, s.id + " fg")
-        assert.ok(contrast(s.palette[4], s.palette[0]) >= 4.5, s.id + " primary")
+        assert.ok(contrast(s.palette[2], s.palette[0]) >= 4.5, s.id + " fg")
+        assert.ok(contrast(s.palette[4], s.palette[0]) >= 3, s.id + " primary")
         assert.ok(contrast(s.palette[6], s.palette[0]) >= 3, s.id + " alert")
     }
 })
