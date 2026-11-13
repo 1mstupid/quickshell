@@ -13,7 +13,9 @@ import "Fuzzy.js" as Fuzzy
 // band that grows out of the bar pill. Left and Right (or h and l) move, Enter applies,
 // Escape closes. "/" starts a fuzzy find on the file names: type to narrow the carousel,
 // Enter applies the best match, Escape leaves the find on the one you are on. It opens
-// on the wallpaper in use, which is remembered in ~/.local/xdg/config/wallpaper-current.
+// on the wallpaper in use, which is remembered in ~/.local/xdg/config/wallpaper-current, and
+// shows the folder that wallpaper is in: a colorscheme's folder (wallpapers/<scheme>/) after
+// the scheme was chosen, since choosing one picks a wallpaper from it. The find looks in all.
 PanelWindow {
     id: root
 
@@ -61,8 +63,21 @@ PanelWindow {
     // the fuzzy find: typed after "/"
     property string query: ""
     property bool finding: false
-    // what the carousel shows: all of them, or the matches of the query, best first
-    readonly property var shown: query === "" ? wallpapers : Fuzzy.rank(wallpapers, query, nameOf)
+    // the folder in view: the one the wallpaper in use is in ("wallpaper" is the top level).
+    // Choosing a colorscheme picks a wallpaper from its folder, so this follows the scheme.
+    readonly property string group: schemeOf(currentPath)
+    // what is browsed: that folder, or everything when it has no wallpapers here
+    function browse(current) {
+        const g = schemeOf(current)
+        const inGroup = wallpapers.filter(p => schemeOf(p) === g)
+        return inGroup.length > 0 ? inGroup : wallpapers
+    }
+    readonly property var browsed: browse(currentPath)
+    // whether that is a colorscheme's folder, and not the top level or everything
+    readonly property bool inFolder: group !== "wallpaper" && wallpapers.some(p => schemeOf(p) === group)
+    // what the carousel shows: the folder, or the matches of the query among all of them,
+    // best first
+    readonly property var shown: query === "" ? browsed : Fuzzy.rank(wallpapers, query, nameOf)
     // an index into `shown`
     property int currentIndex: 0
     onQueryChanged: currentIndex = 0
@@ -115,8 +130,9 @@ PanelWindow {
     function focusCurrent() {
         query = ""
         finding = false
-        const i = wallpapers.indexOf(currentPath)
-        currentIndex = i >= 0 ? i : Math.min(currentIndex, Math.max(0, wallpapers.length - 1))
+        const list = browse(currentPath)
+        const i = list.indexOf(currentPath)
+        currentIndex = i >= 0 ? i : Math.min(currentIndex, Math.max(0, list.length - 1))
     }
 
     // the list and the wallpaper in use are read at start, so the first opening is not
@@ -125,6 +141,8 @@ PanelWindow {
 
     FileView {
         path: root.stateFile
+        watchChanges: true
+        onFileChanged: reload()
         onLoaded: {
             root.currentPath = text().trim()
             if (!root.visible)
@@ -235,9 +253,10 @@ PanelWindow {
                     root.focusCurrent()
                 if (root.randomPending) {
                     root.randomPending = false
-                    if (root.wallpapers.length > 0)
-                        root.apply(root.wallpapers[
-                            Math.floor(Math.random() * root.wallpapers.length)])
+                    // inside the folder in view: another folder would change the scheme
+                    const pool = root.browsed
+                    if (pool.length > 0)
+                        root.apply(pool[Math.floor(Math.random() * pool.length)])
                 }
             }
         }
@@ -331,8 +350,8 @@ PanelWindow {
     // only the band takes clicks; everything around it passes through
     mask: Region { item: outline }
 
-    // header: folder path on the left, refresh and shuffle on the right.
-    // Fades in during the second half of the morph, like the carousel.
+    // header: the title on the left (the find while there is one), the folder in view and
+    // shuffle on the right. Fades in during the second half of the morph, like the carousel.
     Item {
         id: header
         x: card.x + root.pad
@@ -346,42 +365,27 @@ PanelWindow {
             anchors.right: actions.left
             anchors.rightMargin: 12
             anchors.verticalCenter: parent.verticalCenter
-            text: root.finding ? "/" + root.query : root.dirPath
-            elide: root.finding ? Text.ElideRight : Text.ElideLeft
-            color: root.finding ? Theme.fg : Qt.alpha(Theme.fg, 0.5)
-            font.family: Theme.fontFamilyAlt
-            font.pixelSize: 11
+            text: root.finding ? "/" + root.query : "Wallpaper"
+            elide: Text.ElideRight
+            color: Theme.fg
+            font.family: Theme.fontFamilySans
+            font.pixelSize: 15
+            font.weight: Font.DemiBold
         }
 
         Row {
             id: actions
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            spacing: 14
+            spacing: 12
 
+            // the folder in view: a colorscheme's, or all of them while finding
             Text {
-                visible: !root.finding
                 anchors.verticalCenter: parent.verticalCenter
-                text: "/ find"
-                color: Qt.alpha(Theme.fg, 0.35)
-                font.family: Theme.fontFamilyAlt
-                font.pixelSize: 11
-            }
-            Text {
-                text: "󰑐"
-                color: refreshMa.containsMouse ? Theme.accent : Qt.alpha(Theme.fg, 0.6)
-                font.family: Theme.fontFamily
-                font.pixelSize: 16
-                Behavior on color { ColorAnimation { duration: 120 } }
-
-                MouseArea {
-                    id: refreshMa
-                    anchors.fill: parent
-                    anchors.margins: -6
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: lister.running = true
-                }
+                text: root.query !== "" ? "all" : root.inFolder ? root.group : ""
+                color: Qt.alpha(Theme.fg, 0.5)
+                font.family: Theme.fontFamilySans
+                font.pixelSize: 12
             }
             Text {
                 text: "󰒝"
@@ -483,8 +487,8 @@ PanelWindow {
                         anchors.fill: parent
                         radius: 10
                         color: "transparent"
-                        border.width: cell.busy ? 3 : cell.current ? 1 : 0
-                        border.color: cell.busy ? Theme.accent : Qt.alpha(Theme.fg, 0.5)
+                        border.width: cell.busy ? 3 : cell.current ? 2 : 0
+                        border.color: Theme.accent
 
                         SequentialAnimation on opacity {
                             running: cell.busy
@@ -509,20 +513,36 @@ PanelWindow {
         }
     }
 
-    // name of the centred wallpaper, under the carousel
-    Text {
+    // under the carousel: the file name on the left, which of how many and the keys on the right
+    Item {
         x: card.x + root.pad
         y: carousel.y + root.carouselH + 10
         width: Math.max(0, card.width - 2 * root.pad)
         height: root.nameH
-        horizontalAlignment: Text.AlignHCenter
-        elide: Text.ElideRight
-        text: root.shown.length > 0 ? root.nameOf(root.shown[root.currentIndex])
-            : root.finding ? "Nothing matches" : ""
-        color: Qt.alpha(Theme.fg, 0.7)
-        font.family: Theme.fontFamilyAlt
-        font.pixelSize: 12
         opacity: Math.max(0, (root.t - 0.5) * 2)
+
+        Text {
+            anchors.left: parent.left
+            anchors.right: keys.left
+            anchors.rightMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+            elide: Text.ElideRight
+            text: root.shown.length > 0 ? root.nameOf(root.shown[root.currentIndex])
+                : root.finding ? "Nothing matches" : ""
+            color: Qt.alpha(Theme.fg, 0.7)
+            font.family: Theme.fontFamilySans
+            font.pixelSize: 12
+        }
+        Text {
+            id: keys
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            text: (root.shown.length > 0 ? root.currentIndex + 1 : 0) + "/" + root.shown.length
+                + "  ·  " + (root.finding ? "" : "/ find  ·  ") + "Enter to apply"
+            color: Qt.alpha(Theme.fg, 0.4)
+            font.family: Theme.fontFamilySans
+            font.pixelSize: 11
+        }
     }
 
     // Palette math lives in services/WallpaperPalette.js. This widget samples
