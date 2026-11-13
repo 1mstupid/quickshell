@@ -361,7 +361,7 @@ PanelWindow {
                     Text {
                         text: AppUsage.fmt(root.totalSec)
                         color: Theme.fg
-                        font.family: Theme.fontFamilyAlt
+                        font.family: Theme.fontFamilyDisplay
                         font.pixelSize: 22
                         font.bold: true
                     }

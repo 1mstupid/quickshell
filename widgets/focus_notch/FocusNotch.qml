@@ -991,7 +991,7 @@ PanelWindow {
                             Text {
                                 text: Qt.formatDate(Todo.toDate(Todo.today), "d MMM")
                                 color: Theme.fg
-                                font.family: Theme.fontFamilySans
+                                font.family: Theme.fontFamilyDisplay
                                 font.pixelSize: 22
                                 font.weight: Font.DemiBold
                             }
@@ -1513,7 +1513,7 @@ PanelWindow {
                                 Text {
                                     text: root.clockText
                                     color: Theme.fg
-                                    font.family: Theme.fontFamilyNum
+                                    font.family: Theme.fontFamilyDisplay
                                     font.pixelSize: 22
                                     font.bold: true
                                 }
