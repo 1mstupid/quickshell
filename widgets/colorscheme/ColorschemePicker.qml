@@ -358,7 +358,7 @@ PanelWindow {
         Repeater {
             model: root.shown
 
-            Rectangle {
+              Rectangle {
                 id: cell
                 required property int index
                 required property var modelData
@@ -373,10 +373,12 @@ PanelWindow {
                 width: root.cardWidth
                 height: root.cardHeight
                 radius: 10
-                color: Qt.alpha(Theme.fg, current ? 0.08 : 0.05)
+                
+                // CHANGED HERE: Use the first item of the palette array, or fall back to Theme.bg for wallpaper
+                color: isWallpaper ? Theme.bg : modelData.palette[0]
+
                 border.width: busy ? 3 : current ? 2 : 1
                 border.color: current || busy ? Theme.accent : Qt.alpha(Theme.fg, 0.08)
-
                 SequentialAnimation on opacity {
                     running: cell.busy
                     loops: Animation.Infinite

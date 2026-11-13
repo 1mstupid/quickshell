@@ -67,6 +67,7 @@ Singleton {
             if (m)
                 map[m[1]] = m[2]
         }
+        if (map["background"]) bg = map["background"]
         if (map["background-alt"]) altbg = map["background-alt"]
         if (map["foreground"]) fg = map["foreground"]
         if (map["border"]) border = map["border"]
