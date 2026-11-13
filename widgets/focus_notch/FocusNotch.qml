@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Effects
 import Quickshell
 import Quickshell.Wayland
+import Quickshell.Services.Notifications
 import "../../services"
 import "../../services/menu"
 import "../notch"
@@ -104,25 +105,6 @@ PanelWindow {
             }
         }
         return best
-    }
-    // the nearest open task after today, for the notice's second section
-    readonly property var nextLater: {
-        let best = null
-        for (const t of Todo.items) {
-            if (t.done || t.due === "" || t.due <= Todo.today)
-                continue
-            if (best === null || t.due < best.due
-                    || (t.due === best.due && t.time !== "" && (best.time === "" || t.time < best.time)))
-                best = t
-        }
-        return best
-    }
-    readonly property string laterText: {
-        if (nextLater === null)
-            return ""
-        const day = nextLater.due === Todo.addDays(Todo.today, 1) ? "Tomorrow"
-            : Qt.formatDate(Todo.toDate(nextLater.due), "ddd d MMM")
-        return nextLater.time !== "" ? day + " · " + nextLater.time : day
     }
     function minutesOf(hhmm) {
         const p = hhmm.split(":")
@@ -1109,63 +1091,136 @@ PanelWindow {
                         }
                     }
 
-                    // the next task after today
-                    Text {
-                        visible: root.nextLater !== null
-                        text: "Next event"
-                        color: Qt.alpha(Theme.fg, 0.5)
-                        font.family: Theme.fontFamilySans
-                        font.pixelSize: 10
-                    }
-                    Rectangle {
-                        visible: root.nextLater !== null
+                    // notifications, newest first, in the room the day leaves; they scroll
+                    // when there are more. Clear sits in the label row.
+                    Item {
                         width: parent.width
-                        height: 46
-                        radius: 10
-                        color: Qt.alpha(Theme.fg, 0.06)
+                        height: noteLabel.height
 
-                        Rectangle {
-                            x: 8
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: 3
-                            height: 24
-                            radius: 2
-                            color: Theme.accent
-                        }
-                        Column {
-                            anchors.verticalCenter: parent.verticalCenter
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.leftMargin: 20
-                            anchors.rightMargin: 28
-                            spacing: 1
-
-                            Text {
-                                width: parent.width
-                                text: root.nextLater !== null ? root.nextLater.title : ""
-                                color: Theme.fg
-                                font.family: Theme.fontFamilySans
-                                font.pixelSize: 12
-                                font.weight: Font.DemiBold
-                                elide: Text.ElideRight
-                            }
-                            Text {
-                                width: parent.width
-                                text: root.laterText
-                                color: Qt.alpha(Theme.fg, 0.6)
-                                font.family: Theme.fontFamilySans
-                                font.pixelSize: 10
-                                elide: Text.ElideRight
-                            }
+                        Text {
+                            id: noteLabel
+                            text: "Notifications"
+                            color: Qt.alpha(Theme.fg, 0.5)
+                            font.family: Theme.fontFamilySans
+                            font.pixelSize: 10
                         }
                         Text {
+                            visible: Notifications.count > 0
                             anchors.right: parent.right
-                            anchors.rightMargin: 10
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: "󰅂"
-                            color: Qt.alpha(Theme.fg, 0.4)
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 14
+                            text: "Clear"
+                            color: Qt.alpha(Theme.fg, clearHit.containsMouse ? 0.9 : 0.5)
+                            font.family: Theme.fontFamilySans
+                            font.pixelSize: 10
+
+                            MouseArea {
+                                id: clearHit
+                                anchors.fill: parent
+                                anchors.margins: -4
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: Notifications.clearAll()
+                            }
+                        }
+                    }
+                    Text {
+                        visible: Notifications.count === 0
+                        text: "Nothing new"
+                        color: Qt.alpha(Theme.fg, 0.4)
+                        font.family: Theme.fontFamilySans
+                        font.pixelSize: 12
+                    }
+                    Flickable {
+                        id: noteList
+                        visible: Notifications.count > 0
+                        width: parent.width
+                        // down to the panel's bottom margin
+                        height: Math.max(0, homeTab.height - 12 - dayColumn.y - y)
+                        contentWidth: width
+                        contentHeight: noteStack.implicitHeight
+                        clip: true
+                        boundsBehavior: Flickable.StopAtBounds
+
+                        Column {
+                            id: noteStack
+                            width: noteList.width
+                            spacing: 4
+
+                            Repeater {
+                                model: Notifications.notifications.values.slice().reverse()
+
+                                Rectangle {
+                                    id: note
+
+                                    required property var modelData
+
+                                    width: noteStack.width
+                                    height: 36
+                                    radius: 10
+                                    color: Qt.alpha(Theme.fg, 0.06)
+
+                                    HoverHandler { id: noteHover }
+
+                                    // the bar is red for critical, the accent otherwise
+                                    Rectangle {
+                                        x: 8
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: 3
+                                        height: 20
+                                        radius: 2
+                                        color: note.modelData.urgency === NotificationUrgency.Critical
+                                            ? Theme.red : Theme.accent
+                                    }
+                                    Column {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.leftMargin: 20
+                                        anchors.rightMargin: 34
+                                        spacing: 1
+
+                                        Text {
+                                            width: parent.width
+                                            text: note.modelData.summary
+                                            color: Theme.fg
+                                            textFormat: Text.PlainText
+                                            font.family: Theme.fontFamilySans
+                                            font.pixelSize: 12
+                                            font.weight: Font.DemiBold
+                                            elide: Text.ElideRight
+                                        }
+                                        Text {
+                                            width: parent.width
+                                            // one line: the body if there is one, else the sender
+                                            text: note.modelData.body !== ""
+                                                ? note.modelData.body.replace(/\s+/g, " ")
+                                                : note.modelData.appName
+                                            color: Qt.alpha(Theme.fg, 0.6)
+                                            textFormat: Text.PlainText
+                                            font.family: Theme.fontFamilySans
+                                            font.pixelSize: 10
+                                            elide: Text.ElideRight
+                                        }
+                                    }
+                                    // the time, swapped for a dismiss while the pointer is here;
+                                    // no hoverEnabled, so the HoverHandler keeps the hover
+                                    Text {
+                                        anchors.right: parent.right
+                                        anchors.rightMargin: 10
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: noteHover.hovered ? "󰅖" : Notifications.timeOf(note.modelData)
+                                        color: Qt.alpha(Theme.fg, noteHover.hovered ? 0.7 : 0.4)
+                                        font.family: noteHover.hovered ? Theme.fontFamily : Theme.fontFamilyNum
+                                        font.pixelSize: noteHover.hovered ? 13 : 10
+
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            anchors.margins: -6
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: note.modelData.dismiss()
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }

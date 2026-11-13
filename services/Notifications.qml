@@ -8,8 +8,8 @@ import "NotificationMeta.js" as Meta
 
 // Notifications. A notification is kept until it is dismissed; its toast is a
 // shorter life. A toast ends when it times out, and the notification stays in
-// the history, the notch the bar's bell opens. While `muted`, new notifications
-// skip the toast and go straight to the history.
+// the list on the focus notch's Home page. While `muted`, new notifications
+// skip the toast and go straight to that list.
 Singleton {
     id: root
 
@@ -21,8 +21,6 @@ Singleton {
 
     // do not disturb: no toasts, except for critical notifications
     property bool muted: false
-    // whether the history notch is open
-    property bool open: false
 
     // { time, quiet } by notification id, see NotificationMeta.js
     property var meta: ({})
@@ -33,7 +31,6 @@ Singleton {
     function isToast(n) { return Meta.isToast(meta, n.id) }
     function timeOf(n) { return Meta.timeOf(meta, n.id) }
     function expire(n) { meta = Meta.expired(meta, n.id) }
-    function toggleHistory() { open = !open }
 
     function clearAll() {
         const list = server.trackedNotifications.values.slice()
@@ -56,7 +53,7 @@ Singleton {
             n.tracked = true
             AppUsage.countNotification()
 
-            // nothing times out of the history, so cap it
+            // nothing times out of the list, so cap it
             const all = server.trackedNotifications.values
             const extra = all.length - root.maxKept
             if (extra > 0)
@@ -67,7 +64,8 @@ Singleton {
     // qs ipc call notifications toggle | toggleMute | clear
     IpcHandler {
         target: "notifications"
-        function toggle(): void { root.toggleHistory() }
+        // opens the focus notch on Home, where the list now lives
+        function toggle(): void { FocusNotchState.toggleHome() }
         function toggleMute(): void { root.muted = !root.muted }
         function clear(): void { root.clearAll() }
     }

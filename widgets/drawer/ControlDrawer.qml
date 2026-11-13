@@ -6,8 +6,8 @@ import "../../services"
 import "../../services/menu"
 import "../notch"
 
-// The control drawer: a notch hung from the top-right corner, like the toasts
-// and the notification history, opened by the bar's control icon. It grows out
+// The control drawer: a notch hung from the top-right corner, like the toasts,
+// opened by the bar's control icon. It grows out
 // of the corner. Tiles for the quick switches, sliders for volume and
 // brightness, and the power profile. Brightness and the profile only show on
 // hardware that has them, and every item can be turned off in settings.json.
@@ -75,10 +75,9 @@ PanelWindow {
     Component.onCompleted: Power.refresh()
 
     function openDrawer() {
-        // a panel on the pill and the notification history give way to this one
+        // a panel on the pill gives way to this one
         if (PillState.owner !== "")
             PillState.owner = ""
-        Notifications.open = false
         Power.refresh()
         Net.refreshState()
         view = ""
@@ -154,19 +153,11 @@ PanelWindow {
         }
     }
 
-    // a panel took the pill, or the history opened, so the drawer gives way
+    // a panel took the pill, so the drawer gives way
     Connections {
         target: PillState
         function onOwnerChanged() {
             if (PillState.owner !== "" && root.visible)
-                DrawerState.hide()
-        }
-    }
-
-    Connections {
-        target: Notifications
-        function onOpenChanged() {
-            if (Notifications.open && root.visible)
                 DrawerState.hide()
         }
     }
@@ -408,7 +399,7 @@ PanelWindow {
         }
     }
 
-    // flush with the top and right screen edges, like the toast and history notches
+    // flush with the top and right screen edges, like the toast notch
     Notch {
         id: outline
         bodyWidth: card.width
@@ -423,7 +414,7 @@ PanelWindow {
     Rectangle {
         id: card
 
-        // grows out of the top-right corner, the way the history does
+        // grows out of the top-right corner, the way the toast does
         width: root.cardWidth * root.t
         height: root.shownH * root.t
         x: root.width - width

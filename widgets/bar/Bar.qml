@@ -241,8 +241,8 @@ PanelWindow {
                 }
             }
 
-            // notification bell: a dot while the history holds something, a
-            // crossed bell while muted; click opens the history (origin screen only)
+            // notification bell: a dot while there is something unread, a
+            // crossed bell while muted; click opens the focus notch on Home (origin screen only)
             Item {
                 id: bell
                 Layout.alignment: Qt.AlignVCenter
@@ -254,7 +254,7 @@ PanelWindow {
                     id: bellIcon
                     // nf-md-bell_off / nf-md-bell
                     text: Notifications.muted ? "󰂛" : "󰂚"
-                    color: Notifications.open ? Theme.accent : Qt.alpha(Theme.fg, Notifications.muted ? 0.4 : 0.7)
+                    color: Qt.alpha(Theme.fg, Notifications.muted ? 0.4 : 0.7)
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.iconSize
                 }
@@ -271,7 +271,7 @@ PanelWindow {
                     anchors.fill: parent
                     anchors.margins: -4
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: Notifications.toggleHistory()
+                    onClicked: FocusNotchState.toggleHome()
                 }
             }
 

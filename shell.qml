@@ -25,7 +25,6 @@ ShellRoot {
 
     NotificationToast {}
 
-    NotificationHistory {}
 
     ControlDrawer {}
 
