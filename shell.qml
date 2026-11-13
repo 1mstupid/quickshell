@@ -14,8 +14,6 @@ import "./widgets/focus_notch"
 import "./widgets/border"
 import "./widgets/habits"
 import "./widgets/layout"
-import "./widgets/media_notch"
-import "./widgets/notifications"
 import "./widgets/power_menu"
 import "./widgets/todo"
 import "./widgets/usage"
@@ -23,9 +21,6 @@ import "./widgets/wallpaper"
 import "./widgets/colorscheme"
 
 ShellRoot {
-
-    NotificationToast {}
-
 
     ControlDrawer {}
 
@@ -41,8 +36,6 @@ ShellRoot {
     FocusNotch {}
 
     MediaWidget {}
-
-    MediaNotch {}
 
     Usage {}
 
