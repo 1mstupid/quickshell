@@ -73,6 +73,12 @@ const SCHEMES = [
         palette: ["#191724", "#1f1d2e", "#e0def4", "#26233a", "#9ccfd8", "#f6c177", "#eb6f92", "#6e6a86"],
         ansi: ["#26233a", "#eb6f92", "#31748f", "#f6c177", "#9ccfd8", "#c4a7e7", "#ebbcba", "#e0def4",
                "#6e6a86", "#eb6f92", "#31748f", "#f6c177", "#9ccfd8", "#c4a7e7", "#ebbcba", "#908caa"]
+    },
+    {
+        id: "monochrome", name: "Monochrome",
+        palette: ["#121212", "#1c1c1c", "#e0e0e0", "#333333", "#ffffff", "#b0b0b0", "#777777", "#555555"],
+        ansi: ["#121212", "#333333", "#555555", "#777777", "#999999", "#bbbbbb", "#dddddd", "#ffffff",
+               "#262626", "#444444", "#666666", "#888888", "#aaaaaa", "#cccccc", "#eeeeee", "#ffffff"]
     }
 ]
 
