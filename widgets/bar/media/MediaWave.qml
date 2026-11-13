@@ -3,7 +3,8 @@ import "../../../services"
 
 // Bar indicator for media: five bars that stay while a track is loaded and
 // freeze when it is paused. Gone once the player is stopped or absent.
-// Left click opens or closes the now-playing strip, right click stops the player.
+// Left click opens or closes the focus notch on Home, which has the now-playing card;
+// right click stops the player.
 Item {
     id: root
 
@@ -55,7 +56,7 @@ Item {
             if (m.button === Qt.RightButton)
                 media.kill()
             else
-                MediaNotchState.toggle()
+                FocusNotchState.toggleHome()
         }
     }
 }

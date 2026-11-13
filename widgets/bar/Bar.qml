@@ -122,7 +122,7 @@ PanelWindow {
             Behavior on opacity { NumberAnimation { duration: 120 } }
         }
 
-        // right: recorder, pomodoro ring, the notification bell, then the control icon
+        // right: media wave, recorder, pomodoro ring, the notification glyph, then the control icon
         RowLayout {
             id: rightRow
             anchors.verticalCenter: parent.verticalCenter
@@ -241,37 +241,77 @@ PanelWindow {
                 }
             }
 
-            // notification bell: a dot while there is something unread, a
-            // crossed bell while muted; click opens the focus notch on Home (origin screen only)
+            // notification glyph: shows when a notification arrives, in a ring that drains
+            // over its lifetime, and goes away with it; the notification itself is in the Home
+            // list. A critical one has no timeout: its ring stays full, in red, until it is
+            // seen. Click opens the focus notch on Home (origin screen only).
             Item {
                 id: bell
                 Layout.alignment: Qt.AlignVCenter
-                visible: false
-                implicitWidth: bellIcon.implicitWidth
-                implicitHeight: bellIcon.implicitHeight
+                implicitWidth: 22
+                implicitHeight: 22
+                opacity: Notifications.toastCount > 0 ? 1 : 0
+                visible: opacity > 0
+                Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
 
-                Text {
-                    id: bellIcon
-                    // nf-md-bell_off / nf-md-bell
-                    text: Notifications.muted ? "󰂛" : "󰂚"
-                    color: Qt.alpha(Theme.fg, Notifications.muted ? 0.4 : 0.7)
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.iconSize
+                readonly property color tint: Notifications.critical ? Theme.red : Theme.accent
+                // 1 = full ring, 0 = gone
+                property real frac: 1
+                readonly property real shown: Notifications.critical ? 1 : frac
+                onTintChanged: bellRing.requestPaint()
+                onShownChanged: bellRing.requestPaint()
+
+                NumberAnimation {
+                    id: drain
+                    target: bell
+                    property: "frac"
+                    from: 1
+                    to: 0
+                    duration: Notifications.toastLifetime
                 }
-                Rectangle {
-                    visible: Notifications.count > 0
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    width: 5
-                    height: 5
-                    radius: 2.5
-                    color: Theme.accent
+                Connections {
+                    target: Notifications
+                    function onArrivalsChanged() { drain.restart() }
+                }
+
+                Canvas {
+                    id: bellRing
+                    anchors.fill: parent
+                    onPaint: {
+                        const ctx = getContext("2d")
+                        const c = width / 2
+                        const r = c - 1.5
+                        ctx.reset()
+                        ctx.lineWidth = 1.5
+                        ctx.strokeStyle = String(Qt.alpha(Theme.fg, 0.15))
+                        ctx.beginPath()
+                        ctx.arc(c, c, r, 0, 2 * Math.PI)
+                        ctx.stroke()
+                        if (bell.shown > 0) {
+                            ctx.strokeStyle = String(bell.tint)
+                            ctx.beginPath()
+                            ctx.arc(c, c, r, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * bell.shown)
+                            ctx.stroke()
+                        }
+                    }
+                }
+                Text {
+                    anchors.centerIn: parent
+                    // nf-md-bell
+                    text: "󰂚"
+                    color: bell.tint
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 12
                 }
                 MouseArea {
                     anchors.fill: parent
-                    anchors.margins: -4
+                    enabled: root.isOrigin
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: FocusNotchState.toggleHome()
+                    onClicked: {
+                        Notifications.endToasts(true)
+                        FocusNotchState.setPage("home")
+                        FocusNotchState.show()
+                    }
                 }
             }
 
@@ -298,14 +338,6 @@ PanelWindow {
                     onClicked: DrawerState.toggle()
                 }
             }
-        }
-
-        // clicking the clock opens or closes the drawer (origin screen only)
-        MouseArea {
-            anchors.fill: clock
-            enabled: root.isOrigin
-            cursorShape: Qt.PointingHandCursor
-            onClicked: DrawerState.toggle()
         }
 
         // volume readout: icon, track, number; "MU" when muted
