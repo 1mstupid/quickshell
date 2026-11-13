@@ -45,6 +45,8 @@ PanelWindow {
     property int cardHeight: 140
     property int nameH: 18
 
+    readonly property string dirPath: Quickshell.env("HOME") + "/.local/share/wallpapers"
+
     // carousel spacing: gap between neighbouring cards, and how fast they shrink
     property real gap: 24
     property real minScale: 0.55
@@ -173,6 +175,22 @@ PanelWindow {
         }
     }
 
+    // Process to find a random wallpaper inside the scheme's subfolder
+    Process {
+        id: randomWallpaperPicker
+        property var scheme: null
+        stdout: SplitParser {
+            onRead: line => {
+                const imgPath = line.trim()
+                const finalImg = imgPath !== "" ? imgPath : root.wallpaperPath
+                if (randomWallpaperPicker.scheme) {
+                    root.runWithWallpaper(randomWallpaperPicker.scheme.id, randomWallpaperPicker.scheme.palette, randomWallpaperPicker.scheme.ansi, finalImg)
+                    randomWallpaperPicker.scheme = null
+                }
+            }
+        }
+    }
+
     function apply(scheme) {
         if (root.deriving || root.wallpaperPath === "")
             return
@@ -180,18 +198,31 @@ PanelWindow {
             root.deriving = true
             canvas.loadImage("file://" + root.wallpaperPath)
         } else {
-            root.run(scheme.id, scheme.palette, scheme.ansi)
+            randomWallpaperPicker.scheme = scheme
+            randomWallpaperPicker.command = [
+                "sh", "-c",
+                "dir=\"" + root.dirPath + "/" + scheme.id + "\"; " +
+                "img=\"\"; " +
+                "if [ -d \"$dir\" ]; then " +
+                "  img=$(find -L \"$dir\" -type f \\( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' \\) 2>/dev/null | shuf -n 1); " +
+                "fi; " +
+                "echo \"$img\""
+            ]
+            randomWallpaperPicker.running = true
         }
     }
 
-    function run(id, palette, ansi) {
+    function runWithWallpaper(id, palette, ansi, imgPath) {
         Quickshell.execDetached(
-            ["wallpaper-theme", root.wallpaperPath].concat(palette).concat(ansi))
-        // remembered for the next start; >| because the shell's noclobber would refuse to
-        // overwrite the file
+            ["wallpaper-theme", imgPath].concat(palette).concat(ansi))
+
         root.currentId = id
         Quickshell.execDetached(["sh", "-c", "printf '%s\\n' \"$1\" >| \"$2\"",
-                                 "sh", id, root.stateFile])
+                                   "sh", id, root.stateFile])
+        
+        // Update current wallpaper file so everything stays in sync
+        Quickshell.execDetached(["sh", "-c", "printf '%s\\n' \"$1\" >| \"$2\"",
+                                   "sh", imgPath, root.wallpaperFile])
         root.close()
     }
 
@@ -462,7 +493,7 @@ PanelWindow {
             root.deriving = false
             const result = Palette.derive(data)
             if (result)
-                root.run("wallpaper", result.palette, result.ansi)
+                root.runWithWallpaper("wallpaper", result.palette, result.ansi, root.wallpaperPath)
         }
     }
 }
