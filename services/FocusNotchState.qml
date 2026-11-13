@@ -20,6 +20,15 @@ Singleton {
     function setPage(key) { page = key }
 
     function toggle() { openRequested = !openRequested }
+    // open on Home, where the notifications are; closes if already there
+    function toggleHome() {
+        if (openRequested && page === "home") {
+            hide()
+            return
+        }
+        page = "home"
+        show()
+    }
     function show() { openRequested = true }
     function hide() { openRequested = false }
 
