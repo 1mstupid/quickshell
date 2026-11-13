@@ -6,14 +6,16 @@ import Quickshell.Wayland
 import "../../services"
 import "../../services/WallpaperPalette.js" as Palette
 import "../notch"
+import "../wallpaper/Fuzzy.js" as Fuzzy
 import "Colorschemes.js" as Schemes
 
-// The colorscheme picker: the wallpaper picker's carousel and band, with a few fixed
-// schemes and "Wallpaper", whose colours are derived from the wallpaper in use, as the
-// wallpaper picker does. Left and Right (or h and l) move, Enter applies, Escape closes.
-// Every scheme goes through the same wallpaper-theme script, so the files it writes
-// stay in step; a fixed scheme just hands it its own colours. The scheme in use is
-// remembered in ~/.local/xdg/config/colorscheme-current, and the picker opens on it.
+// The colorscheme picker: a row of cards in the band that grows out of the bar pill, with
+// "Wallpaper", whose colours are derived from the wallpaper in use, as the wallpaper picker
+// does. Type to search, Left and Right move, Enter applies, Escape clears the search, then
+// closes. Every scheme goes through the same wallpaper-theme script, so the files it writes
+// stay in step; a fixed scheme hands it its own colours and a random wallpaper from its
+// folder in ~/.local/share/wallpapers, if it has one. The scheme in use is remembered in
+// ~/.local/xdg/config/colorscheme-current, and the picker opens on it.
 PanelWindow {
     id: root
 
@@ -35,28 +37,30 @@ PanelWindow {
     WlrLayershell.keyboardFocus: root.visible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     WlrLayershell.namespace: "quickshell-colorschemes"
 
-    // wide enough for the five cards; a narrower screen clips the outer ones
-    property int bandWidth: Math.min(1040, (root.screen ? root.screen.width : 1920) - 48)
-    property int bandHeight: 230
+    // the band: the search row, a row of cards that scrolls when it is longer than the
+    // band, and a hint under it
+    property int bandWidth: Math.min(860, (root.screen ? root.screen.width : 1920) - 48)
+    property int bandHeight: 190
     property int pad: 14
     property int headerH: 22
-    property int carouselH: 140
-    property int cardWidth: 220
-    property int cardHeight: 140
-    property int nameH: 18
+    property int cardWidth: 186
+    property int cardHeight: 96
+    property int cardGap: 12
+    property int footH: 18
 
     readonly property string dirPath: Quickshell.env("HOME") + "/.local/share/wallpapers"
-
-    // carousel spacing: gap between neighbouring cards, and how fast they shrink
-    property real gap: 24
-    property real minScale: 0.55
-    property real scaleStep: 0.15
 
     // 0 = the bar pill, 1 = the full band
     property real t: 0
 
     readonly property var schemes: Schemes.SCHEMES
+    // the search: typed straight away, there is no field to focus
+    property string query: ""
+    // what the row shows: all of them, or the matches of the query, best first
+    readonly property var shown: query === "" ? schemes : Fuzzy.rank(schemes, query, s => s.name)
+    // an index into `shown`
     property int currentIndex: 0
+    onQueryChanged: currentIndex = 0
 
     // the scheme in use, and the wallpaper the script is given. Both are read from the
     // files the pickers write, at start, so the first opening is not the one that loads them.
@@ -67,28 +71,20 @@ PanelWindow {
     // set while the wallpaper is being sampled
     property bool deriving: false
 
-    function scaleAt(u) {
-        return Math.max(minScale, 1 - scaleStep * Math.abs(u))
-    }
-
-    // centre-to-centre distance from the card `k` slots out to the one `k+1` slots out
-    function pitch(k) {
-        return cardWidth * (scaleAt(k) + scaleAt(k + 1)) / 2 + gap
-    }
-
-    // horizontal offset of a card `u` slots from the centre; fractional u interpolates
-    function offsetFor(u) {
-        const a = Math.abs(u)
-        const whole = Math.floor(a)
-        let total = 0
-        for (let j = 0; j < whole; j++)
-            total += pitch(j)
-        return Math.sign(u) * (total + (a - whole) * pitch(whole))
-    }
+    // the row's scroll: the chosen card centred, held inside the row's ends. It uses the band's
+    // full width and not the card's, which is still growing while it opens.
+    readonly property real step: cardWidth + cardGap
+    readonly property real innerW: bandWidth - 2 * pad
+    readonly property real scrollTarget: Math.max(0,
+        Math.min(shown.length * step - cardGap - innerW,
+                 currentIndex * step + cardWidth / 2 - innerW / 2))
+    property real scroll: scrollTarget
+    Behavior on scroll { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
     // on the scheme in use; "wallpaper" when none was remembered, as that is what a
     // wallpaper change leaves behind
     function focusCurrent() {
+        query = ""
         const i = Schemes.indexOfId(currentId === "" ? "wallpaper" : currentId)
         currentIndex = i >= 0 ? i : 0
     }
@@ -192,7 +188,7 @@ PanelWindow {
     }
 
     function apply(scheme) {
-        if (root.deriving || root.wallpaperPath === "")
+        if (!scheme || root.deriving || root.wallpaperPath === "")
             return
         if (scheme.id === "wallpaper") {
             root.deriving = true
@@ -226,7 +222,8 @@ PanelWindow {
         root.close()
     }
 
-    // Keyboard & Vim navigation; Esc closes
+    // Keyboard: letters go into the search; the arrows move, Enter applies. Esc clears
+    // the search, and closes when there is none.
     Item {
         id: keyHost
         anchors.fill: parent
@@ -235,20 +232,30 @@ PanelWindow {
         Keys.onPressed: event => {
             const enter = event.key === Qt.Key_Return || event.key === Qt.Key_Enter
             if (event.key === Qt.Key_Escape) {
-                root.close()
-                event.accepted = true
-            } else if (event.key === Qt.Key_Left || event.text === "h") {
+                if (root.query !== "") {
+                    // back to the whole list, still on the scheme that was chosen
+                    const keep = root.shown[root.currentIndex]
+                    root.query = ""
+                    root.currentIndex = Math.max(0, root.schemes.indexOf(keep))
+                } else {
+                    root.close()
+                }
+            } else if (event.key === Qt.Key_Backspace) {
+                root.query = root.query.slice(0, -1)
+            } else if (event.key === Qt.Key_Left) {
                 if (root.currentIndex > 0)
                     root.currentIndex--
-                event.accepted = true
-            } else if (event.key === Qt.Key_Right || event.text === "l") {
-                if (root.currentIndex < root.schemes.length - 1)
+            } else if (event.key === Qt.Key_Right) {
+                if (root.currentIndex < root.shown.length - 1)
                     root.currentIndex++
-                event.accepted = true
             } else if (enter) {
-                root.apply(root.schemes[root.currentIndex])
-                event.accepted = true
+                root.apply(root.shown[root.currentIndex])
+            } else if (event.text.length > 0 && event.text.charCodeAt(0) >= 0x20) {
+                root.query += event.text
+            } else {
+                return
             }
+            event.accepted = true
         }
     }
 
@@ -279,72 +286,134 @@ PanelWindow {
     // only the band takes clicks; everything around it passes through
     mask: Region { item: outline }
 
-    // header: what this is. Fades in during the second half of the morph.
-    Text {
+    // search row: the magnifier, what is typed (or what to type), and which card of how
+    // many. Fades in during the second half of the morph, like the row.
+    Item {
+        id: header
         x: card.x + root.pad
         y: card.y + root.pad
         width: Math.max(0, card.width - 2 * root.pad)
         height: root.headerH
-        verticalAlignment: Text.AlignVCenter
-        elide: Text.ElideRight
-        text: "Colorscheme"
-        color: Qt.alpha(Theme.fg, 0.5)
-        font.family: Theme.fontFamilyAlt
-        font.pixelSize: 11
         opacity: Math.max(0, (root.t - 0.5) * 2)
+
+        Text {
+            id: glass
+            anchors.verticalCenter: parent.verticalCenter
+            text: "󰍉"
+            color: Qt.alpha(Theme.fg, 0.5)
+            font.family: Theme.fontFamily
+            font.pixelSize: 16
+        }
+        Text {
+            id: typed
+            anchors.left: glass.right
+            anchors.leftMargin: 12
+            anchors.right: count.left
+            anchors.rightMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+            text: root.query !== "" ? root.query : "Search themes…"
+            elide: Text.ElideRight
+            color: root.query !== "" ? Theme.fg : Qt.alpha(Theme.fg, 0.4)
+            font.family: Theme.fontFamilySans
+            font.pixelSize: 13
+        }
+        // the caret: after the text, or at the start of the placeholder
+        Rectangle {
+            x: typed.x + (root.query !== "" ? Math.min(typed.contentWidth, typed.width) + 1 : -1)
+            anchors.verticalCenter: parent.verticalCenter
+            width: 1
+            height: 14
+            color: Theme.accent
+        }
+        Text {
+            id: count
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            text: (root.shown.length > 0 ? root.currentIndex + 1 : 0) + "/" + root.shown.length
+            color: Qt.alpha(Theme.fg, 0.4)
+            font.family: Theme.fontFamilyNum
+            font.pixelSize: 11
+        }
     }
 
-    // carousel: cards are placed from their scaled widths, so neighbours
-    // take only the space they show. Fades in during the second half of the morph.
+    // the row of cards, scrolled so the chosen one is centred. Fades in with the header.
     Item {
-        id: carousel
+        id: strip
         x: card.x + root.pad
-        y: card.y + root.pad + root.headerH + 12
+        y: card.y + root.pad + root.headerH + 14
         width: Math.max(0, card.width - 2 * root.pad)
-        height: root.carouselH
+        height: root.cardHeight
         clip: true
         opacity: Math.max(0, (root.t - 0.5) * 2)
 
-        // animated centre position, so moving between cards glides
-        property real pos: root.currentIndex
-        Behavior on pos {
-            NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+        Text {
+            visible: root.shown.length === 0
+            anchors.centerIn: parent
+            text: "Nothing matches"
+            color: Qt.alpha(Theme.fg, 0.4)
+            font.family: Theme.fontFamilySans
+            font.pixelSize: 12
         }
 
         Repeater {
-            model: root.schemes
+            model: root.shown
 
-            Item {
+            Rectangle {
                 id: cell
                 required property int index
                 required property var modelData
 
-                // slots from the centre; fractional while the carousel is moving
-                readonly property real d: cell.index - carousel.pos
                 readonly property bool current: root.currentIndex === cell.index
                 readonly property bool isWallpaper: modelData.id === "wallpaper"
                 readonly property bool busy: isWallpaper && root.deriving
-                // the card's own colours: a fixed scheme shows itself, the wallpaper card the
-                // theme in use
-                readonly property color bgCol: isWallpaper ? Theme.bg : modelData.palette[0]
-                readonly property color fgCol: isWallpaper ? Theme.fg : modelData.palette[2]
-                readonly property color accentCol: isWallpaper ? Theme.accent : modelData.palette[4]
+                // the scheme in use; "wallpaper" when none was remembered
+                readonly property bool inUse: modelData.id === (root.currentId === "" ? "wallpaper" : root.currentId)
 
+                x: cell.index * root.step - root.scroll
                 width: root.cardWidth
                 height: root.cardHeight
-                x: carousel.width / 2 - width / 2 + root.offsetFor(d)
-                y: (carousel.height - height) / 2
-                scale: root.scaleAt(d)
-                opacity: Math.abs(d) > 3 ? 0 : Math.max(0.35, 1 - 0.25 * Math.abs(d))
-                // a card that cannot be seen is not drawn
-                visible: opacity > 0
+                radius: 10
+                color: Qt.alpha(Theme.fg, current ? 0.08 : 0.05)
+                border.width: busy ? 3 : current ? 2 : 1
+                border.color: current || busy ? Theme.accent : Qt.alpha(Theme.fg, 0.08)
 
-                Rectangle {
-                    anchors.fill: parent
-                    radius: 10
-                    color: cell.bgCol
+                SequentialAnimation on opacity {
+                    running: cell.busy
+                    loops: Animation.Infinite
+                    alwaysRunToEnd: true
+                    NumberAnimation { to: 0.5; duration: 120 }
+                    NumberAnimation { to: 1.0; duration: 120 }
+                }
 
-                    // hidden rounded shape, used only to mask the wallpaper
+                // a fixed scheme: its six colours
+                Row {
+                    visible: !cell.isWallpaper
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    y: 24
+                    spacing: 8
+
+                    Repeater {
+                        model: cell.isWallpaper ? [] : cell.modelData.ansi.slice(1, 7)
+
+                        Rectangle {
+                            required property string modelData
+                            width: 14
+                            height: 14
+                            radius: 7
+                            color: modelData
+                        }
+                    }
+                }
+
+                // the wallpaper card: the wallpaper its colours come from
+                Item {
+                    visible: cell.isWallpaper
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    y: 14
+                    width: 116
+                    height: 38
+
+                    // hidden rounded shape, used only to mask the thumbnail
                     Item {
                         id: thumbMask
                         anchors.fill: parent
@@ -353,17 +422,14 @@ PanelWindow {
 
                         Rectangle {
                             anchors.fill: parent
-                            radius: 10
+                            radius: 6
                             color: "white"
                         }
                     }
-
-                    // the wallpaper card shows the wallpaper it will take its colours from
                     Image {
                         anchors.fill: parent
-                        visible: cell.isWallpaper
                         source: cell.isWallpaper && root.wallpaperPath !== "" ? "file://" + root.wallpaperPath : ""
-                        sourceSize.width: root.cardWidth * 2
+                        sourceSize.width: 232
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
                         opacity: status === Image.Ready ? 1 : 0
@@ -374,91 +440,69 @@ PanelWindow {
                             maskSource: thumbMask
                         }
                     }
+                }
 
-                    // a fixed scheme: its text and accent on its background, and its six colours
-                    Item {
-                        anchors.fill: parent
-                        visible: !cell.isWallpaper
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.bottom: parent.bottom
+                    anchors.bottomMargin: 16
+                    width: parent.width - 20
+                    horizontalAlignment: Text.AlignHCenter
+                    elide: Text.ElideRight
+                    text: cell.modelData.name
+                    color: cell.current ? Theme.fg : Qt.alpha(Theme.fg, 0.6)
+                    font.family: Theme.fontFamilySans
+                    font.pixelSize: 12
+                    font.weight: cell.current ? Font.DemiBold : Font.Normal
+                }
 
-                        Text {
-                            x: 16
-                            y: 12
-                            text: "Aa"
-                            color: cell.fgCol
-                            font.family: Theme.fontFamilySans
-                            font.pixelSize: 28
-                            font.weight: Font.DemiBold
-                        }
-                        Rectangle {
-                            x: 16
-                            y: 54
-                            width: 28
-                            height: 3
-                            radius: 2
-                            color: cell.accentCol
-                        }
-                        Row {
-                            x: 16
-                            anchors.bottom: parent.bottom
-                            anchors.bottomMargin: 16
-                            spacing: 8
+                // the scheme in use
+                Rectangle {
+                    visible: cell.inUse
+                    anchors.top: parent.top
+                    anchors.right: parent.right
+                    anchors.margins: 10
+                    width: 6
+                    height: 6
+                    radius: 3
+                    color: Theme.accent
+                }
 
-                            Repeater {
-                                model: cell.isWallpaper ? [] : cell.modelData.ansi.slice(1, 7)
-
-                                Rectangle {
-                                    required property string modelData
-                                    width: 18
-                                    height: 18
-                                    radius: 9
-                                    color: modelData
-                                }
-                            }
-                        }
-                    }
-
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: 10
-                        color: "transparent"
-                        border.width: cell.busy ? 3 : cell.current ? 1 : 0
-                        border.color: cell.busy ? Theme.accent : Qt.alpha(Theme.fg, 0.5)
-
-                        SequentialAnimation on opacity {
-                            running: cell.busy
-                            loops: Animation.Infinite
-                            alwaysRunToEnd: true
-                            NumberAnimation { to: 0.4; duration: 120 }
-                            NumberAnimation { to: 1.0; duration: 120 }
-                        }
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: {
-                            root.currentIndex = cell.index
-                            root.apply(cell.modelData)
-                        }
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: {
+                        root.currentIndex = cell.index
+                        root.apply(cell.modelData)
                     }
                 }
             }
         }
     }
 
-    // name of the centred scheme, under the carousel; a hint when nothing can be applied yet
-    Text {
+    // under the row: what is missing before anything can be applied, and the key to apply
+    Item {
         x: card.x + root.pad
-        y: carousel.y + root.carouselH + 10
+        y: strip.y + root.cardHeight + 10
         width: Math.max(0, card.width - 2 * root.pad)
-        height: root.nameH
-        horizontalAlignment: Text.AlignHCenter
-        elide: Text.ElideRight
-        text: root.wallpaperPath === "" ? "Pick a wallpaper first"
-            : root.schemes[root.currentIndex].name
-        color: Qt.alpha(Theme.fg, 0.7)
-        font.family: Theme.fontFamilyAlt
-        font.pixelSize: 12
+        height: root.footH
         opacity: Math.max(0, (root.t - 0.5) * 2)
+
+        Text {
+            anchors.verticalCenter: parent.verticalCenter
+            visible: root.wallpaperPath === ""
+            text: "Pick a wallpaper first"
+            color: Qt.alpha(Theme.fg, 0.5)
+            font.family: Theme.fontFamilySans
+            font.pixelSize: 11
+        }
+        Text {
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            text: "Enter to apply"
+            color: Qt.alpha(Theme.fg, 0.4)
+            font.family: Theme.fontFamilySans
+            font.pixelSize: 11
+        }
     }
 
     // the Wallpaper card: the palette maths is in services/WallpaperPalette.js, the same
