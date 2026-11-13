@@ -102,7 +102,7 @@ PanelWindow {
                     anchors.verticalCenter: parent.verticalCenter
                     text: root.readout
                     color: Pomodoro.done ? Theme.red : Theme.fg
-                    font.family: Theme.fontFamilyAlt
+                    font.family: Theme.fontFamilyDisplay
                     font.pixelSize: 34
                     font.bold: true
                 }
