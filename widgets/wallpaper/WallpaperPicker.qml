@@ -5,6 +5,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import "../../services"
 import "../../services/WallpaperPalette.js" as Palette
+import "../../widgets/colorscheme/Colorschemes.js" as Schemes 
 import "../notch"
 import "Fuzzy.js" as Fuzzy
 
@@ -70,7 +71,7 @@ PanelWindow {
     // survives a reboot and the picker opens on it and not on the first of the list.
     property string currentPath: ""
     readonly property string stateFile: Quickshell.env("HOME") + "/.local/xdg/config/wallpaper-current"
-    // the colorscheme in use; applying a wallpaper makes it "wallpaper"
+    // the colorscheme in use; applying a wallpaper makes it "wallpaper" or the subfolder name
     readonly property string schemeFile: Quickshell.env("HOME") + "/.local/xdg/config/colorscheme-current"
     property string applyingPath: ""
     property bool randomPending: false
@@ -98,6 +99,16 @@ PanelWindow {
     // "/x/y/name.png" -> "name"
     function nameOf(path) {
         return path.split("/").pop().replace(/\.[^.]+$/, "")
+    }
+
+    // Extracts the parent folder name as the scheme if it's nested under wallpapers/
+    function schemeOf(path) {
+        const rel = path.substring(root.dirPath.length + 1)
+        const parts = rel.split("/")
+        if (parts.length > 1) {
+            return parts[0] // e.g. ~/.local/share/wallpapers/catppuccin-mocha/bg.png -> "catppuccin-mocha"
+        }
+        return "wallpaper"
     }
 
     // the whole list, on the wallpaper in use
@@ -202,7 +213,7 @@ PanelWindow {
     Process {
         id: lister
         command: ["sh", "-c",
-            "find -L \"" + root.dirPath + "\" -maxdepth 1 -type f " +
+            "find -L \"" + root.dirPath + "\" -type f " +
             "\\( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' \\) | sort"]
         stdout: SplitParser {
             onRead: line => { if (line.trim() !== "") root._found.push(line.trim()) }
@@ -548,20 +559,39 @@ PanelWindow {
     }
 
     function finish(d) {
-        const result = Palette.derive(d)
-        if (!result)
-            return
+        let targetScheme = root.schemeOf(root.applyingPath)
+        let result = null
+
+        if (targetScheme !== "wallpaper") {
+            const idx = Schemes.indexOfId(targetScheme)
+            if (idx >= 0 && Schemes.SCHEMES[idx].palette) {
+                result = Schemes.SCHEMES[idx]
+            } else {
+                // Subfolder name doesn't match a known scheme ID; fall back to dynamic extraction
+                targetScheme = "wallpaper"
+            }
+        }
+
+        if (!result) {
+            result = Palette.derive(d)
+            if (!result)
+                return
+        }
+
+        // Always passes 25 arguments: 1 image path + 8 palette colors + 16 ansi colors
         Quickshell.execDetached(
             ["wallpaper-theme", root.applyingPath]
                 .concat(result.palette).concat(result.ansi))
-        // remembered for the next start; >| because the shell's noclobber would refuse to
-        // overwrite the file
+
+        // Remember current wallpaper for next boot
         root.currentPath = root.applyingPath
         Quickshell.execDetached(["sh", "-c", "printf '%s\\n' \"$1\" >| \"$2\"",
-                                 "sh", root.applyingPath, root.stateFile])
-        // its colours are derived from it, which is the colorscheme picker's "Wallpaper"
-        Quickshell.execDetached(["sh", "-c", "printf 'wallpaper\\n' >| \"$1\"",
-                                 "sh", root.schemeFile])
+                                   "sh", root.applyingPath, root.stateFile])
+
+        // Write out the active scheme ID (e.g. "gruvbox", "nord", or "wallpaper")
+        Quickshell.execDetached(["sh", "-c", "printf '%s\\n' \"$1\" >| \"$2\"",
+                                   "sh", targetScheme, root.schemeFile])
+
         root.applyingPath = ""
         root.close()
     }
