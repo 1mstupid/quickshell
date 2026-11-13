@@ -452,7 +452,12 @@ PanelWindow {
                     horizontalAlignment: Text.AlignHCenter
                     elide: Text.ElideRight
                     text: cell.modelData.name
-                    color: cell.current ? Theme.fg : Qt.alpha(Theme.fg, 0.6)
+                    
+                    // CHANGED HERE: Use the scheme's foreground color (palette[2]), or Theme.fg for wallpaper
+                    color: cell.isWallpaper 
+                        ? (cell.current ? Theme.fg : Qt.alpha(Theme.fg, 0.8)) 
+                        : (cell.current ? cell.modelData.palette[2] : Qt.alpha(cell.modelData.palette[2], 0.7))
+                        
                     font.family: Theme.fontFamilySans
                     font.pixelSize: 12
                     font.weight: cell.current ? Font.DemiBold : Font.Normal
