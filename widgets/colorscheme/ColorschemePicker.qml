@@ -435,24 +435,30 @@ PanelWindow {
                     // the art, across the whole row and shaded from the left like a shadow, so the
                     // name and colours stay readable on any wallpaper. The shade is the panel colour
                     // at a falling alpha; only the chosen row loads an image.
+                    // hidden rounded shape, used only to mask the art and its shade together: a
+                    // gradient rectangle does not follow its own radius, so it cannot round itself
+                    Item {
+                        id: artMask
+                        anchors.fill: parent
+                        visible: false
+                        layer.enabled: true
+
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: cell.radius
+                            color: "white"
+                        }
+                    }
                     Item {
                         anchors.fill: parent
                         visible: cell.grow > 0 && cell.art !== ""
                         opacity: cell.grow
-
-                        // hidden rounded shape, used only to mask the image
-                        Item {
-                            id: artMask
-                            anchors.fill: parent
-                            visible: false
-                            layer.enabled: true
-
-                            Rectangle {
-                                anchors.fill: parent
-                                radius: cell.radius
-                                color: "white"
-                            }
+                        layer.enabled: true
+                        layer.effect: MultiEffect {
+                            maskEnabled: true
+                            maskSource: artMask
                         }
+
                         Image {
                             anchors.fill: parent
                             source: cell.current && cell.art !== "" ? "file://" + cell.art : ""
@@ -461,15 +467,9 @@ PanelWindow {
                             asynchronous: true
                             opacity: status === Image.Ready ? 0.6 : 0
                             Behavior on opacity { NumberAnimation { duration: 160 } }
-                            layer.enabled: true
-                            layer.effect: MultiEffect {
-                                maskEnabled: true
-                                maskSource: artMask
-                            }
                         }
                         Rectangle {
                             anchors.fill: parent
-                            radius: cell.radius
                             gradient: Gradient {
                                 orientation: Gradient.Horizontal
                                 GradientStop { position: 0.0; color: Qt.alpha(Theme.bg, 0.95) }
