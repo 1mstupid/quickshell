@@ -9,13 +9,15 @@ import "../notch"
 import "../wallpaper/Fuzzy.js" as Fuzzy
 import "Colorschemes.js" as Schemes
 
-// The colorscheme picker: a row of cards in the band that grows out of the bar pill, with
+// The colorscheme picker: a list in the band that grows out of the bar pill, with
 // "Wallpaper", whose colours are derived from the wallpaper in use, as the wallpaper picker
-// does. Type to search, Left and Right move, Enter applies, Escape clears the search, then
-// closes. Every scheme goes through the same wallpaper-theme script, so the files it writes
-// stay in step; a fixed scheme hands it its own colours and a random wallpaper from its
-// folder in ~/.local/share/wallpapers, if it has one. The scheme in use is remembered in
-// ~/.local/xdg/config/colorscheme-current, and the picker opens on it.
+// does. The chosen row grows to show the scheme's colours over a wallpaper from its folder.
+// Type to search, Up and Down (or Left and Right) move, Enter applies, Escape clears the
+// search, then closes. Every scheme goes through the same wallpaper-theme script, so the
+// files it writes stay in step; a fixed scheme hands it its own colours and the wallpaper
+// shown behind its row, drawn from its folder in ~/.local/share/wallpapers, if it has one.
+// The scheme in use is remembered in ~/.local/xdg/config/colorscheme-current, and the
+// picker opens on it.
 PanelWindow {
     id: root
 
@@ -37,16 +39,17 @@ PanelWindow {
     WlrLayershell.keyboardFocus: root.visible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     WlrLayershell.namespace: "quickshell-colorschemes"
 
-    // the band: the search row, a row of cards that scrolls when it is longer than the
-    // band, and a hint under it
-    property int bandWidth: Math.min(860, (root.screen ? root.screen.width : 1920) - 48)
-    property int bandHeight: 190
+    // the band: the search row, a rule, and a list of rows that scrolls when it is longer
+    // than the band. The chosen row is taller than the others; the list shows four plain
+    // rows and the chosen one.
+    property int bandWidth: Math.min(460, (root.screen ? root.screen.width : 1920) - 48)
     property int pad: 14
     property int headerH: 22
-    property int cardWidth: 186
-    property int cardHeight: 96
-    property int cardGap: 12
-    property int footH: 18
+    property int rowH: 40
+    property int rowGap: 6
+    property int selH: 96
+    property int listH: 4 * (rowH + rowGap) + selH
+    property int bandHeight: pad + headerH + 14 + listH + pad
 
     readonly property string dirPath: Quickshell.env("HOME") + "/.local/share/wallpapers"
 
@@ -71,13 +74,11 @@ PanelWindow {
     // set while the wallpaper is being sampled
     property bool deriving: false
 
-    // the row's scroll: the chosen card centred, held inside the row's ends. It uses the band's
-    // full width and not the card's, which is still growing while it opens.
-    readonly property real step: cardWidth + cardGap
-    readonly property real innerW: bandWidth - 2 * pad
-    readonly property real scrollTarget: Math.max(0,
-        Math.min(shown.length * step - cardGap - innerW,
-                 currentIndex * step + cardWidth / 2 - innerW / 2))
+    // the list's scroll: the chosen row centred, held inside the list's ends. Only the chosen
+    // row is tall, so the rows above it are all rowH and its top is currentIndex * (rowH + rowGap).
+    readonly property real contentH: shown.length * (rowH + rowGap) - rowGap + (selH - rowH)
+    readonly property real scrollTarget: Math.max(0, Math.min(contentH - listH,
+        currentIndex * (rowH + rowGap) + selH / 2 - listH / 2))
     property real scroll: scrollTarget
     Behavior on scroll { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
@@ -111,8 +112,10 @@ PanelWindow {
     }
 
     onVisibleChanged: {
-        if (visible)
+        if (visible) {
+            lister.running = true
             keyHost.forceActiveFocus()
+        }
     }
 
     // another panel took the pill, so this one gives way
@@ -171,19 +174,36 @@ PanelWindow {
         }
     }
 
-    // Process to find a random wallpaper inside the scheme's subfolder
+    // One image per scheme folder, drawn when the picker opens. It is the art behind the
+    // chosen row and the wallpaper that choosing the scheme sets, so the row shows what it
+    // will apply. A scheme with no folder keeps the wallpaper in use.
+    property var folderImages: ({})
+    property var _found: []
+    Component.onCompleted: lister.running = true
     Process {
-        id: randomWallpaperPicker
-        property var scheme: null
+        id: lister
+        command: ["sh", "-c",
+            "find -L \"" + root.dirPath + "\" -mindepth 2 -type f " +
+            "\\( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' \\)"]
         stdout: SplitParser {
-            onRead: line => {
-                const imgPath = line.trim()
-                const finalImg = imgPath !== "" ? imgPath : root.wallpaperPath
-                if (randomWallpaperPicker.scheme) {
-                    root.runWithWallpaper(randomWallpaperPicker.scheme.id, randomWallpaperPicker.scheme.palette, randomWallpaperPicker.scheme.ansi, finalImg)
-                    randomWallpaperPicker.scheme = null
-                }
+            onRead: line => { if (line.trim() !== "") root._found.push(line.trim()) }
+        }
+        onRunningChanged: {
+            if (running) {
+                root._found = []
+                return
             }
+            const groups = {}
+            for (const p of root._found) {
+                const id = p.substring(root.dirPath.length + 1).split("/")[0]
+                if (!groups[id])
+                    groups[id] = []
+                groups[id].push(p)
+            }
+            const picked = {}
+            for (const id in groups)
+                picked[id] = groups[id][Math.floor(Math.random() * groups[id].length)]
+            root.folderImages = picked
         }
     }
 
@@ -194,17 +214,8 @@ PanelWindow {
             root.deriving = true
             canvas.loadImage("file://" + root.wallpaperPath)
         } else {
-            randomWallpaperPicker.scheme = scheme
-            randomWallpaperPicker.command = [
-                "sh", "-c",
-                "dir=\"" + root.dirPath + "/" + scheme.id + "\"; " +
-                "img=\"\"; " +
-                "if [ -d \"$dir\" ]; then " +
-                "  img=$(find -L \"$dir\" -type f \\( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' \\) 2>/dev/null | shuf -n 1); " +
-                "fi; " +
-                "echo \"$img\""
-            ]
-            randomWallpaperPicker.running = true
+            root.runWithWallpaper(scheme.id, scheme.palette, scheme.ansi,
+                                  root.folderImages[scheme.id] || root.wallpaperPath)
         }
     }
 
@@ -258,9 +269,9 @@ PanelWindow {
                 }
             } else if (event.key === Qt.Key_Backspace) {
                 root.query = root.query.slice(0, -1)
-            } else if (event.key === Qt.Key_Left) {
+            } else if (event.key === Qt.Key_Up || event.key === Qt.Key_Left) {
                 root.moveBy(-1, event.isAutoRepeat)
-            } else if (event.key === Qt.Key_Right) {
+            } else if (event.key === Qt.Key_Down || event.key === Qt.Key_Right) {
                 root.moveBy(1, event.isAutoRepeat)
             } else if (enter) {
                 root.apply(root.shown[root.currentIndex])
@@ -300,7 +311,7 @@ PanelWindow {
     // only the band takes clicks; everything around it passes through
     mask: Region { item: outline }
 
-    // search row: the magnifier, what is typed (or what to type), and which card of how
+    // search row: the magnifier, what is typed (or what to type), and which row of how
     // many. Fades in during the second half of the morph, like the row.
     Item {
         id: header
@@ -325,7 +336,8 @@ PanelWindow {
             anchors.right: count.left
             anchors.rightMargin: 12
             anchors.verticalCenter: parent.verticalCenter
-            text: root.query !== "" ? root.query : "Search themes…"
+            text: root.query !== "" ? root.query
+                : root.wallpaperPath === "" ? "Pick a wallpaper first" : "Search themes…"
             elide: Text.ElideRight
             color: root.query !== "" ? Theme.fg : Qt.alpha(Theme.fg, 0.4)
             font.family: Theme.fontFamilySans
@@ -350,13 +362,23 @@ PanelWindow {
         }
     }
 
-    // the row of cards, scrolled so the chosen one is centred. Fades in with the header.
+    // a thin rule under the search
+    Rectangle {
+        x: header.x
+        y: header.y + root.headerH + 6
+        width: header.width
+        height: 1
+        color: Qt.alpha(Theme.fg, 0.08)
+        opacity: header.opacity
+    }
+
+    // the list, scrolled so the chosen row is centred. Fades in with the header.
     Item {
         id: strip
         x: card.x + root.pad
         y: card.y + root.pad + root.headerH + 14
         width: Math.max(0, card.width - 2 * root.pad)
-        height: root.cardHeight
+        height: root.listH
         clip: true
         opacity: Math.max(0, (root.t - 0.5) * 2)
 
@@ -369,160 +391,146 @@ PanelWindow {
             font.pixelSize: 12
         }
 
-        Repeater {
-            model: root.shown
+        Column {
+            y: -root.scroll
+            width: parent.width
+            spacing: root.rowGap
 
-              Rectangle {
-                id: cell
-                required property int index
-                required property var modelData
+            Repeater {
+                model: root.shown
 
-                readonly property bool current: root.currentIndex === cell.index
-                readonly property bool isWallpaper: modelData.id === "wallpaper"
-                readonly property bool busy: isWallpaper && root.deriving
-                // the scheme in use; "wallpaper" when none was remembered
-                readonly property bool inUse: modelData.id === (root.currentId === "" ? "wallpaper" : root.currentId)
+                Rectangle {
+                    id: cell
+                    required property int index
+                    required property var modelData
 
-                x: cell.index * root.step - root.scroll
-                width: root.cardWidth
-                height: root.cardHeight
-                radius: 10
-                
-                // CHANGED HERE: Use the first item of the palette array, or fall back to Theme.bg for wallpaper
-                color: isWallpaper ? Theme.bg : modelData.palette[0]
+                    readonly property bool current: root.currentIndex === cell.index
+                    readonly property bool isWallpaper: modelData.id === "wallpaper"
+                    readonly property bool busy: isWallpaper && root.deriving
+                    // the scheme in use; "wallpaper" when none was remembered
+                    readonly property bool inUse: modelData.id === (root.currentId === "" ? "wallpaper" : root.currentId)
+                    // the wallpaper behind the row: the one in use for "Wallpaper", else its folder's
+                    readonly property string art: isWallpaper ? root.wallpaperPath
+                        : (root.folderImages[modelData.id] || "")
+                    readonly property int inset: 12
+                    // 0 on a plain row, 1 on the chosen one, between while it grows or shrinks.
+                    // Everything that moves is derived from it, so the height is the one animation.
+                    readonly property real grow: Math.max(0, Math.min(1,
+                        (height - root.rowH) / (root.selH - root.rowH)))
 
-                border.width: busy ? 3 : current ? 2 : 1
-                border.color: current || busy ? Theme.accent : Qt.alpha(Theme.fg, 0.08)
-                SequentialAnimation on opacity {
-                    running: cell.busy
-                    loops: Animation.Infinite
-                    alwaysRunToEnd: true
-                    NumberAnimation { to: 0.5; duration: 120 }
-                    NumberAnimation { to: 1.0; duration: 120 }
-                }
+                    width: strip.width
+                    height: current ? root.selH : root.rowH
+                    Behavior on height { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                    radius: 12
+                    color: Qt.alpha(Theme.fg, 0.06 * grow)
 
-                // a fixed scheme: its six colours
-                Row {
-                    visible: !cell.isWallpaper
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    y: 24
-                    spacing: 8
+                    SequentialAnimation on opacity {
+                        running: cell.busy
+                        loops: Animation.Infinite
+                        alwaysRunToEnd: true
+                        NumberAnimation { to: 0.5; duration: 120 }
+                        NumberAnimation { to: 1.0; duration: 120 }
+                    }
 
+                    // the art, fading in from the left so the name stays readable. The mask is
+                    // a rounded rectangle whose alpha rises to the right; only the chosen row
+                    // loads an image.
+                    Item {
+                        anchors.fill: parent
+                        visible: cell.grow > 0 && cell.art !== ""
+                        opacity: cell.grow
+
+                        Item {
+                            id: artMask
+                            anchors.fill: parent
+                            visible: false
+                            layer.enabled: true
+
+                            Rectangle {
+                                anchors.fill: parent
+                                radius: cell.radius
+                                gradient: Gradient {
+                                    orientation: Gradient.Horizontal
+                                    GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0) }
+                                    GradientStop { position: 0.7; color: Qt.rgba(1, 1, 1, 1) }
+                                }
+                            }
+                        }
+                        Image {
+                            anchors.fill: parent
+                            source: cell.current && cell.art !== "" ? "file://" + cell.art : ""
+                            sourceSize.width: 640
+                            fillMode: Image.PreserveAspectCrop
+                            asynchronous: true
+                            opacity: status === Image.Ready ? 0.6 : 0
+                            Behavior on opacity { NumberAnimation { duration: 160 } }
+                            layer.enabled: true
+                            layer.effect: MultiEffect {
+                                maskEnabled: true
+                                maskSource: artMask
+                            }
+                        }
+                    }
+
+                    // a plain row: the scheme's colour in a small tile. It goes as the row grows.
+                    Rectangle {
+                        x: cell.inset
+                        y: (root.rowH - height) / 2
+                        width: 28
+                        height: 28
+                        radius: 8
+                        color: Qt.alpha(Theme.fg, 0.06)
+                        opacity: 1 - cell.grow
+
+                        Rectangle {
+                            anchors.centerIn: parent
+                            width: 12
+                            height: 12
+                            radius: 6
+                            color: cell.isWallpaper ? Theme.accent : cell.modelData.palette[4]
+                        }
+                    }
+
+                    // the name: beside the tile on a plain row, larger at the top left on the chosen one
+                    Text {
+                        x: (cell.inset + 28 + 12) * (1 - cell.grow) + cell.inset * cell.grow
+                        y: ((root.rowH - height) / 2) * (1 - cell.grow) + 22 * cell.grow
+                        text: cell.modelData.name
+                        color: cell.inUse ? Theme.accent
+                            : cell.current ? Theme.fg : Qt.alpha(Theme.fg, 0.8)
+                        font.family: Theme.fontFamilySans
+                        font.pixelSize: Math.round(13 + 4 * cell.grow)
+                        font.weight: cell.current ? Font.DemiBold : Font.Normal
+                    }
+
+                    // the six colours: small and at the right on a plain row; they grow and move
+                    // under the name as the row is chosen. "Wallpaper" has none until applied.
                     Repeater {
                         model: cell.isWallpaper ? [] : cell.modelData.ansi.slice(1, 7)
 
                         Rectangle {
+                            required property int index
                             required property string modelData
-                            width: 14
-                            height: 14
-                            radius: 7
+                            readonly property real d: 10 + 4 * cell.grow
+                            width: d
+                            height: d
+                            radius: d / 2
                             color: modelData
+                            x: (cell.width - cell.inset - 90 + index * 16) * (1 - cell.grow)
+                                + (cell.inset + index * 22) * cell.grow
+                            y: ((root.rowH - 10) / 2) * (1 - cell.grow) + (root.selH - 40) * cell.grow
                         }
                     }
-                }
 
-                // the wallpaper card: the wallpaper its colours come from
-                Item {
-                    visible: cell.isWallpaper
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    y: 14
-                    width: 116
-                    height: 38
-
-                    // hidden rounded shape, used only to mask the thumbnail
-                    Item {
-                        id: thumbMask
+                    MouseArea {
                         anchors.fill: parent
-                        visible: false
-                        layer.enabled: true
-
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: 6
-                            color: "white"
+                        onClicked: {
+                            root.currentIndex = cell.index
+                            root.apply(cell.modelData)
                         }
-                    }
-                    Image {
-                        anchors.fill: parent
-                        source: cell.isWallpaper && root.wallpaperPath !== "" ? "file://" + root.wallpaperPath : ""
-                        sourceSize.width: 232
-                        fillMode: Image.PreserveAspectCrop
-                        asynchronous: true
-                        opacity: status === Image.Ready ? 1 : 0
-                        Behavior on opacity { NumberAnimation { duration: 160 } }
-                        layer.enabled: true
-                        layer.effect: MultiEffect {
-                            maskEnabled: true
-                            maskSource: thumbMask
-                        }
-                    }
-                }
-
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.bottom: parent.bottom
-                    anchors.bottomMargin: 16
-                    width: parent.width - 20
-                    horizontalAlignment: Text.AlignHCenter
-                    elide: Text.ElideRight
-                    text: cell.modelData.name
-                    
-                    // CHANGED HERE: Use the scheme's foreground color (palette[2]), or Theme.fg for wallpaper
-                    color: cell.isWallpaper 
-                        ? (cell.current ? Theme.fg : Qt.alpha(Theme.fg, 0.8)) 
-                        : (cell.current ? cell.modelData.palette[2] : Qt.alpha(cell.modelData.palette[2], 0.7))
-                        
-                    font.family: Theme.fontFamilySans
-                    font.pixelSize: 12
-                    font.weight: cell.current ? Font.DemiBold : Font.Normal
-                }
-
-                // the scheme in use
-                Rectangle {
-                    visible: cell.inUse
-                    anchors.top: parent.top
-                    anchors.right: parent.right
-                    anchors.margins: 10
-                    width: 6
-                    height: 6
-                    radius: 3
-                    color: Theme.accent
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: {
-                        root.currentIndex = cell.index
-                        root.apply(cell.modelData)
                     }
                 }
             }
-        }
-    }
-
-    // under the row: what is missing before anything can be applied, and the key to apply
-    Item {
-        x: card.x + root.pad
-        y: strip.y + root.cardHeight + 10
-        width: Math.max(0, card.width - 2 * root.pad)
-        height: root.footH
-        opacity: Math.max(0, (root.t - 0.5) * 2)
-
-        Text {
-            anchors.verticalCenter: parent.verticalCenter
-            visible: root.wallpaperPath === ""
-            text: "Pick a wallpaper first"
-            color: Qt.alpha(Theme.fg, 0.5)
-            font.family: Theme.fontFamilySans
-            font.pixelSize: 11
-        }
-        Text {
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            text: "Enter to apply"
-            color: Qt.alpha(Theme.fg, 0.4)
-            font.family: Theme.fontFamilySans
-            font.pixelSize: 11
         }
     }
 
