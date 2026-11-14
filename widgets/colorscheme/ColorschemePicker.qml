@@ -432,14 +432,15 @@ PanelWindow {
                         NumberAnimation { to: 1.0; duration: 120 }
                     }
 
-                    // the art, fading in from the left so the name stays readable. The mask is
-                    // a rounded rectangle whose alpha rises to the right; only the chosen row
-                    // loads an image.
+                    // the art, across the whole row and shaded from the left like a shadow, so the
+                    // name and colours stay readable on any wallpaper. The shade is the panel colour
+                    // at a falling alpha; only the chosen row loads an image.
                     Item {
                         anchors.fill: parent
                         visible: cell.grow > 0 && cell.art !== ""
                         opacity: cell.grow
 
+                        // hidden rounded shape, used only to mask the image
                         Item {
                             id: artMask
                             anchors.fill: parent
@@ -449,11 +450,7 @@ PanelWindow {
                             Rectangle {
                                 anchors.fill: parent
                                 radius: cell.radius
-                                gradient: Gradient {
-                                    orientation: Gradient.Horizontal
-                                    GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0) }
-                                    GradientStop { position: 0.7; color: Qt.rgba(1, 1, 1, 1) }
-                                }
+                                color: "white"
                             }
                         }
                         Image {
@@ -468,6 +465,16 @@ PanelWindow {
                             layer.effect: MultiEffect {
                                 maskEnabled: true
                                 maskSource: artMask
+                            }
+                        }
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: cell.radius
+                            gradient: Gradient {
+                                orientation: Gradient.Horizontal
+                                GradientStop { position: 0.0; color: Qt.alpha(Theme.bg, 0.95) }
+                                GradientStop { position: 0.5; color: Qt.alpha(Theme.bg, 0.6) }
+                                GradientStop { position: 1.0; color: Qt.alpha(Theme.bg, 0) }
                             }
                         }
                     }
