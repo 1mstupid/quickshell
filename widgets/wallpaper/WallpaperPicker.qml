@@ -10,12 +10,11 @@ import "../notch"
 import "Fuzzy.js" as Fuzzy
 
 // The wallpaper picker: a carousel of the images in ~/.local/share/wallpapers, in the
-// band that grows out of the bar pill. Left and Right (or h and l) move, Enter applies,
-// Escape closes. "/" starts a fuzzy find on the file names: type to narrow the carousel,
-// Enter applies the best match, Escape leaves the find on the one you are on. It opens
-// on the wallpaper in use, which is remembered in ~/.local/xdg/config/wallpaper-current, and
-// shows the folder that wallpaper is in: a colorscheme's folder (wallpapers/<scheme>/) after
-// the scheme was chosen, since choosing one picks a wallpaper from it. The find looks in all.
+// band that grows out of the bar pill. Type to search the file names (fuzzy, in all the
+// folders), Left and Right move, Enter applies, Escape clears the search, then closes. It
+// opens on the wallpaper in use, which is remembered in ~/.local/xdg/config/wallpaper-current,
+// and shows the folder that wallpaper is in: a colorscheme's folder (wallpapers/<scheme>/) after
+// the scheme was chosen, since choosing one picks a wallpaper from it.
 PanelWindow {
     id: root
 
@@ -60,9 +59,8 @@ PanelWindow {
     property real t: 0
 
     property var wallpapers: []
-    // the fuzzy find: typed after "/"
+    // the search: typed straight away, there is no field to focus
     property string query: ""
-    property bool finding: false
     // the folder in view: the one the wallpaper in use is in ("wallpaper" is the top level).
     // Choosing a colorscheme picks a wallpaper from its folder, so this follows the scheme.
     readonly property string group: schemeOf(currentPath)
@@ -129,7 +127,6 @@ PanelWindow {
     // the whole list, on the wallpaper in use
     function focusCurrent() {
         query = ""
-        finding = false
         const list = browse(currentPath)
         const i = list.indexOf(currentPath)
         currentIndex = i >= 0 ? i : Math.min(currentIndex, Math.max(0, list.length - 1))
@@ -278,8 +275,8 @@ PanelWindow {
         currentIndex = next
     }
 
-    // Keyboard & Vim navigation; Esc closes. "/" starts the find: then the keys type
-    // into the query, and only the arrows move.
+    // Keyboard: letters go into the search; the arrows move, Enter applies. Esc clears
+    // the search, and closes when there is none.
     Item {
         id: keyHost
         anchors.fill: parent
@@ -287,51 +284,30 @@ PanelWindow {
 
         Keys.onPressed: event => {
             const enter = event.key === Qt.Key_Return || event.key === Qt.Key_Enter
-            if (root.finding) {
-                if (event.key === Qt.Key_Escape) {
-                    if (root.query !== "") {
-                        // back to the whole list, still on the wallpaper that was picked
-                        const keep = root.shown[root.currentIndex]
-                        root.query = ""
-                        root.currentIndex = Math.max(0, root.wallpapers.indexOf(keep))
-                    } else {
-                        root.finding = false
-                    }
-                } else if (event.key === Qt.Key_Backspace) {
-                    root.query = root.query.slice(0, -1)
-                } else if (event.key === Qt.Key_Left) {
-                    root.moveBy(-1, event.isAutoRepeat)
-                } else if (event.key === Qt.Key_Right) {
-                    root.moveBy(1, event.isAutoRepeat)
-                } else if (enter) {
-                    if (root.shown.length > 0)
-                        root.apply(root.shown[root.currentIndex])
-                } else if (event.text.length > 0 && event.text.charCodeAt(0) >= 0x20) {
-                    root.query += event.text
-                } else {
-                    return
-                }
-                event.accepted = true
-                return
-            }
-
             if (event.key === Qt.Key_Escape) {
-                root.close()
-                event.accepted = true
-            } else if (event.text === "/") {
-                root.finding = true
-                event.accepted = true
-            } else if (event.key === Qt.Key_Left || event.text === "h") {
+                if (root.query !== "") {
+                    // back to the folder in view, still on the wallpaper that was picked
+                    const keep = root.shown[root.currentIndex]
+                    root.query = ""
+                    root.currentIndex = Math.max(0, root.browsed.indexOf(keep))
+                } else {
+                    root.close()
+                }
+            } else if (event.key === Qt.Key_Backspace) {
+                root.query = root.query.slice(0, -1)
+            } else if (event.key === Qt.Key_Left) {
                 root.moveBy(-1, event.isAutoRepeat)
-                event.accepted = true
-            } else if (event.key === Qt.Key_Right || event.text === "l") {
+            } else if (event.key === Qt.Key_Right) {
                 root.moveBy(1, event.isAutoRepeat)
-                event.accepted = true
             } else if (enter) {
                 if (root.shown.length > 0)
                     root.apply(root.shown[root.currentIndex])
-                event.accepted = true
+            } else if (event.text.length > 0 && event.text.charCodeAt(0) >= 0x20) {
+                root.query += event.text
+            } else {
+                return
             }
+            event.accepted = true
         }
     }
 
@@ -362,8 +338,8 @@ PanelWindow {
     // only the band takes clicks; everything around it passes through
     mask: Region { item: outline }
 
-    // header: the title on the left (the find while there is one), the folder in view and
-    // shuffle on the right. Fades in during the second half of the morph, like the carousel.
+    // header: the magnifier, what is typed (or what to type), then the folder in view and
+    // shuffle. Fades in during the second half of the morph, like the carousel.
     Item {
         id: header
         x: card.x + root.pad
@@ -373,16 +349,33 @@ PanelWindow {
         opacity: Math.max(0, (root.t - 0.5) * 2)
 
         Text {
-            anchors.left: parent.left
+            id: glass
+            anchors.verticalCenter: parent.verticalCenter
+            text: "󰍉"
+            color: Qt.alpha(Theme.fg, 0.5)
+            font.family: Theme.fontFamily
+            font.pixelSize: 16
+        }
+        Text {
+            id: typed
+            anchors.left: glass.right
+            anchors.leftMargin: 12
             anchors.right: actions.left
             anchors.rightMargin: 12
             anchors.verticalCenter: parent.verticalCenter
-            text: root.finding ? "/" + root.query : "Wallpaper"
+            text: root.query !== "" ? root.query : "Search wallpapers…"
             elide: Text.ElideRight
-            color: Theme.fg
+            color: root.query !== "" ? Theme.fg : Qt.alpha(Theme.fg, 0.4)
             font.family: Theme.fontFamilySans
-            font.pixelSize: 15
-            font.weight: Font.DemiBold
+            font.pixelSize: 13
+        }
+        // the caret: after the text, or at the start of the placeholder
+        Rectangle {
+            x: typed.x + (root.query !== "" ? Math.min(typed.contentWidth, typed.width) + 1 : -1)
+            anchors.verticalCenter: parent.verticalCenter
+            width: 1
+            height: 14
+            color: Theme.accent
         }
 
         Row {
@@ -391,7 +384,7 @@ PanelWindow {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 12
 
-            // the folder in view: a colorscheme's, or all of them while finding
+            // the folder in view: a colorscheme's, or all of them while searching
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 text: root.query !== "" ? "all" : root.inFolder ? root.group : ""
@@ -416,6 +409,16 @@ PanelWindow {
                 }
             }
         }
+    }
+
+    // a thin rule between the search and the carousel
+    Rectangle {
+        x: header.x
+        y: header.y + root.headerH + 6
+        width: header.width
+        height: 1
+        color: Qt.alpha(Theme.fg, 0.08)
+        opacity: header.opacity
     }
 
     // carousel: cards are placed from their scaled widths, so neighbours
@@ -525,7 +528,7 @@ PanelWindow {
         }
     }
 
-    // under the carousel: the file name on the left, which of how many and the keys on the right
+    // under the carousel: the file name on the left, which of how many on the right
     Item {
         x: card.x + root.pad
         y: carousel.y + root.carouselH + 10
@@ -535,22 +538,21 @@ PanelWindow {
 
         Text {
             anchors.left: parent.left
-            anchors.right: keys.left
+            anchors.right: count.left
             anchors.rightMargin: 12
             anchors.verticalCenter: parent.verticalCenter
             elide: Text.ElideRight
             text: root.shown.length > 0 ? root.nameOf(root.shown[root.currentIndex])
-                : root.finding ? "Nothing matches" : ""
+                : root.query !== "" ? "Nothing matches" : ""
             color: Qt.alpha(Theme.fg, 0.7)
             font.family: Theme.fontFamilySans
             font.pixelSize: 12
         }
         Text {
-            id: keys
+            id: count
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             text: (root.shown.length > 0 ? root.currentIndex + 1 : 0) + "/" + root.shown.length
-                + "  ·  " + (root.finding ? "" : "/ find  ·  ") + "Enter to apply"
             color: Qt.alpha(Theme.fg, 0.4)
             font.family: Theme.fontFamilySans
             font.pixelSize: 11
