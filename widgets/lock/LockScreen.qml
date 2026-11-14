@@ -1,3 +1,4 @@
+
 import QtQuick
 import Quickshell
 import "../../services"
@@ -24,6 +25,19 @@ Item {
         duration: 600
         easing.type: Easing.InOutCubic
         running: true
+    }
+
+    // Screensaver
+    property bool screensaverActive: false
+
+    // Start the screensaver 5 minutes after the lockscreen animation finishes
+    Timer {
+        id: screensaverTimer
+        interval: 5 * 60 * 1000
+        repeat: false
+        running: root.t >= 1
+
+        onTriggered: root.screensaverActive = true
     }
 
     // sideways offset of the notch, for the shake after a wrong password
@@ -200,4 +214,31 @@ Item {
             event.accepted = true
         }
     }
+
+    // Screensaver overlay
+    Item {
+        id: screensaver
+
+        anchors.fill: parent
+        z: 100
+        visible: root.screensaverActive
+
+        Rectangle {
+            anchors.fill: parent
+            color: "#000000"
+
+            Text {
+                anchors.centerIn: parent
+                text: Qt.formatDateTime(clock.date, "HH:mm")
+                color: "white"
+                font.pixelSize: 64
+            }
+        }
+
+        opacity: visible ? 1 : 0
+        Behavior on opacity {
+            NumberAnimation { duration: 800 }
+        }
+    }
 }
+
