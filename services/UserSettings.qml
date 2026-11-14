@@ -11,6 +11,8 @@ import Quickshell.Io
 //   {"wifi": true, "bluetooth": true, "vpn": true, "brightness": true, "powerProfile": true,
 //    "nightLight": true, "keepAwake": true, "screenshot": true}
 // (bluetooth and vpn also need an adapter and a VPN profile to show)
+// and how long the session may sit idle before it locks, in minutes (0 turns it off):
+//   {"lockIdleMinutes": 10}
 // A missing file, a bad file or a missing key keeps the default (shown). The
 // file is read on start and whenever it changes. The IPC toggles change the
 // running value only, so the file stays the source of truth. The four corner
@@ -34,6 +36,7 @@ Singleton {
     property bool nightLight: true
     property bool keepAwake: true
     property bool screenshot: true
+    property real lockIdleMinutes: 10
 
     function parse(t) {
         let d = null
@@ -57,6 +60,8 @@ Singleton {
         nightLight = typeof d.nightLight === "boolean" ? d.nightLight : true
         keepAwake = typeof d.keepAwake === "boolean" ? d.keepAwake : true
         screenshot = typeof d.screenshot === "boolean" ? d.screenshot : true
+        lockIdleMinutes = typeof d.lockIdleMinutes === "number" && d.lockIdleMinutes >= 0
+            ? d.lockIdleMinutes : 10
     }
 
     FileView {

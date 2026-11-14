@@ -5,7 +5,9 @@ import Quickshell.Wayland
 import Quickshell.Services.Pam
 import "../../services"
 
-// The lock screen. `qs ipc call lock lock` locks the session: the compositor covers every
+// The lock screen. `qs ipc call lock lock` locks the session, and so does sitting idle for
+// `lockIdleMinutes` (UserSettings; needs ext-idle-notify-v1 in the compositor, and the drawer's
+// Keep awake holds it off). The lock: the compositor covers every
 // screen with a LockScreen (ext-session-lock-v1, so it stays locked if the shell dies), the
 // password is checked by PAM, and a right password unlocks. State shared by the screens
 // (what is typed, whether it failed) lives here; each screen only draws it.
@@ -58,6 +60,16 @@ Scope {
                     + "security.pam.services." + root.pamService + " = {}; to the NixOS config."])
             }
         }
+    }
+
+    // lock after the user has been idle. A Wayland idle inhibitor (a playing video) counts as
+    // activity. Keep awake is a systemd inhibitor, which the compositor's idle protocol may not
+    // see, so it is checked here. The monitor is off while locked.
+    IdleMonitor {
+        enabled: UserSettings.lockIdleMinutes > 0 && !Power.caffeine && !session.locked
+        timeout: UserSettings.lockIdleMinutes * 60
+        respectInhibitors: true
+        onIsIdleChanged: if (isIdle) root.lockNow()
     }
 
     function lockNow() {
