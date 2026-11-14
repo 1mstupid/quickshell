@@ -432,9 +432,9 @@ PanelWindow {
                         NumberAnimation { to: 1.0; duration: 120 }
                     }
 
-                    // the art, fading in from the left so the name stays readable. The mask is
-                    // a rounded rectangle whose alpha rises to the right; only the chosen row
-                    // loads an image.
+                    // the art, clear under the name and colours (the left 40%) and fading in to the right
+                    // so the text stays readable on any wallpaper. The mask is a rounded rectangle
+                    // whose alpha rises to the right; only the chosen row loads an image.
                     Item {
                         anchors.fill: parent
                         visible: cell.grow > 0 && cell.art !== ""
@@ -452,7 +452,8 @@ PanelWindow {
                                 gradient: Gradient {
                                     orientation: Gradient.Horizontal
                                     GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0) }
-                                    GradientStop { position: 0.7; color: Qt.rgba(1, 1, 1, 1) }
+                                    GradientStop { position: 0.4; color: Qt.rgba(1, 1, 1, 0) }
+                                    GradientStop { position: 1.0; color: Qt.rgba(1, 1, 1, 1) }
                                 }
                             }
                         }
