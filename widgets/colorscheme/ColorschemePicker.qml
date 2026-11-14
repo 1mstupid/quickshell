@@ -222,6 +222,22 @@ PanelWindow {
         root.close()
     }
 
+    // A held key repeats at the keyboard's rate, faster than the list can be
+    // followed. Repeats are held to one step per repeatGap ms; a fresh press always steps.
+    readonly property int repeatGap: 120
+    property double lastMove: 0
+
+    function moveBy(delta, repeat) {
+        const now = Date.now()
+        if (repeat && now - lastMove < repeatGap)
+            return
+        const next = currentIndex + delta
+        if (next < 0 || next > shown.length - 1)
+            return
+        lastMove = now
+        currentIndex = next
+    }
+
     // Keyboard: letters go into the search; the arrows move, Enter applies. Esc clears
     // the search, and closes when there is none.
     Item {
@@ -243,11 +259,9 @@ PanelWindow {
             } else if (event.key === Qt.Key_Backspace) {
                 root.query = root.query.slice(0, -1)
             } else if (event.key === Qt.Key_Left) {
-                if (root.currentIndex > 0)
-                    root.currentIndex--
+                root.moveBy(-1, event.isAutoRepeat)
             } else if (event.key === Qt.Key_Right) {
-                if (root.currentIndex < root.shown.length - 1)
-                    root.currentIndex++
+                root.moveBy(1, event.isAutoRepeat)
             } else if (enter) {
                 root.apply(root.shown[root.currentIndex])
             } else if (event.text.length > 0 && event.text.charCodeAt(0) >= 0x20) {
