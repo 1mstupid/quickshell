@@ -262,6 +262,22 @@ PanelWindow {
         }
     }
 
+    // A held key repeats at the keyboard's rate, faster than the carousel can be
+    // followed. Repeats are held to one step per repeatGap ms; a fresh press always steps.
+    readonly property int repeatGap: 120
+    property double lastMove: 0
+
+    function moveBy(delta, repeat) {
+        const now = Date.now()
+        if (repeat && now - lastMove < repeatGap)
+            return
+        const next = currentIndex + delta
+        if (next < 0 || next > shown.length - 1)
+            return
+        lastMove = now
+        currentIndex = next
+    }
+
     // Keyboard & Vim navigation; Esc closes. "/" starts the find: then the keys type
     // into the query, and only the arrows move.
     Item {
@@ -284,11 +300,9 @@ PanelWindow {
                 } else if (event.key === Qt.Key_Backspace) {
                     root.query = root.query.slice(0, -1)
                 } else if (event.key === Qt.Key_Left) {
-                    if (root.currentIndex > 0)
-                        root.currentIndex--
+                    root.moveBy(-1, event.isAutoRepeat)
                 } else if (event.key === Qt.Key_Right) {
-                    if (root.currentIndex < root.shown.length - 1)
-                        root.currentIndex++
+                    root.moveBy(1, event.isAutoRepeat)
                 } else if (enter) {
                     if (root.shown.length > 0)
                         root.apply(root.shown[root.currentIndex])
@@ -308,12 +322,10 @@ PanelWindow {
                 root.finding = true
                 event.accepted = true
             } else if (event.key === Qt.Key_Left || event.text === "h") {
-                if (root.currentIndex > 0)
-                    root.currentIndex--
+                root.moveBy(-1, event.isAutoRepeat)
                 event.accepted = true
             } else if (event.key === Qt.Key_Right || event.text === "l") {
-                if (root.currentIndex < root.shown.length - 1)
-                    root.currentIndex++
+                root.moveBy(1, event.isAutoRepeat)
                 event.accepted = true
             } else if (enter) {
                 if (root.shown.length > 0)
