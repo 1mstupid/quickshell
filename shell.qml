@@ -14,6 +14,7 @@ import "./widgets/focus_notch"
 import "./widgets/border"
 import "./widgets/habits"
 import "./widgets/layout"
+import "./widgets/lock"
 import "./widgets/power_menu"
 import "./widgets/todo"
 import "./widgets/usage"
@@ -46,6 +47,8 @@ ShellRoot {
     HabitsWidget {}
 
     LayoutEditor {}
+
+    Lock {}
 
     Variants {
         model: Quickshell.screens
