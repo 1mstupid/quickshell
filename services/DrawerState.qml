@@ -3,16 +3,16 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Open state of the control drawer on the right edge. Opened by the bar's
-// control icon, or `qs ipc call drawer toggle`.
+// Open state of the control panel, which is a page of the focus notch (see
+// FocusNotchState). Opened by the gear on the notch's header, or `qs ipc call drawer toggle`.
 Singleton {
     id: root
 
-    property bool open: false
+    readonly property bool open: FocusNotchState.openRequested && FocusNotchState.page === "control"
 
-    function toggle() { open = !open }
-    function show() { open = true }
-    function hide() { open = false }
+    function toggle() { FocusNotchState.toggleControl() }
+    function show() { FocusNotchState.showControl() }
+    function hide() { if (open) FocusNotchState.hide() }
 
     IpcHandler {
         target: "drawer"
