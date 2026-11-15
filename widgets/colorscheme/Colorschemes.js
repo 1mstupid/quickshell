@@ -4,7 +4,9 @@
 // wallpaper-theme script takes them (the same as WallpaperPalette.derive):
 //   palette: background, background-alt, foreground, border, primary, secondary, alert, disabled
 //   ansi:    the 16 terminal colours, black to bright white
-// The "wallpaper" entry has none: its colours are derived from the wallpaper in use.
+//   light:   true for a light scheme; the script then gets --light and picks its light background
+// The "wallpaper" entry has none: its colours are derived from the wallpaper in use, and
+// those are always a dark scheme.
 // No QML types, so the list can be checked with plain node.
 const SCHEMES = [
     {
@@ -51,7 +53,7 @@ const SCHEMES = [
                "#626880", "#e78284", "#a6d189", "#e5c890", "#8caaee", "#f4b8e4", "#81c8be", "#a5adce"]
     },
     {
-        id: "catppuccin-latte", name: "Catppuccin Latte",
+        id: "catppuccin-latte", name: "Catppuccin Latte", light: true,
         palette: ["#eff1f5", "#e6e9ef", "#4c4f69", "#ccd0da", "#1e66f5", "#fe640b", "#d20f39", "#9ca0b0"],
         ansi: ["#ccd0da", "#d20f39", "#40a02b", "#df8e1d", "#1e66f5", "#ea76cb", "#179299", "#6c6f85",
                "#bcc0cc", "#d20f39", "#40a02b", "#df8e1d", "#1e66f5", "#ea76cb", "#179299", "#5c5f77"]

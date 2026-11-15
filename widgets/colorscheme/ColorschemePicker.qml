@@ -220,8 +220,11 @@ PanelWindow {
     }
 
     function runWithWallpaper(id, palette, ansi, imgPath) {
+        // the script picks its background from the mode; the wallpaper's own scheme is dark
+        const at = Schemes.indexOfId(id)
+        const mode = at >= 0 && Schemes.SCHEMES[at].light === true ? "--light" : "--dark"
         Quickshell.execDetached(
-            ["wallpaper-theme", imgPath].concat(palette).concat(ansi))
+            ["wallpaper-theme", mode, imgPath].concat(palette).concat(ansi))
 
         root.currentId = id
         Quickshell.execDetached(["sh", "-c", "printf '%s\\n' \"$1\" >| \"$2\"",

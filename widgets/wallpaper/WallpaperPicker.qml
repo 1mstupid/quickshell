@@ -643,9 +643,10 @@ PanelWindow {
                 return
         }
 
-        // Always passes 25 arguments: 1 image path + 8 palette colors + 16 ansi colors
+        // Passes the mode, then 25 arguments: 1 image path + 8 palette colors + 16 ansi colors.
+        // Only a preset can be light; a scheme derived from the wallpaper is dark.
         Quickshell.execDetached(
-            ["wallpaper-theme", root.applyingPath]
+            ["wallpaper-theme", result.light === true ? "--light" : "--dark", root.applyingPath]
                 .concat(result.palette).concat(result.ansi))
 
         // Remember current wallpaper for next boot
