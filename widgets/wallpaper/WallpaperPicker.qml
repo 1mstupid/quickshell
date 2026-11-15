@@ -40,7 +40,7 @@ PanelWindow {
     // wide enough for seven cards in full: the centre one and three each side, with the
     // next one each side cut by the carousel's clip. On a narrower screen more of the
     // outer ones are cut off.
-    property int bandWidth: Math.min(1360, (root.screen ? root.screen.width : 1920) - 48)
+    property int bandWidth: Math.min(1050, (root.screen ? root.screen.width : 1920) - 48)
     property int bandHeight: 230
     property int pad: 14
     property int headerH: 22

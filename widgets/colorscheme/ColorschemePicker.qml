@@ -225,11 +225,11 @@ PanelWindow {
 
         root.currentId = id
         Quickshell.execDetached(["sh", "-c", "printf '%s\\n' \"$1\" >| \"$2\"",
-                                   "sh", id, root.stateFile])
+                                 "sh", id, root.stateFile])
         
         // Update current wallpaper file so everything stays in sync
         Quickshell.execDetached(["sh", "-c", "printf '%s\\n' \"$1\" >| \"$2\"",
-                                   "sh", imgPath, root.wallpaperFile])
+                                 "sh", imgPath, root.wallpaperFile])
         root.close()
     }
 
@@ -305,7 +305,8 @@ PanelWindow {
         height: fromH + (root.bandHeight - fromH) * root.t
         x: (root.width - width) / 2
         y: PillState.pillTop
-        color: "transparent"
+        color: Theme.bg
+        radius: 26
     }
 
     // only the band takes clicks; everything around it passes through
@@ -409,6 +410,8 @@ PanelWindow {
                     readonly property bool busy: isWallpaper && root.deriving
                     // the scheme in use; "wallpaper" when none was remembered
                     readonly property bool inUse: modelData.id === (root.currentId === "" ? "wallpaper" : root.currentId)
+                    // Individual background color for this specific scheme (falls back to Theme.bg)
+                    readonly property string schemeBg: isWallpaper || !modelData.palette || !modelData.palette[0] ? Theme.bg : modelData.palette[0]
                     // the wallpaper behind the row: the one in use for "Wallpaper", else its folder's
                     readonly property string art: isWallpaper ? root.wallpaperPath
                         : (root.folderImages[modelData.id] || "")
@@ -433,7 +436,7 @@ PanelWindow {
                     }
 
                     // the art, across the whole row and shaded from the left like a shadow, so the
-                    // name and colours stay readable on any wallpaper. The shade is the panel colour
+                    // name and colours stay readable on any wallpaper. The shade is the scheme's background colour
                     // at a falling alpha; only the chosen row loads an image.
                     // hidden rounded shape, used only to mask the art and its shade together: a
                     // gradient rectangle does not follow its own radius, so it cannot round itself
@@ -472,9 +475,11 @@ PanelWindow {
                             anchors.fill: parent
                             gradient: Gradient {
                                 orientation: Gradient.Horizontal
-                                GradientStop { position: 0.0; color: Qt.alpha(Theme.bg, 0.95) }
-                                GradientStop { position: 0.5; color: Qt.alpha(Theme.bg, 0.6) }
-                                GradientStop { position: 1.0; color: Qt.alpha(Theme.bg, 0) }
+                                // Strong, opaque scheme background on the left for maximum readability, fading out to the right
+                                GradientStop { position: 0.0; color: Qt.alpha(cell.schemeBg, 1.0) }
+                                GradientStop { position: 0.5; color: Qt.alpha(cell.schemeBg, 0.95) }
+                                GradientStop { position: 0.8; color: Qt.alpha(cell.schemeBg, 0.4) }
+                                GradientStop { position: 1.0; color: Qt.alpha(cell.schemeBg, 0.0) }
                             }
                         }
                     }
