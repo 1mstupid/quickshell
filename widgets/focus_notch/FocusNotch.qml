@@ -311,7 +311,7 @@ PanelWindow {
         id: expandAnim
         target: root
         property: "expand"
-        duration: 320
+        duration: PillState.morphMs
         easing.type: Easing.InOutCubic
     }
 
@@ -381,8 +381,6 @@ PanelWindow {
     Notch {
         bodyWidth: card.width
         bodyHeight: card.height
-        // the bottom corners round off as the pill grows, so the panel reads as one soft shape
-        corner: 12 + 8 * root.grow + 6 * root.expand
         x: card.x - bodyX
         y: card.y
     }

@@ -13,7 +13,7 @@ Canvas {
     property real bodyWidth: 0
     property real bodyHeight: 0
     property real shoulder: 10
-    property real corner: 12
+    property real corner: UserSettings.cornerRadius
     property bool leftShoulder: true
     property bool rightShoulder: true
     // square bottom-right corner, for a notch flush with the right screen edge
@@ -37,22 +37,21 @@ Canvas {
     onPaint: {
         const ctx = getContext("2d")
         const w = bodyWidth, h = bodyHeight
-        const s = shoulder, r = corner
+        // never past half the shorter side, or a small pill would fold over itself
+        const s = shoulder, r = Math.min(corner, w / 2, h / 2)
         ctx.reset()
         ctx.translate(bodyX, 0)
         ctx.beginPath()
         if (asPill) {
-            // the radius cannot pass half the shorter side, or a small pill would fold over itself
-            const q = Math.min(r, w / 2, h / 2)
-            ctx.moveTo(q, 0)
-            ctx.lineTo(w - q, 0)
-            ctx.quadraticCurveTo(w, 0, w, q)
-            ctx.lineTo(w, h - q)
-            ctx.quadraticCurveTo(w, h, w - q, h)
-            ctx.lineTo(q, h)
-            ctx.quadraticCurveTo(0, h, 0, h - q)
-            ctx.lineTo(0, q)
-            ctx.quadraticCurveTo(0, 0, q, 0)
+            ctx.moveTo(r, 0)
+            ctx.lineTo(w - r, 0)
+            ctx.quadraticCurveTo(w, 0, w, r)
+            ctx.lineTo(w, h - r)
+            ctx.quadraticCurveTo(w, h, w - r, h)
+            ctx.lineTo(r, h)
+            ctx.quadraticCurveTo(0, h, 0, h - r)
+            ctx.lineTo(0, r)
+            ctx.quadraticCurveTo(0, 0, r, 0)
             ctx.closePath()
             ctx.fillStyle = String(fillColor)
             ctx.fill()
