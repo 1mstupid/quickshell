@@ -2,6 +2,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "../widgets/colorscheme/Colorschemes.js" as Schemes
 
 Singleton {
     id: root
@@ -15,7 +16,10 @@ Singleton {
         onTriggered: root._barStateLoads = 2
     }
 
-    property color bg: "#010101"
+    // The background is not taken from a scheme: near black, or a pale blue while the scheme
+    // in use is a light one (`light` in Colorschemes.js).
+    property bool light: false
+    property color bg: light ? "#EDF4FE" : "#010101"
     property color altbg: "#161b22"
     property color fg: "#c9d1d9"
     property color border: "#30363d"
@@ -60,6 +64,19 @@ Singleton {
     readonly property int effectiveBarHeight: 30
     readonly property int cardRadius: 20
 
+
+    // the scheme in use, written by the colorscheme and wallpaper pickers; none, or one that is
+    // not in the list (the wallpaper's own), is dark
+    FileView {
+        path: Quickshell.env("HOME") + "/.local/xdg/config/colorscheme-current"
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: {
+            const at = Schemes.indexOfId(text().trim())
+            root.light = at >= 0 && Schemes.SCHEMES[at].light === true
+        }
+        onLoadFailed: root.light = false
+    }
 
     FileView {
         path: root.configDir + "/../.local/state/colors.ini"
