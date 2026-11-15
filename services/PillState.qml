@@ -12,6 +12,9 @@ QtObject {
     property string owner: ""
     readonly property bool active: owner !== ""
 
+    // how long a panel takes to grow out of the pill, and to go back: the same for all of them
+    readonly property int morphMs: 320
+
     // morph progress of the owning panel, 0 = pill, 1 = full panel
     property real progress: 0
 

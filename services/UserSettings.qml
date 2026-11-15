@@ -13,6 +13,9 @@ import Quickshell.Io
 // (bluetooth and vpn also need an adapter and a VPN profile to show)
 // and the shape of the bar: {"pill": true} makes the notch a floating pill and hides
 // the screen border. Unlike the others it is off when missing.
+// The rounding of the notch and of every panel that grows from it, in pixels, is
+// {"cornerRadius": 26}; it never goes past half the shorter side of what it rounds, so
+// the small bar pill is a capsule and the radius opens up as a panel grows.
 // A missing file, a bad file or a missing key keeps the default (shown). The
 // file is read on start and whenever it changes. The IPC toggles change the
 // running value only, so the file stays the source of truth. The four corner
@@ -38,6 +41,8 @@ Singleton {
     property bool screenshot: true
     // the bar and its panels as a floating pill, without the screen border
     property bool pill: false
+    // 26 is the control panel's, the one the others follow
+    property real cornerRadius: 26
 
     function parse(t) {
         let d = null
@@ -62,6 +67,7 @@ Singleton {
         keepAwake = typeof d.keepAwake === "boolean" ? d.keepAwake : true
         screenshot = typeof d.screenshot === "boolean" ? d.screenshot : true
         pill = typeof d.pill === "boolean" ? d.pill : false
+        cornerRadius = typeof d.cornerRadius === "number" && d.cornerRadius >= 0 ? d.cornerRadius : 26
     }
 
     // qs ipc call pill toggle

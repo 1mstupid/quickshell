@@ -163,7 +163,7 @@ PanelWindow {
         id: morph
         target: root
         property: "t"
-        duration: 480
+        duration: PillState.morphMs
         easing.type: Easing.InOutCubic
         onFinished: {
             if (root.t < 0.5) {
