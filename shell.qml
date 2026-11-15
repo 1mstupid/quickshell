@@ -9,7 +9,6 @@ import "./widgets/app_launcher"
 import "./widgets/bar"
 import "./widgets/bar/media"
 import "./widgets/dashboard"
-import "./widgets/drawer"
 import "./widgets/focus_notch"
 import "./widgets/border"
 import "./widgets/habits"
@@ -22,8 +21,6 @@ import "./widgets/wallpaper"
 import "./widgets/colorscheme"
 
 ShellRoot {
-
-    ControlDrawer {}
 
     WallpaperPicker {}
     ColorschemePicker {}

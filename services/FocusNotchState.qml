@@ -19,6 +19,34 @@ Singleton {
     property string page: "home"
     function setPage(key) { page = key }
 
+    // The control panel is a page with no tab: the gear on the header opens it, and
+    // `before` is the page it goes back to.
+    property string before: "home"
+    function showControl() {
+        if (page !== "control")
+            before = page
+        page = "control"
+        show()
+    }
+    function leaveControl() {
+        if (page === "control")
+            page = before
+    }
+    // the gear: into the control panel, or back out of it
+    function toggleGear() {
+        if (page === "control")
+            leaveControl()
+        else
+            showControl()
+    }
+    // IPC and the bar: opens on the control panel, closes if already there
+    function toggleControl() {
+        if (openRequested && page === "control")
+            hide()
+        else
+            showControl()
+    }
+
     function toggle() { openRequested = !openRequested }
     // open on Home, where the notifications are; closes if already there
     function toggleHome() {

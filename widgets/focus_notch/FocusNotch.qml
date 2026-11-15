@@ -7,6 +7,7 @@ import "../../services"
 import "../../services/menu"
 import "../notch"
 import "../bar/media"
+import "../drawer"
 
 // The focus notch: the bar's center pill grows into the task timer and, on a
 // click, into a panel with a row of page buttons along the top. Hover the pill
@@ -25,6 +26,9 @@ import "../bar/media"
 //   Week   the schedule's grid, with today and the block that is on now marked.
 //   Focus  the task in hand: its timer, pause, stop and done, and the time tracked today.
 //   Ports  what is listening on this machine, and which of it the network can reach.
+// The gear at the right of the header, on every page, opens the control panel (ControlPage):
+// a page with no tab, narrower than the others and as tall as its rows, and the gear leaves
+// it again. `qs ipc call drawer toggle` opens it too.
 // The strip closes when the pointer leaves it; the open panel closes on Escape
 // or a click outside.
 PanelWindow {
@@ -33,12 +37,14 @@ PanelWindow {
     screen: PillState.originScreen
     visible: false
 
+    // the whole height: the control page is as tall as its rows. The mask keeps the
+    // rest of the screen usable.
     anchors {
         top: true
+        bottom: true
         left: true
         right: true
     }
-    implicitHeight: PillState.pillTop + openH + 12
 
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
@@ -55,10 +61,26 @@ PanelWindow {
     readonly property int hoverH: 78
     readonly property int openW: 580
     readonly property int openH: 260
+    // The card's size on the open panel. The pages share openW x openH; the control page is
+    // narrower and as tall as its rows. The card eases from one to the other, and the
+    // pages stay at their own size under it, so none of them is stretched on the way.
+    readonly property bool onControl: tab === "control"
+    property real shownW: onControl ? controlPage.width : openW
+    property real shownH: onControl ? controlPage.y + controlPage.height : openH
+    // only a change on an open panel is eased; opening goes straight to the size
+    Behavior on shownW {
+        enabled: root.expand > 0.99
+        NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+    }
+    Behavior on shownH {
+        enabled: root.expand > 0.99
+        NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+    }
 
     // "" closed, "hover" the strip, "open" the full panel
     property string stage: ""
-    // the open panel's page: "home", "day", "week", "focus" or "ports", remembered across openings
+    // the open panel's page: "home", "day", "week", "focus", "ports" or "control", remembered
+    // across openings (the control page is not: it is left when the panel closes)
     readonly property string tab: FocusNotchState.page
     readonly property var pages: ["home", "day", "week", "focus", "ports"]
     readonly property int pageIndex: Math.max(0, pages.indexOf(tab))
@@ -70,6 +92,9 @@ PanelWindow {
     onTabChanged: if (tab === "day" || tab === "week" || tab === "focus") lastWork = tab
     // wraps at both ends
     function stepPage(delta) {
+        // the control page is not in the row of pages
+        if (onControl)
+            return
         const n = pages.length
         FocusNotchState.setPage(pages[(pageIndex + delta + n) % n])
     }
@@ -239,7 +264,7 @@ PanelWindow {
     }
 
     // ── Open / close ───────────────────────────────────────────────────────
-    readonly property bool canTake: PillState.owner === "" && !Overview.open && !DrawerState.open
+    readonly property bool canTake: PillState.owner === "" && !Overview.open
 
     function goTo(g, e) {
         growAnim.stop()
@@ -275,6 +300,7 @@ PanelWindow {
         onFinished: {
             if (root.stage === "" && root.grow < 0.01) {
                 root.visible = false
+                FocusNotchState.leaveControl()
                 if (PillState.owner === "focus")
                     PillState.owner = ""
             }
@@ -322,7 +348,9 @@ PanelWindow {
         }
         function onOpenRequestedChanged() {
             if (FocusNotchState.openRequested) {
-                if (root.stage !== "open" && (root.canTake || root.stage === "hover"))
+                // the control panel takes the pill from another panel, as it did as a window
+                if (root.stage !== "open" && (root.canTake || root.stage === "hover"
+                        || FocusNotchState.page === "control"))
                     root.show("open")
             } else if (root.stage !== "") {
                 root.close()
@@ -343,7 +371,10 @@ PanelWindow {
     // a click in the band outside the card closes the open panel
     MouseArea {
         id: catcher
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        height: PillState.pillTop + root.shownH + 12
         onClicked: root.close()
     }
 
@@ -362,8 +393,8 @@ PanelWindow {
         readonly property real stripW: PillState.pillWidth + (root.hoverW - PillState.pillWidth) * root.grow
         readonly property real stripH: PillState.pillHeight + (root.hoverH - PillState.pillHeight) * root.grow
 
-        width: stripW + (root.openW - stripW) * root.expand
-        height: stripH + (root.openH - stripH) * root.expand
+        width: stripW + (root.shownW - stripW) * root.expand
+        height: stripH + (root.shownH - stripH) * root.expand
         x: (root.width - width) / 2
         y: PillState.pillTop
         color: "transparent"
@@ -402,7 +433,11 @@ PanelWindow {
             id: keyHost
             anchors.fill: parent
             focus: true
-            Keys.onEscapePressed: root.close()
+            Keys.onEscapePressed: {
+                // a list on the control page goes back to the switches first
+                if (!(root.onControl && controlPage.leaveView()))
+                    root.close()
+            }
             Keys.onLeftPressed: root.stepPage(-1)
             Keys.onRightPressed: root.stepPage(1)
         }
@@ -540,10 +575,11 @@ PanelWindow {
 
             // header: the Home and Work tabs and, on Work, the Day | Week switch. The
             // tab that is on grows into a pill with its name; the other stays an icon.
+            // It is as wide as the page, so the gear stays at the corner on the narrow one.
             Item {
-                x: 18
+                x: (panel.width - root.shownW) / 2 + 18
                 y: 8
-                width: parent.width - 36
+                width: root.shownW - 36
                 height: 30
 
                 Row {
@@ -609,9 +645,10 @@ PanelWindow {
                     }
                 }
 
-                // on Work: what is playing, and a menu button that does nothing yet
+                // on Work: what is playing
                 Row {
-                    anchors.right: parent.right
+                    anchors.right: gear.left
+                    anchors.rightMargin: 6
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 6
                     opacity: root.onWork ? 1 : 0
@@ -672,26 +709,34 @@ PanelWindow {
                             }
                         }
                     }
+                }
 
-                    Rectangle {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 24
-                        height: 24
-                        radius: 12
-                        color: moreMouse.containsMouse ? Qt.alpha(Theme.fg, 0.2) : Qt.alpha(Theme.fg, 0.08)
-                        Behavior on color { ColorAnimation { duration: 120 } }
+                // the gear, on every page: the control panel, and back from it
+                Rectangle {
+                    id: gear
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 24
+                    height: 24
+                    radius: 12
+                    color: gearMouse.containsMouse ? Qt.alpha(Theme.fg, 0.2) : Qt.alpha(Theme.fg, 0.08)
+                    Behavior on color { ColorAnimation { duration: 120 } }
 
-                        Text {
-                            anchors.centerIn: parent
-                            text: "󰇘"
-                            color: Qt.alpha(Theme.fg, 0.7)
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 13
-                        }
-                        MouseArea {
-                            id: moreMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
+                    Text {
+                        anchors.centerIn: parent
+                        text: "󰒓"
+                        color: root.onControl ? Theme.accent : Qt.alpha(Theme.fg, 0.7)
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 13
+                    }
+                    MouseArea {
+                        id: gearMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            FocusNotchState.toggleGear()
+                            keyHost.forceActiveFocus()
                         }
                     }
                 }
@@ -1876,6 +1921,16 @@ PanelWindow {
                 y: 72
                 width: panel.width - 24
                 height: panel.height - y - 10
+            }
+
+            // ── Control: the switches and sliders, from the gear ───────────
+            // centred under the header; taller than the panel, the card's clip does the rest
+            ControlPage {
+                id: controlPage
+                visible: root.onControl
+                x: (panel.width - width) / 2
+                // 12 px under the header
+                y: 50
             }
         }
     }
