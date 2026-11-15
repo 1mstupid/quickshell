@@ -25,8 +25,9 @@ PanelWindow {
 
     WlrLayershell.layer: WlrLayer.Top
 
-    // notch: the bar sits flush with the top edge
-    readonly property real topGap: 0
+    // notch: the bar sits flush with the top edge; pill: it floats a little below it. Every
+    // panel grows from here, through PillState.pillTop.
+    readonly property real topGap: UserSettings.pill ? 8 : 0
 
     implicitHeight: topGap + pill.height
 
@@ -103,7 +104,7 @@ PanelWindow {
             when: root.isOrigin
         }
 
-        // notch outline; the shoulders reach past the pill onto the screen edge
+        // notch outline; the shoulders reach past the pill onto the screen edge (not in pill mode)
         Notch {
             x: -bodyX
             bodyWidth: pill.width
