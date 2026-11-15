@@ -37,23 +37,26 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell-wallpapers"
 
     // the panel, and the layout inside it: pad, header, gap, carousel, gap, name, pad
-    // wide enough for five cards: the centre one and two each side. On a narrower
-    // screen the outer ones are cut off by the carousel's clip.
+    // wide enough for seven cards in full: the centre one and three each side, with the
+    // next one each side cut by the carousel's clip. On a narrower screen more of the
+    // outer ones are cut off.
     property int bandWidth: Math.min(1360, (root.screen ? root.screen.width : 1920) - 48)
-    property int bandHeight: 260
+    property int bandHeight: 230
     property int pad: 14
     property int headerH: 22
-    property int carouselH: 170
-    property int cardWidth: 300
-    property int cardHeight: 170
+    property int carouselH: 140
+    property int cardWidth: 240
+    property int cardHeight: 140
     property int nameH: 18
 
     readonly property string dirPath: Quickshell.env("HOME") + "/.local/share/wallpapers"
 
-    // carousel spacing: gap between neighbouring cards, and how fast they shrink
-    property real gap: 24
-    property real minScale: 0.55
-    property real scaleStep: 0.15
+    // carousel spacing: gap between neighbouring cards, and how fast they shrink. The
+    // first step is steep and the rest are flat, so the centre card stands out and the
+    // others pack close.
+    property real gap: 12
+    property real minScale: 0.6
+    property real scaleStep: 0.3
 
     // 0 = the bar pill, 1 = the full band
     property real t: 0
@@ -261,7 +264,7 @@ PanelWindow {
 
     // A held key repeats at the keyboard's rate, faster than the carousel can be
     // followed. Repeats are held to one step per repeatGap ms; a fresh press always steps.
-    readonly property int repeatGap: 120
+    readonly property int repeatGap: 80
     property double lastMove: 0
 
     function moveBy(delta, repeat) {
@@ -435,7 +438,7 @@ PanelWindow {
         // animated centre position, so moving between cards glides
         property real pos: root.currentIndex
         Behavior on pos {
-            NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+            NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
         }
 
         Repeater {
@@ -459,7 +462,7 @@ PanelWindow {
                 x: carousel.width / 2 - width / 2 + root.offsetFor(d)
                 y: (carousel.height - height) / 2
                 scale: root.scaleAt(d)
-                opacity: Math.abs(d) > 3 ? 0 : Math.max(0.35, 1 - 0.25 * Math.abs(d))
+                opacity: Math.abs(d) > 4.5 ? 0 : Math.max(0.5, 1 - 0.15 * Math.abs(d))
                 // a card that cannot be seen is not drawn
                 visible: opacity > 0
 
@@ -524,6 +527,34 @@ PanelWindow {
                         }
                     }
                 }
+            }
+        }
+
+        // the cards dissolve into the panel at both ends. The fade is the panel colour at a
+        // rising alpha, and it is what shows how far the list goes on, so it is strong at
+        // the very edge. It takes no clicks.
+        Rectangle {
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            width: parent.width * 0.25
+            gradient: Gradient {
+                orientation: Gradient.Horizontal
+                GradientStop { position: 0.0; color: Qt.alpha(Theme.bg, 0.95) }
+                GradientStop { position: 0.4; color: Qt.alpha(Theme.bg, 0.55) }
+                GradientStop { position: 1.0; color: Qt.alpha(Theme.bg, 0) }
+            }
+        }
+        Rectangle {
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            width: parent.width * 0.25
+            gradient: Gradient {
+                orientation: Gradient.Horizontal
+                GradientStop { position: 0.0; color: Qt.alpha(Theme.bg, 0) }
+                GradientStop { position: 0.6; color: Qt.alpha(Theme.bg, 0.55) }
+                GradientStop { position: 1.0; color: Qt.alpha(Theme.bg, 0.95) }
             }
         }
     }
