@@ -37,6 +37,12 @@ ok("text and accent are readable on the background", () => {
         assert.ok(contrast(s.palette[6], s.palette[0]) >= 3, s.id + " alert")
     }
 })
+ok("light is set on exactly the schemes with a light background", () => {
+    for (const s of M.SCHEMES) {
+        if (!s.palette) continue
+        assert.strictEqual(s.light === true, lum(s.palette[0]) > 0.5, s.id)
+    }
+})
 ok("indexOfId", () => {
     assert.strictEqual(M.indexOfId("nord"), 2)
     assert.strictEqual(M.indexOfId("nope"), -1)
