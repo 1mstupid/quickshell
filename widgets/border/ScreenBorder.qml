@@ -5,7 +5,8 @@ import "../../services"
 
 // Rounded frame around one screen, in the bar's background colour. The
 // corners outside the rounded inner edge are filled too, so the frame reads
-// as one bezel. Hidden while the overview is open. Clicks pass through.
+// as one bezel. Hidden while the overview is open, and in pill mode, where the bar
+// floats free of the edge and a frame would have nothing to join. Clicks pass through.
 PanelWindow {
     id: root
 
@@ -22,7 +23,7 @@ PanelWindow {
     color: "transparent"
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.namespace: "quickshell-border"
-    visible: !Overview.open
+    visible: !Overview.open && !UserSettings.pill
     mask: Region {}
 
     Canvas {
