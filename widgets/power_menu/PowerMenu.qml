@@ -4,6 +4,7 @@ import Quickshell.Io
 import QtQuick
 import "../../services"
 import "../notch"
+import "../focus_notch"
 
 // Power menu. A row of round glyph buttons that morphs out of the bar pill like the
 // other panels, with the uptime above and the selected action's name below. Reboot
@@ -178,7 +179,7 @@ PanelWindow {
     // the lock screen is its own shell component, reached over its IPC target
     Process {
         id: procLock
-        command: ["qs", "ipc", "call", "lock", "lock"]
+        command: ["quickshell", "ipc", "call", "lock", "lock"]
     }
     Process {
         id: procReboot
@@ -277,6 +278,7 @@ PanelWindow {
                         icon: root.actions[index].icon
                         hold: root.actions[index].hold
                         selected: root.selectedIndex === index
+                        progress: root.holdIndex === index ? root.holdProgress : 0
                         onPressStarted: {
                             root.selectedIndex = index
                             root.startHold(index)
@@ -286,7 +288,7 @@ PanelWindow {
                 }
             }
 
-            // the selected action's name, or what a hold is for, with the hold's progress under it
+            // the selected action's name, or what a hold is for
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: root.holdIndex >= 0
@@ -295,22 +297,6 @@ PanelWindow {
                 color: Theme.fg
                 font.pixelSize: 12
                 font.weight: Font.DemiBold
-            }
-
-            Rectangle {
-                anchors.horizontalCenter: parent.horizontalCenter
-                width: 120
-                height: 2
-                radius: 1
-                opacity: root.holdIndex >= 0 ? 1 : 0
-                color: Qt.alpha(Theme.fg, 0.12)
-
-                Rectangle {
-                    width: parent.width * root.holdProgress
-                    height: parent.height
-                    radius: parent.radius
-                    color: Theme.primary
-                }
             }
         }
     }
@@ -322,6 +308,8 @@ PanelWindow {
         required property string icon
         required property bool hold
         property bool selected: false
+        // how far a hold on this button has got, 0 to 1; the ring shows it
+        property real progress: 0
 
         // a press runs the action (or starts its hold); letting go cancels a hold
         signal pressStarted()
@@ -342,8 +330,18 @@ PanelWindow {
                 anchors.centerIn: parent
                 text: btn.icon
                 color: btn.selected ? Theme.bg : Theme.fg
+                font.family: Theme.fontFamily
                 font.pixelSize: 17
             }
+        }
+
+        // the hold's ring, round the button, in the alert colour
+        Ring {
+            anchors.centerIn: parent
+            size: 46
+            fraction: btn.progress
+            tint: Theme.alert
+            visible: btn.progress > 0
         }
 
         Accessible.role: Accessible.Button
