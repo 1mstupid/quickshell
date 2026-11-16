@@ -114,17 +114,31 @@ Item {
     }
 
     // Fixed-size notch matching the bar pill exactly
+    // Dynamically expanding notch
     Notch {
         id: notch
 
+        readonly property int dotsCount: Math.min(root.lock.buffer.length, 24)
+        readonly property real dotsWidth: dotsCount > 0 ? (dotsCount * 6 + (dotsCount - 1) * 5) : 0
+        readonly property real capsWidth: capsLabel.visible ? (capsLabel.implicitWidth + 12) : 0
+        // icon (12 + 14) + leftMargin (10) + dots + rightMargin (12) + caps
+        readonly property real neededWidth: 46 + dotsWidth + capsWidth + 12
+
         visible: root.primary
-        bodyWidth: PillState.pillWidth
+        bodyWidth: Math.max(PillState.pillWidth, neededWidth)
         bodyHeight: PillState.pillHeight
         x: (root.width - bodyWidth) / 2 - bodyX + root.shake
         y: PillState.pillTop
+
+        Behavior on bodyWidth {
+            NumberAnimation {
+                duration: 140
+                easing.type: Easing.OutCubic
+            }
+        }
     }
 
-    // Password content inside the unchanged pill silhouette
+    // Password content inside the pill silhouette
     Item {
         visible: root.primary
         x: notch.x + notch.bodyX
@@ -161,7 +175,7 @@ Item {
             anchors.rightMargin: 10
             anchors.verticalCenter: parent.verticalCenter
             elide: Text.ElideRight
-            text: root.lock.failed ? "Wrong password" : "Password"
+            text: root.lock.failed ? "" : ""
             color: root.lock.failed ? Theme.alert : Qt.alpha(Theme.fg, 0.4)
             font.family: Theme.fontFamilySans
             font.pixelSize: 12
@@ -174,7 +188,7 @@ Item {
             spacing: 5
 
             Repeater {
-                model: Math.min(root.lock.buffer.length, 16)
+                model: notch.dotsCount
 
                 Rectangle {
                     width: 6
@@ -198,7 +212,7 @@ Item {
             font.letterSpacing: 1
         }
     }
-
+    
     Item {
         anchors.fill: parent
         focus: true
