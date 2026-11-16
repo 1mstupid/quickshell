@@ -5,13 +5,6 @@ import Quickshell.Wayland
 import Quickshell.Services.Pam
 import "../../services"
 
-// The lock screen. `qs ipc call lock lock` locks the session: the compositor covers every
-// screen with a LockScreen (ext-session-lock-v1, so it stays locked if the shell dies), the
-// password is checked by PAM, and a right password unlocks. State shared by the screens
-// (what is typed, whether it failed) lives here; each screen only draws it.
-//
-// PAM service: needs `security.pam.services.quickshell = {};` in the NixOS config. Without
-// it nothing could unlock the session, so locking is refused when the service file is missing.
 Scope {
     id: root
 
@@ -20,6 +13,7 @@ Scope {
     property string pending: ""
     property bool busy: false
     property bool failed: false
+    property bool unlocking: false
     // the wallpaper in use, read as the pickers do; the screens show it dimmed
     property string wallpaperPath: ""
 
@@ -50,6 +44,7 @@ Scope {
                 root.pending = ""
                 root.busy = false
                 root.failed = false
+                root.unlocking = false
                 session.locked = true
             } else {
                 console.warn("lock: /etc/pam.d/" + root.pamService + " is missing, not locking")
@@ -66,14 +61,14 @@ Scope {
     }
 
     function type(text) {
-        if (busy)
+        if (busy || unlocking)
             return
         failed = false
         buffer += text
     }
 
     function backspace() {
-        if (busy)
+        if (busy || unlocking)
             return
         failed = false
         // by characters, not UTF-16 units, so an emoji or accent is removed whole
@@ -81,12 +76,12 @@ Scope {
     }
 
     function clear() {
-        if (!busy)
+        if (!busy && !unlocking)
             buffer = ""
     }
 
     function submit() {
-        if (busy || buffer === "")
+        if (busy || unlocking || buffer === "")
             return
         pending = buffer
         buffer = ""
@@ -97,6 +92,15 @@ Scope {
             busy = false
             failed = true
             authFailed()
+        }
+    }
+
+    Timer {
+        id: unlockTimer
+        interval: PillState.morphMs
+        onTriggered: {
+            session.locked = false
+            root.unlocking = false
         }
     }
 
@@ -117,7 +121,8 @@ Scope {
             root.pending = ""
             if (result === PamResult.Success) {
                 root.buffer = ""
-                session.locked = false
+                root.unlocking = true
+                unlockTimer.restart()
             } else {
                 root.failed = true
                 root.authFailed()
@@ -133,7 +138,7 @@ Scope {
         surface: Component {
             WlSessionLockSurface {
                 id: surface
-                color: Theme.bg
+                color: "transparent"
 
                 LockScreen {
                     anchors.fill: parent

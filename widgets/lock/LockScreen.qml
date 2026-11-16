@@ -1,46 +1,61 @@
-
 import QtQuick
 import Quickshell
 import "../../services"
 import "../notch"
 
-// What one screen shows while locked: the wallpaper dimmed, and on the origin screen the clock
-// in the middle and the notch as the password field. The clock starts as a speck inside the
-// notch and grows out to the centre while the screen dims. Every screen takes the keys, since
-// the compositor decides which one has the keyboard, and they all feed the same lock.
 Item {
     id: root
 
     required property var lock
     required property string screenName
 
-    // the clock and the notch are drawn on the origin screen only; the rest are dimmed
     readonly property bool primary: PillState.originName === "" || screenName === PillState.originName
 
-    // 0 = just locked, 1 = settled
+    // 0 = desktop/bar state, 1 = settled lockscreen
     property real t: 0
-    NumberAnimation on t {
-        from: 0
-        to: 1
-        duration: 600
-        easing.type: Easing.InOutCubic
-        running: true
+    Behavior on t {
+        NumberAnimation {
+            duration: PillState.morphMs
+            easing.type: Easing.InOutCubic
+        }
     }
 
-    // Screensaver
-    property bool screensaverActive: false
-
-    // Start the screensaver 5 minutes after the lockscreen animation finishes
-    Timer {
-        id: screensaverTimer
-        interval: 5 * 60 * 1000
-        repeat: false
-        running: root.t >= 1
-
-        onTriggered: root.screensaverActive = true
+    Component.onCompleted: {
+        if (root.primary)
+            PillState.owner = "lock"
+        t = 1
     }
 
-    // sideways offset of the notch, for the shake after a wrong password
+    Connections {
+        target: root.lock
+        function onUnlockingChanged() {
+            if (root.lock.unlocking)
+                root.t = 0
+        }
+    }
+
+    onTChanged: {
+        if (root.primary && root.lock.unlocking && t === 0 && PillState.owner === "lock") {
+            PillState.progress = 0
+            PillState.owner = ""
+        }
+    }
+
+    Component.onDestruction: {
+        if (root.primary && PillState.owner === "lock") {
+            PillState.progress = 0
+            PillState.owner = ""
+        }
+    }
+
+    Binding {
+        target: PillState
+        property: "progress"
+        value: root.t
+        when: root.primary && PillState.owner === "lock"
+    }
+
+    // Sideways shake on wrong password
     property real shake: 0
     SequentialAnimation {
         id: shakeAnim
@@ -59,10 +74,11 @@ Item {
         precision: SystemClock.Minutes
     }
 
-    // the surface colour is not reliable on every compositor, so this is drawn as well
+    // Background fades in/out with t so unlocking dissolves cleanly back to the desktop
     Rectangle {
         anchors.fill: parent
         color: Theme.bg
+        opacity: root.t
     }
 
     Image {
@@ -72,17 +88,17 @@ Item {
         sourceSize.height: root.height
         fillMode: Image.PreserveAspectCrop
         asynchronous: true
-        opacity: status === Image.Ready ? 1 : 0
+        opacity: (status === Image.Ready ? 1 : 0) * root.t
         Behavior on opacity { NumberAnimation { duration: 200 } }
     }
 
-    // the dim
     Rectangle {
         anchors.fill: parent
         color: Qt.alpha(Theme.bg, 0.65)
         opacity: root.t
     }
 
+    // Center clock emerges from the notch and returns to it on unlock
     Text {
         visible: root.primary
         text: Qt.formatDateTime(clock.date, UserSettings.clockFormat)
@@ -90,7 +106,6 @@ Item {
         font.family: Theme.fontFamilyDisplay
         font.bold: true
         font.pixelSize: Math.round(root.height * 0.28)
-        // from the notch's middle to the screen's middle, growing as it goes
         scale: 0.06 + 0.94 * root.t
         opacity: root.t
         x: (root.width - width) / 2
@@ -98,46 +113,35 @@ Item {
             + (root.height / 2 - height / 2) * root.t
     }
 
-    // the notch: grows from the bar pill into the password field
-    Item {
-        id: card
-
-        readonly property real fromW: PillState.pillWidth
-        readonly property real fromH: PillState.pillHeight
+    // Fixed-size notch matching the bar pill exactly
+    Notch {
+        id: notch
 
         visible: root.primary
-        width: fromW + (280 - fromW) * root.t
-        height: fromH + (46 - fromH) * root.t
-        x: (root.width - width) / 2 + root.shake
+        bodyWidth: PillState.pillWidth
+        bodyHeight: PillState.pillHeight
+        x: (root.width - bodyWidth) / 2 - bodyX + root.shake
         y: PillState.pillTop
     }
 
-    Notch {
-        visible: root.primary
-        bodyWidth: card.width
-        bodyHeight: card.height
-        x: card.x - bodyX
-        y: card.y
-    }
-
-    // the lock icon, the typed characters as dots (or what to type), and Caps Lock. Fades in
-    // during the second half of the morph, like the pickers' content.
+    // Password content inside the unchanged pill silhouette
     Item {
         visible: root.primary
-        x: card.x
-        y: card.y
-        width: card.width
-        height: card.height
+        x: notch.x + notch.bodyX
+        y: notch.y
+        width: notch.bodyWidth
+        height: notch.bodyHeight
+        clip: true
         opacity: Math.max(0, (root.t - 0.5) * 2)
 
         Text {
             id: icon
-            x: 16
+            x: 12
             anchors.verticalCenter: parent.verticalCenter
             text: "󰌾"
             color: root.lock.failed ? Theme.alert : Qt.alpha(Theme.fg, 0.6)
             font.family: Theme.fontFamily
-            font.pixelSize: 16
+            font.pixelSize: 14
             Behavior on color { ColorAnimation { duration: 120 } }
 
             SequentialAnimation on opacity {
@@ -152,36 +156,40 @@ Item {
         Text {
             visible: root.lock.buffer.length === 0
             anchors.left: icon.right
-            anchors.leftMargin: 12
+            anchors.leftMargin: 8
+            anchors.right: capsLabel.visible ? capsLabel.left : parent.right
+            anchors.rightMargin: 10
             anchors.verticalCenter: parent.verticalCenter
+            elide: Text.ElideRight
             text: root.lock.failed ? "Wrong password" : "Password"
             color: root.lock.failed ? Theme.alert : Qt.alpha(Theme.fg, 0.4)
             font.family: Theme.fontFamilySans
-            font.pixelSize: 13
+            font.pixelSize: 12
         }
 
         Row {
             anchors.left: icon.right
-            anchors.leftMargin: 14
+            anchors.leftMargin: 10
             anchors.verticalCenter: parent.verticalCenter
-            spacing: 6
+            spacing: 5
 
             Repeater {
-                model: Math.min(root.lock.buffer.length, 20)
+                model: Math.min(root.lock.buffer.length, 16)
 
                 Rectangle {
-                    width: 7
-                    height: 7
-                    radius: 3.5
+                    width: 6
+                    height: 6
+                    radius: 3
                     color: Theme.fg
                 }
             }
         }
 
         Text {
+            id: capsLabel
             visible: Locks.shown
             anchors.right: parent.right
-            anchors.rightMargin: 16
+            anchors.rightMargin: 12
             anchors.verticalCenter: parent.verticalCenter
             text: Locks.label
             color: Theme.accent
@@ -191,10 +199,10 @@ Item {
         }
     }
 
-    // Keyboard: characters go to the password, Backspace removes one, Enter checks it, Esc clears it
     Item {
         anchors.fill: parent
         focus: true
+        enabled: !root.lock.unlocking
         Component.onCompleted: forceActiveFocus()
 
         Keys.onPressed: event => {
@@ -214,31 +222,4 @@ Item {
             event.accepted = true
         }
     }
-
-    // Screensaver overlay
-    Item {
-        id: screensaver
-
-        anchors.fill: parent
-        z: 100
-        visible: root.screensaverActive
-
-        Rectangle {
-            anchors.fill: parent
-            color: "#000000"
-
-            Text {
-                anchors.centerIn: parent
-                text: Qt.formatDateTime(clock.date, UserSettings.clockFormat)
-                color: "white"
-                font.pixelSize: 64
-            }
-        }
-
-        opacity: visible ? 1 : 0
-        Behavior on opacity {
-            NumberAnimation { duration: 800 }
-        }
-    }
 }
-

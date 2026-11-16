@@ -3,12 +3,12 @@ import QtQuick
 import Quickshell
 
 // Shared state for the bar pill and the morphing panels (wallpaper and colorscheme pickers,
-// app launcher, control panel). The bar fades its pill from `progress` while a panel owns
-// it, and the owning panel grows out of the origin pill.
+// app launcher, control panel, lockscreen). The bar fades its pill from `progress` while a panel
+// owns it, and the owning panel grows out of the origin pill.
 QtObject {
     id: root
 
-    // which panel owns the pill: "", "wallpapers", "colorschemes", "applauncher", "clipboard" or "focus"
+    // which panel owns the pill: "", "wallpapers", "colorschemes", "applauncher", "clipboard", "focus", or "lock"
     property string owner: ""
     readonly property bool active: owner !== ""
 
