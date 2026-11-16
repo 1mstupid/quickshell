@@ -9,8 +9,10 @@ import Quickshell.Io
 // pomodoro runs; it is kept in 5-minute slots for the focus widget and the
 // Pomodoro page. Totals per day live in
 // app-usage.json; categories in app-categories, one "app_id category" line each;
-// limits in app-limits, one "app_id minutes" line each. A limit
-// notifies at 80% and at 100%, once each.
+// limits in app-limits, one "app_id minutes" line each; schedules in
+// app-schedules, one "target HH:MM-HH:MM[,HH:MM-HH:MM] [days]" line each
+// (target can be an app_id, prefix*, or @Category). A limit notifies at 80%
+// and at 100%, once each.
 Singleton {
     id: root
 
@@ -28,6 +30,8 @@ Singleton {
     property var days: ({})
     // { "helium": 60 } in minutes
     property var limits: ({})
+    // { "@Games": [{ windows: [{ start: 540, end: 1020 }], days: [1,2,3,4,5] }] }
+    property var schedules: ({})
     // { "helium": "Internet" } from app-categories; unlisted apps are "Other"
     property var categories: ({})
     // app ids whose focus time counts toward the focus widget; a pomodoro always counts
@@ -77,15 +81,53 @@ Singleton {
             && focusApps.length > 0 && focusApps.indexOf(app) < 0
     }
 
+    function matchesTarget(target, app) {
+        if (target.startsWith("@"))
+            return categoryOf(app).toLowerCase() === target.slice(1).toLowerCase()
+        if (target.endsWith("*"))
+            return app.startsWith(target.slice(0, -1))
+        return target === app
+    }
+
+    // scheduled blocks: matches active time windows from app-schedules
+    // (supports exact app_id, prefix*, and @Category targets)
+    function scheduledBlock(app) {
+        if (!app)
+            return false
+        const now = new Date()
+        const day = now.getDay()
+        const yesterday = (day + 6) % 7
+        const min = now.getHours() * 60 + now.getMinutes()
+
+        for (const target of Object.keys(schedules)) {
+            if (!matchesTarget(target, app))
+                continue
+            for (const r of schedules[target]) {
+                for (const w of r.windows) {
+                    if (w.start <= w.end) {
+                        if (r.days.indexOf(day) >= 0 && min >= w.start && min < w.end)
+                            return true
+                    } else {
+                        // Overnight window (e.g., 22:30-06:00)
+                        if ((r.days.indexOf(day) >= 0 && min >= w.start)
+                            || (r.days.indexOf(yesterday) >= 0 && min < w.end))
+                            return true
+                    }
+                }
+            }
+        }
+        return false
+    }
+
     // ask each open window of a blocked app to close, retrying every 10 s
     // while it stays open (an app may show a save prompt first). Blocked means
-    // over its limit, or outside focus mode during a work session.
+    // over its limit, outside focus mode during a work session, or in a scheduled block.
     function enforce(list) {
         const now = Date.now()
         const next = {}
         for (const w of list) {
             const last = closeSent[w.id] ?? 0
-            if ((blocked(w.app_id) || outOfFocus(w.app_id)) && now - last >= 10000) {
+            if ((blocked(w.app_id) || outOfFocus(w.app_id) || scheduledBlock(w.app_id)) && now - last >= 10000) {
                 Quickshell.execDetached(["umbriel", "msg", "window-close:" + w.id])
                 next[w.id] = now
             } else if (last) {
@@ -321,7 +363,13 @@ Singleton {
     }
 
     function categoryOf(app) {
-        return categories[app] ?? "Other"
+        if (categories[app])
+            return categories[app]
+        for (const k of Object.keys(categories)) {
+            if (k.endsWith("*") && app.startsWith(k.slice(0, -1)))
+                return categories[k]
+        }
+        return "Other"
     }
 
     // seconds per category for a day, most used first. Looked up at read time,
@@ -348,6 +396,64 @@ Singleton {
                 m[p[0]] = parseInt(p[1])
         }
         limits = m
+    }
+
+    function parseTime(s) {
+        const m = s.match(/^(\d{1,2}):(\d{2})$/)
+        if (!m) return -1
+        const h = parseInt(m[1]), mm = parseInt(m[2])
+        return (h >= 0 && h <= 23 && mm >= 0 && mm <= 59) ? h * 60 + mm : -1
+    }
+
+    function parseDays(s) {
+        const names = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]
+        if (!s) return [0, 1, 2, 3, 4, 5, 6]
+        const out = []
+        for (const part of s.toLowerCase().split(",")) {
+            const range = part.split("-")
+            if (range.length === 2) {
+                const a = names.indexOf(range[0]), b = names.indexOf(range[1])
+                if (a >= 0 && b >= 0) {
+                    for (let d = a; ; d = (d + 1) % 7) {
+                        if (out.indexOf(d) < 0) out.push(d)
+                        if (d === b) break
+                    }
+                }
+            } else {
+                const d = names.indexOf(part)
+                if (d >= 0 && out.indexOf(d) < 0) out.push(d)
+            }
+        }
+        return out
+    }
+
+    // "target HH:MM-HH:MM[,HH:MM-HH:MM] [days]" per line
+    function parseSchedules(t) {
+        const m = {}
+        for (const raw of t.split("\n")) {
+            const line = raw.replace(/#.*$/, "").trim()
+            if (!line) continue
+            const p = line.split(/\s+/)
+            if (p.length < 2) continue
+
+            const target = p[0]
+            const windows = []
+            for (const span of p[1].split(",")) {
+                const bounds = span.split("-")
+                if (bounds.length !== 2) continue
+                const start = parseTime(bounds[0])
+                const end = parseTime(bounds[1])
+                if (start >= 0 && end >= 0 && start !== end)
+                    windows.push({ start: start, end: end })
+            }
+            if (windows.length === 0) continue
+
+            const days = parseDays(p[2] ?? "")
+            m[target] = m[target] ?? []
+            m[target].push({ windows: windows, days: days })
+        }
+        schedules = m
+        enforce(lastWindows)
     }
 
     Component.onCompleted: revision++
@@ -426,6 +532,14 @@ Singleton {
         onFileChanged: reload()
         onLoaded: root.parseLimits(text())
         onLoadFailed: root.limits = {}
+    }
+
+    FileView {
+        path: root.dir + "/app-schedules"
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: root.parseSchedules(text())
+        onLoadFailed: root.schedules = {}
     }
 
     // one "app_id category" per line; a missing file means everything is "Other"
