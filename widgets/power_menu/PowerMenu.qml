@@ -38,7 +38,7 @@ PanelWindow {
 
     // ── Actions ──────────────────────────────────────────────────────────────
     readonly property var actions: [
-        { label: "Suspend", icon: "󰒲", hold: false },
+        { label: "Suspend", icon: "󰒲", hold: true },
         { label: "Lock", icon: "󰌾", hold: false },
         { label: "Reboot", icon: "󰜉", hold: true },
         { label: "Power off", icon: "󰐥", hold: true }

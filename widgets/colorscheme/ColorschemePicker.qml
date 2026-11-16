@@ -65,12 +65,14 @@ PanelWindow {
     property int currentIndex: 0
     onQueryChanged: currentIndex = 0
 
-    // the scheme in use, and the wallpaper the script is given. Both are read from the
+    // the scheme in use, mode, and the wallpaper the script is given. Read from the
     // files the pickers write, at start, so the first opening is not the one that loads them.
     property string currentId: ""
     property string wallpaperPath: ""
+    property bool lightMode: Theme.light
     readonly property string stateFile: Quickshell.env("HOME") + "/.local/xdg/config/colorscheme-current"
     readonly property string wallpaperFile: Quickshell.env("HOME") + "/.local/xdg/config/wallpaper-current"
+    readonly property string modeFile: Quickshell.env("HOME") + "/.local/xdg/config/colorscheme-mode"
     // set while the wallpaper is being sampled
     property bool deriving: false
 
@@ -90,6 +92,13 @@ PanelWindow {
         currentIndex = i >= 0 ? i : 0
     }
 
+    function imageFor(id) {
+        const mode = root.lightMode ? "light" : "dark"
+        return root.folderImages[id + "/" + mode]
+            || root.folderImages[id]
+            || root.wallpaperPath
+    }
+
     // wallpaper-theme takes the wallpaper path first; without one nothing can be applied
     FileView {
         path: root.wallpaperFile
@@ -97,6 +106,21 @@ PanelWindow {
         onFileChanged: reload()
         onLoaded: root.wallpaperPath = text().trim()
     }
+
+    // watches the global light/dark mode file written by the settings drawer
+    FileView {
+        path: Quickshell.env("HOME") + "/.local/xdg/config/colorscheme-mode"
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: {
+            root.lightMode = text().trim() === "light"
+            Theme.light = root.lightMode
+        }
+        onLoadFailed: {
+            root.lightMode = false
+            Theme.light = false
+        }
+      }
 
     // the wallpaper picker writes this file too, so a new wallpaper (whose colours are
     // derived) shows up here as the scheme in use
@@ -150,11 +174,36 @@ PanelWindow {
         else
             openPicker()
     }
+    function toggleMode(): void {
+        root.lightMode = !root.lightMode
+        Theme.light = root.lightMode
+
+        const mode = root.lightMode ? "light" : "dark"
+
+        Quickshell.execDetached([
+            "sh", "-c",
+            "printf '%s\\n' \"$1\" >| \"$2\"",
+            "sh", mode, root.modeFile
+        ])
+
+        const id = root.currentId === "" ? "wallpaper" : root.currentId
+        const index = Schemes.indexOfId(id)
+
+        if (index >= 0)
+            root.apply(Schemes.SCHEMES[index])
+    }
 
     // qs ipc call colorschemes toggle
     IpcHandler {
         target: "colorschemes"
-        function toggle(): void { root.toggle() }
+
+        function toggle(): void {
+            root.toggle()
+        }
+
+        function toggleMode(): void {
+            root.toggleMode()
+        }
     }
 
     // grows the card from the pill (t=0) into the band (t=1); on the way back
@@ -174,9 +223,9 @@ PanelWindow {
         }
     }
 
-    // One image per scheme folder, drawn when the picker opens. It is the art behind the
-    // chosen row and the wallpaper that choosing the scheme sets, so the row shows what it
-    // will apply. A scheme with no folder keeps the wallpaper in use.
+    // One image per scheme folder (and mode subfolder), drawn when the picker opens.
+    // It is the art behind the chosen row and the wallpaper that choosing the scheme sets,
+    // so the row shows what it will apply. A scheme with no folder keeps the wallpaper in use.
     property var folderImages: ({})
     property var _found: []
     Component.onCompleted: lister.running = true
@@ -195,14 +244,18 @@ PanelWindow {
             }
             const groups = {}
             for (const p of root._found) {
-                const id = p.substring(root.dirPath.length + 1).split("/")[0]
-                if (!groups[id])
-                    groups[id] = []
-                groups[id].push(p)
+                const rel = p.substring(root.dirPath.length + 1)
+                const parts = rel.split("/")
+                // e.g. "gruvbox/dark" if nested in dark/light, otherwise just "gruvbox"
+                const key = (parts.length >= 3 && (parts[1] === "dark" || parts[1] === "light"))
+                    ? parts[0] + "/" + parts[1]
+                    : parts[0]
+                if (!groups[key]) groups[key] = []
+                groups[key].push(p)
             }
             const picked = {}
-            for (const id in groups)
-                picked[id] = groups[id][Math.floor(Math.random() * groups[id].length)]
+            for (const key in groups)
+                picked[key] = groups[key][Math.floor(Math.random() * groups[key].length)]
             root.folderImages = picked
         }
     }
@@ -214,22 +267,28 @@ PanelWindow {
             root.deriving = true
             canvas.loadImage("file://" + root.wallpaperPath)
         } else {
-            root.runWithWallpaper(scheme.id, scheme.palette, scheme.ansi,
-                                  root.folderImages[scheme.id] || root.wallpaperPath)
+            const v = Schemes.variantFor(scheme, root.lightMode)
+            if (!v)
+                return
+            root.runWithWallpaper(scheme.id, v.palette, v.ansi, root.imageFor(scheme.id))
         }
     }
 
     function runWithWallpaper(id, palette, ansi, imgPath) {
-        // the script picks its background from the mode; the wallpaper's own scheme is dark
         const at = Schemes.indexOfId(id)
-        const mode = at >= 0 && Schemes.SCHEMES[at].light === true ? "--light" : "--dark"
+        const scheme = at >= 0 ? Schemes.SCHEMES[at] : null
+        const isLight = id === "wallpaper"
+          ? root.lightMode
+          : Schemes.isLightVariant(scheme, root.lightMode)
+        const mode = isLight ? "--light" : "--dark"
+
         Quickshell.execDetached(
             ["wallpaper-theme", mode, imgPath].concat(palette).concat(ansi))
 
         root.currentId = id
         Quickshell.execDetached(["sh", "-c", "printf '%s\\n' \"$1\" >| \"$2\"",
                                  "sh", id, root.stateFile])
-        
+
         // Update current wallpaper file so everything stays in sync
         Quickshell.execDetached(["sh", "-c", "printf '%s\\n' \"$1\" >| \"$2\"",
                                  "sh", imgPath, root.wallpaperFile])
@@ -413,11 +472,12 @@ PanelWindow {
                     readonly property bool busy: isWallpaper && root.deriving
                     // the scheme in use; "wallpaper" when none was remembered
                     readonly property bool inUse: modelData.id === (root.currentId === "" ? "wallpaper" : root.currentId)
-                    // Individual background color for this specific scheme (falls back to Theme.bg)
-                    readonly property string schemeBg: isWallpaper || !modelData.palette || !modelData.palette[0] ? Theme.bg : modelData.palette[0]
+                    // Individual variant & background color for this specific scheme (falls back to Theme.bg)
+                    readonly property var variant: Schemes.variantFor(modelData, root.lightMode)
+                    
+                    readonly property string schemeBg: isWallpaper || !variant ? Theme.bg : variant.palette[0]
                     // the wallpaper behind the row: the one in use for "Wallpaper", else its folder's
-                    readonly property string art: isWallpaper ? root.wallpaperPath
-                        : (root.folderImages[modelData.id] || "")
+                    readonly property string art: isWallpaper ? root.wallpaperPath : root.imageFor(modelData.id)
                     readonly property int inset: 12
                     // 0 on a plain row, 1 on the chosen one, between while it grows or shrinks.
                     // Everything that moves is derived from it, so the height is the one animation.
@@ -502,7 +562,7 @@ PanelWindow {
                             width: 12
                             height: 12
                             radius: 6
-                            color: cell.isWallpaper ? Theme.accent : cell.modelData.palette[4]
+                            color: cell.isWallpaper || !cell.variant ? Theme.accent : cell.variant.palette[4]
                         }
                     }
 
@@ -511,7 +571,8 @@ PanelWindow {
                         x: (cell.inset + 28 + 12) * (1 - cell.grow) + cell.inset * cell.grow
                         y: ((root.rowH - height) / 2) * (1 - cell.grow) + 22 * cell.grow
                         text: cell.modelData.name
-                        color: cell.inUse ? Theme.accent
+                        color: cell.current && cell.variant ? cell.variant.palette[2]
+                            : cell.inUse ? Theme.accent
                             : cell.current ? Theme.fg : Qt.alpha(Theme.fg, 0.8)
                         font.family: Theme.fontFamilySans
                         font.pixelSize: Math.round(13 + 4 * cell.grow)
@@ -521,7 +582,7 @@ PanelWindow {
                     // the six colours: small and at the right on a plain row; they grow and move
                     // under the name as the row is chosen. "Wallpaper" has none until applied.
                     Repeater {
-                        model: cell.isWallpaper ? [] : cell.modelData.ansi.slice(1, 7)
+                        model: cell.isWallpaper || !cell.variant ? [] : cell.variant.ansi.slice(1, 7)
 
                         Rectangle {
                             required property int index
@@ -579,7 +640,7 @@ PanelWindow {
             const data = ctx.getImageData(0, 0, width, height).data
             unloadImage(url)
             root.deriving = false
-            const result = Palette.derive(data)
+            const result = Palette.derive(data, root.lightMode)
             if (result)
                 root.runWithWallpaper("wallpaper", result.palette, result.ansi, root.wallpaperPath)
         }

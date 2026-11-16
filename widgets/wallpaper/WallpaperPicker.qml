@@ -5,7 +5,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import "../../services"
 import "../../services/WallpaperPalette.js" as Palette
-import "../../widgets/colorscheme/Colorschemes.js" as Schemes 
+import "../../widgets/colorscheme/Colorschemes.js" as Schemes
 import "../notch"
 import "Fuzzy.js" as Fuzzy
 
@@ -66,19 +66,28 @@ PanelWindow {
     property string query: ""
     // the folder in view: the one the wallpaper in use is in ("wallpaper" is the top level).
     // Choosing a colorscheme picks a wallpaper from its folder, so this follows the scheme.
-    readonly property string group: schemeOf(currentPath)
-    // what is browsed: that folder, or everything when it has no wallpapers here
-    function browse(current) {
-        const g = schemeOf(current)
-        const inGroup = wallpapers.filter(p => schemeOf(p) === g)
-        return inGroup.length > 0 ? inGroup : wallpapers
+    // Active wallpaper pool, determined by the current theme mode.
+    readonly property string modeFolder: lightMode ? "light" : "dark"
+
+    function isInMode(path) {
+        const rel = path.substring(root.dirPath.length + 1)
+        const parts = rel.split("/")
+        return parts.length >= 3 && parts[1] === modeFolder
     }
-    readonly property var browsed: browse(currentPath)
-    // whether that is a colorscheme's folder, and not the top level or everything
-    readonly property bool inFolder: group !== "wallpaper" && wallpapers.some(p => schemeOf(p) === group)
+
+    readonly property string group: modeFolder
+    readonly property bool inFolder: true
+
+    // Search only within the active mode.
+    readonly property var browsed: wallpapers.filter(p =>
+        schemeOf(currentPath) === schemeOf(p) && isInMode(p)
+    )
+
+    readonly property var shown: query === ""
+        ? browsed
+        : Fuzzy.rank(browsed, query, nameOf)
     // what the carousel shows: the folder, or the matches of the query among all of them,
     // best first
-    readonly property var shown: query === "" ? browsed : Fuzzy.rank(wallpapers, query, nameOf)
     // an index into `shown`
     property int currentIndex: 0
     onQueryChanged: currentIndex = 0
@@ -89,6 +98,25 @@ PanelWindow {
     readonly property string stateFile: Quickshell.env("HOME") + "/.local/xdg/config/wallpaper-current"
     // the colorscheme in use; applying a wallpaper makes it "wallpaper" or the subfolder name
     readonly property string schemeFile: Quickshell.env("HOME") + "/.local/xdg/config/colorscheme-current"
+    readonly property string modeFile: Quickshell.env("HOME") + "/.local/xdg/config/colorscheme-mode"
+    property bool lightMode: false
+    Connections {
+        target: root
+
+        function onLightModeChanged() {
+            if (!root.visible)
+                root.focusCurrent()
+            else
+                root.currentIndex = 0
+        }
+    }
+
+    FileView {
+        path: root.modeFile
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: root.lightMode = text().trim() === "light"
+    }
     property string applyingPath: ""
     property bool randomPending: false
 
@@ -118,13 +146,18 @@ PanelWindow {
     }
 
     // Extracts the parent folder name as the scheme if it's nested under wallpapers/
+
     function schemeOf(path) {
-        const rel = path.substring(root.dirPath.length + 1)
-        const parts = rel.split("/")
-        if (parts.length > 1) {
-            return parts[0] // e.g. ~/.local/share/wallpapers/catppuccin-mocha/bg.png -> "catppuccin-mocha"
-        }
-        return "wallpaper"
+      const rel = path.substring(root.dirPath.length + 1)
+      const parts = rel.split("/")
+
+      return parts.length >= 3 ? parts[0] : "wallpaper"
+    }
+    function browse(current) {
+        const scheme = schemeOf(current)
+        return wallpapers.filter(p =>
+            schemeOf(p) === scheme && isInMode(p)
+        )
     }
 
     // the whole list, on the wallpaper in use
@@ -231,8 +264,8 @@ PanelWindow {
     Process {
         id: lister
         command: ["sh", "-c",
-            "find -L \"" + root.dirPath + "\" -type f " +
-            "\\( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' \\) | sort"]
+          "find -L \"" + root.dirPath + "\" -type f " +
+          "\\( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' \\) | sort"]
         stdout: SplitParser {
             onRead: line => { if (line.trim() !== "") root._found.push(line.trim()) }
         }
@@ -629,10 +662,13 @@ PanelWindow {
 
         if (targetScheme !== "wallpaper") {
             const idx = Schemes.indexOfId(targetScheme)
-            if (idx >= 0 && Schemes.SCHEMES[idx].palette) {
-                result = Schemes.SCHEMES[idx]
+
+            if (idx >= 0) {
+                result = Schemes.variantFor(
+                    Schemes.SCHEMES[idx],
+                    root.lightMode
+                )
             } else {
-                // Subfolder name doesn't match a known scheme ID; fall back to dynamic extraction
                 targetScheme = "wallpaper"
             }
         }
@@ -643,12 +679,10 @@ PanelWindow {
                 return
         }
 
-        // Passes the mode, then 25 arguments: 1 image path + 8 palette colors + 16 ansi colors.
-        // Only a preset can be light; a scheme derived from the wallpaper is dark.
+        const isLight = root.lightMode && targetScheme !== "wallpaper"
         Quickshell.execDetached(
-            ["wallpaper-theme", result.light === true ? "--light" : "--dark", root.applyingPath]
+            ["wallpaper-theme", isLight ? "--light" : "--dark", root.applyingPath]
                 .concat(result.palette).concat(result.ansi))
-
         // Remember current wallpaper for next boot
         root.currentPath = root.applyingPath
         Quickshell.execDetached(["sh", "-c", "printf '%s\\n' \"$1\" >| \"$2\"",

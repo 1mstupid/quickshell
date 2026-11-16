@@ -468,6 +468,18 @@ Item {
                     shot.restart()
                 }
             }
+            // Dark/Light mode toggle tile
+            Tile {
+                width: root.tileWidth
+                glyph: Theme.light ? "󰖨" : "󰔎"
+                title: "Theme"
+                subtitle: Theme.light ? "Light" : "Dark"
+                active: Theme.light
+
+                onClicked: Quickshell.execDetached([
+                    "qs", "-p", "./", "ipc", "call", "colorschemes", "toggleMode"
+                ])
+            }
         }
 
         Column {
@@ -628,9 +640,9 @@ Item {
                     height: parent.height
                     active: root.inView
                     source: root.view === "wifi" ? "../menu/WifiPanel.qml"
-                                : root.view === "bluetooth" ? "../menu/BluetoothPanel.qml"
-                                : root.view === "vpn" ? "../menu/VpnPanel.qml"
-                                : ""
+                                            : root.view === "bluetooth" ? "../menu/BluetoothPanel.qml"
+                                            : root.view === "vpn" ? "../menu/VpnPanel.qml"
+                                            : ""
                 }
             }
         }
