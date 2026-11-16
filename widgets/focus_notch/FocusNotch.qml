@@ -17,8 +17,8 @@ import "../bar"
 // when it ends), and pause and done. With nothing in focus it shows the clock,
 // the date, the now-playing track and the workspaces. Click the strip (or run
 // `qs ipc call focusnotch toggle`) and it opens further. A header switches between
-// Home, Work and Ports; Work holds the Day, Week and Focus pages, and a small switch
-// on a row under the tabs picks between them:
+// Home, Work, Ports and Usage; Work holds the Day, Week and Focus pages, and a small
+// switch on a row under the tabs picks between them:
 //   Home   the now-playing card on the left, and the day on the right: the date,
 //          what is on now and what comes next.
 //   Day    what is left to do: todo.md's tasks together with today's blocks from
@@ -28,6 +28,7 @@ import "../bar"
 //   Week   the schedule's grid, with today and the block that is on now marked.
 //   Focus  the task in hand: its timer, pause, stop and done, and the time tracked today.
 //   Ports  what is listening on this machine, and which of it the network can reach.
+//   Usage  time per app for today, this week or this month, charted by hour or by day.
 // The gear at the right of the header, on every page, opens the control panel (ControlPage):
 // a page with no tab, narrower than the others and as tall as its rows, and the gear leaves
 // it again. `qs ipc call drawer toggle` opens it too.
@@ -81,10 +82,10 @@ PanelWindow {
 
     // "" closed, "hover" the strip, "open" the full panel
     property string stage: ""
-    // the open panel's page: "home", "day", "week", "focus", "ports" or "control", remembered
+    // the open panel's page: "home", "day", "week", "focus", "ports", "usage" or "control", remembered
     // across openings (the control page is not: it is left when the panel closes)
     readonly property string tab: FocusNotchState.page
-    readonly property var pages: ["home", "day", "week", "focus", "ports"]
+    readonly property var pages: ["home", "day", "week", "focus", "ports", "usage"]
     readonly property int pageIndex: Math.max(0, pages.indexOf(tab))
     // Work is Day or Week; the Work tab returns to the one last shown
     property string lastWork: "day"
@@ -169,7 +170,7 @@ PanelWindow {
         : "Nothing else today"
     // The time tracked: tasks due today with time on them (and the one in focus,
     // live), against the minutes the schedule planned for them, and the total for
-    // today and for this week, Sunday to Saturday like the usage dashboard. The
+    // today and for this week, Sunday to Saturday like the Usage page. The
     // time sits on the day the task is due, so work on an overdue task counts there.
     readonly property var tracked: {
         const sunday = Todo.addDays(Todo.today, -Todo.toDate(Todo.today).getDay())
@@ -703,7 +704,8 @@ PanelWindow {
                     Repeater {
                         model: [{ key: "home", glyph: "󰋜", name: "Home" },
                                 { key: "work", glyph: "󰸗", name: "Work" },
-                                { key: "ports", glyph: "󰈀", name: "Ports" }]
+                                { key: "ports", glyph: "󰈀", name: "Ports" },
+                                { key: "usage", glyph: "󰄧", name: "Usage" }]
 
                         Rectangle {
                             id: tabButton
@@ -2026,6 +2028,14 @@ PanelWindow {
                     font.family: Theme.fontFamilySans
                     font.pixelSize: 12
                 }
+            }
+
+            // ── Usage: time per app, from the usage data ───────────────────
+            UsagePage {
+                visible: root.tab === "usage"
+                y: 40
+                width: panel.width
+                height: panel.height - y
             }
 
             // ── Week: the schedule's grid ──────────────────────────────────
