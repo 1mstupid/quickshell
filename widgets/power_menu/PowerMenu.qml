@@ -274,9 +274,11 @@ PanelWindow {
                     model: root.actions
 
                     PowerButton {
-                        label: root.actions[index].label
-                        icon: root.actions[index].icon
-                        hold: root.actions[index].hold
+                        required property var modelData
+                        required property int index
+                        label: modelData.label
+                        icon: modelData.icon
+                        hold: modelData.hold
                         selected: root.selectedIndex === index
                         progress: root.holdIndex === index ? root.holdProgress : 0
                         onPressStarted: {
