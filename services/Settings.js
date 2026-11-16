@@ -3,18 +3,28 @@
 // Every setting in settings.json: its key, type and default, for a number its range, and a
 // label and group for the settings panel. UserSettings reads, checks and writes the file
 // through this list, so a new setting is one entry here and one property there.
-// No QML types, so the list can be checked with plain node.
+// For the panel a number also has a `step` and a `unit`, and a widget a `layout` id: its
+// visibility is kept in layout.json once that has one (see WidgetLayout), so the panel
+// goes through that. No QML types, so the list can be checked with plain node.
+
+// the pages of the panel, in order; a group with no setting has no page
+const GROUPS = [
+    { id: "bar", title: "Bar & Island", glyph: "󰍜" },
+    { id: "widgets", title: "Widgets", glyph: "󰕮" },
+    { id: "controlCenter", title: "Control Center", glyph: "󰘮" }
+]
+
 const SETTINGS = [
     // the bar and its panels
     { key: "pill", type: "bool", def: false, group: "bar", label: "Floating pill" },
-    { key: "cornerRadius", type: "number", def: 26, min: 0, max: 40, group: "bar", label: "Corner radius" },
+    { key: "cornerRadius", type: "number", def: 26, min: 0, max: 40, step: 1, unit: "px", group: "bar", label: "Corner radius" },
 
     // the corner widgets and the media player
-    { key: "usageRing", type: "bool", def: true, group: "widgets", label: "Usage ring" },
-    { key: "focusWidget", type: "bool", def: true, group: "widgets", label: "Focus" },
-    { key: "todoWidget", type: "bool", def: true, group: "widgets", label: "Todo" },
-    { key: "habitsWidget", type: "bool", def: true, group: "widgets", label: "Habits" },
-    { key: "mediaWidget", type: "bool", def: true, group: "widgets", label: "Media player" },
+    { key: "usageRing", type: "bool", def: true, layout: "usage", group: "widgets", label: "Usage ring" },
+    { key: "focusWidget", type: "bool", def: true, layout: "focus", group: "widgets", label: "Focus" },
+    { key: "todoWidget", type: "bool", def: true, layout: "todo", group: "widgets", label: "Todo" },
+    { key: "habitsWidget", type: "bool", def: true, layout: "habits", group: "widgets", label: "Habits" },
+    { key: "mediaWidget", type: "bool", def: true, layout: "media", group: "widgets", label: "Media player" },
 
     // what the control panel offers
     { key: "wifi", type: "bool", def: true, group: "controlCenter", label: "Wi-Fi" },
