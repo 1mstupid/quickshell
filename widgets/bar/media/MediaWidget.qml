@@ -4,6 +4,7 @@ import Quickshell.Io
 import QtQuick
 import QtQuick.Effects
 import "../../../services"
+import "./LyricsMath.js" as LyricsMath
 
 PanelWindow {
     id: root
@@ -83,48 +84,7 @@ PanelWindow {
         function kill(): void { media.kill() }
     }
 
-    // ── Lyrics ─────────────────────────────────────────────────────────────
-
-    function parseLrc(json) {
-        let synced = ""
-        try {
-            synced = JSON.parse(json).syncedLyrics ?? ""
-        } catch (e) {
-            return []
-        }
-        const out = []
-        for (const line of synced.split("\n")) {
-            const m = line.match(/^\[(\d+):(\d+(?:\.\d+)?)\]\s?(.*)$/)
-            if (m)
-                out.push({ t: parseInt(m[1]) * 60 + parseFloat(m[2]), text: m[3] })
-        }
-        return out
-    }
-
-    function lineAt(pos) {
-        let i = -1
-        for (let k = 0; k < lyrics.length; k++) {
-            if (lyrics[k].t <= pos)
-                i = k
-            else
-                break
-        }
-        return i
-    }
-
-    function activeLineProgress() {
-        if (lyricIdx < 0 || lyricIdx >= lyrics.length) return 0.0
-        let currentLine = lyrics[lyricIdx]
-        let nextLine = lyrics[lyricIdx + 1]
-        
-        if (!nextLine) return 1.0 
-        
-        let duration = nextLine.t - currentLine.t
-        if (duration <= 0) return 0.0
-        
-        let elapsed = root.livePos - currentLine.t
-        return Math.max(0.0, Math.min(1.0, elapsed / duration))
-    }
+    // ── Integrated LyricsMath Helpers ───────────────────────────────────────
 
     function loadLyrics() {
         const title = media.player?.trackTitle ?? ""
@@ -133,22 +93,29 @@ PanelWindow {
             lyricStatus = ""
             return
         }
-        const key = artist + "|" + title
+        
+        const key = LyricsMath.trackKey(artist, title, media.len)
         if (key === lyricsKey)
             return
         lyricsKey = key
+        
         if (cache[key] !== undefined) {
             lyrics = cache[key]
             lyricStatus = lyrics.length ? "" : "none"
             return
         }
+        
         lyrics = []
         lyricStatus = "searching"
         fetchKey = key
 
+        const cands = LyricsMath.candidates(artist, title)
+        const queryArtist = cands.length > 0 ? cands[0].artist : artist
+        const queryTitle = cands.length > 0 ? cands[0].title : title
+
         const args = ["curl", "-sG", "--max-time", "8", "https://lrclib.net/api/get",
-            "--data-urlencode", "track_name=" + title,
-            "--data-urlencode", "artist_name=" + artist]
+            "--data-urlencode", "track_name=" + queryTitle,
+            "--data-urlencode", "artist_name=" + queryArtist]
         if (media.len > 0)
             args.push("--data-urlencode", "duration=" + Math.round(media.len))
 
@@ -157,14 +124,45 @@ PanelWindow {
         fetchProc.running = true
     }
 
+    function activeLineProgress() {
+        if (lyricIdx < 0 || lyricIdx >= lyrics.length) return 0.0
+        let currentLine = lyrics[lyricIdx]
+        if (!currentLine || !currentLine.text) return 0.0
+
+        let nextLine = lyrics[lyricIdx + 1]
+        let room = nextLine ? (nextLine.t - currentLine.t) : 6.0
+        
+        let rate = LyricsMath.songRate(lyrics)
+        let spanDuration = LyricsMath.sungSpan(currentLine.text, room, rate, currentLine.end)
+        
+        let toks = LyricsMath.tokens(currentLine.text)
+        let sp = LyricsMath.spansFor(toks, currentLine.t, spanDuration, currentLine.marks)
+        
+        let activeWordIdx = LyricsMath.wordAt(sp, root.livePos)
+        if (activeWordIdx < 0) return 0.0
+        if (activeWordIdx >= sp.length - 1) return 1.0
+
+        let hopProgress = LyricsMath.hop(sp, activeWordIdx, root.livePos)
+        return (activeWordIdx + hopProgress) / sp.length
+    }
+
     Process {
         id: fetchProc
         stdout: StdioCollector {
             onStreamFinished: {
-                const parsed = root.parseLrc(text)
+                let parsed = []
+                try {
+                    const rawLrc = JSON.parse(text).syncedLyrics ?? ""
+                    parsed = LyricsMath.parseLrc(rawLrc)
+                    parsed = LyricsMath.foldEchoes(parsed)
+                } catch (e) {
+                    parsed = []
+                }
+
                 const c = Object.assign({}, root.cache)
                 c[root.fetchKey] = parsed
                 root.cache = c
+
                 if (root.fetchKey === root.lyricsKey) {
                     root.lyrics = parsed
                     root.lyricStatus = parsed.length ? "" : "none"
@@ -178,7 +176,7 @@ PanelWindow {
     Connections {
         target: media.player
         function onTrackTitleChanged() {
-            root.lyricsKey = root.lyricsKey
+            root.lyricsKey = ""
             root.loadLyrics()
         }
     }
@@ -189,7 +187,9 @@ PanelWindow {
         repeat: true
         running: root.lyricsOn && root.visible
         triggeredOnStart: true
-        onTriggered: root.lyricIdx = root.lineAt(root.livePos)
+        onTriggered: {
+            root.lyricIdx = LyricsMath.lineIndexAt(root.lyrics, root.livePos)
+        }
     }
 
     // ── Custom Karaoke Fill Component (Fixed for Long Strings) ─────────────
@@ -408,7 +408,6 @@ PanelWindow {
                 color: Theme.fg
                 font.family: Theme.fontFamily
                 font.pixelSize: 16
-                // font.bold: true // Uncomment if MarqueeText supports bold property in your setup
             }
 
             ListView {
