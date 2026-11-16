@@ -2,8 +2,10 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "Settings.js" as Schema
 
-// Widget visibility, read from ~/.local/xdg/config/settings.json:
+// The settings, read from ~/.local/xdg/config/settings.json. What can be set, with its type
+// and default, is listed in Settings.js. Widget visibility:
 //   {"usageRing": true, "focusWidget": true, "todoWidget": true, "habitsWidget": true,
 //    "mediaWidget": true}
 // and what the control drawer offers (brightness and powerProfile also need the
@@ -16,58 +18,61 @@ import Quickshell.Io
 // The rounding of the notch and of every panel that grows from it, in pixels, is
 // {"cornerRadius": 26}; it never goes past half the shorter side of what it rounds, so
 // the small bar pill is a capsule and the radius opens up as a panel grows.
-// A missing file, a bad file or a missing key keeps the default (shown). The
-// file is read on start and whenever it changes. The IPC toggles change the
-// running value only, so the file stays the source of truth. The four corner
-// widgets are the exception: once layout.json has a `visible` for one, that
-// wins, and their toggles write it (see WidgetLayout).
+// A missing file, a bad file or a missing key keeps the default, and so does a value of the
+// wrong type; a number outside its range is held to it. The file is read on start and whenever
+// it changes. `set(key, value)` changes one setting and writes the file, and keys that
+// Settings.js does not list are kept. The IPC toggles change the running value only, so the
+// file stays the source of truth. The four corner widgets are the exception: once
+// layout.json has a `visible` for one, that wins, and their toggles write it (see WidgetLayout).
 Singleton {
     id: root
 
     readonly property string path: Quickshell.env("HOME") + "/.local/xdg/config/settings.json"
 
-    property bool usageRing: true
-    property bool focusWidget: true
-    property bool todoWidget: true
-    property bool habitsWidget: true
-    property bool mediaWidget: true
-    property bool wifi: true
-    property bool bluetooth: true
-    property bool vpn: true
-    property bool brightness: true
-    property bool powerProfile: true
-    property bool nightLight: true
-    property bool keepAwake: true
-    property bool screenshot: true
+    // the defaults are the list's, so that there is one place for them
+    property bool usageRing: Schema.defaultOf("usageRing")
+    property bool focusWidget: Schema.defaultOf("focusWidget")
+    property bool todoWidget: Schema.defaultOf("todoWidget")
+    property bool habitsWidget: Schema.defaultOf("habitsWidget")
+    property bool mediaWidget: Schema.defaultOf("mediaWidget")
+    property bool wifi: Schema.defaultOf("wifi")
+    property bool bluetooth: Schema.defaultOf("bluetooth")
+    property bool vpn: Schema.defaultOf("vpn")
+    property bool brightness: Schema.defaultOf("brightness")
+    property bool powerProfile: Schema.defaultOf("powerProfile")
+    property bool nightLight: Schema.defaultOf("nightLight")
+    property bool keepAwake: Schema.defaultOf("keepAwake")
+    property bool screenshot: Schema.defaultOf("screenshot")
     // the bar and its panels as a floating pill, without the screen border
-    property bool pill: false
+    property bool pill: Schema.defaultOf("pill")
     // 26 is the control panel's, the one the others follow
-    property real cornerRadius: 26
+    property real cornerRadius: Schema.defaultOf("cornerRadius")
+
+    // what the file last said, for every setting, and its keys that are not settings
+    property var saved: Schema.parse("").values
+    property var extra: ({})
 
     function parse(t) {
-        let d = null
-        try {
-            d = JSON.parse(t)
-        } catch (e) {
-            d = null
-        }
-        if (typeof d !== "object" || d === null)
-            d = {}
-        usageRing = typeof d.usageRing === "boolean" ? d.usageRing : true
-        focusWidget = typeof d.focusWidget === "boolean" ? d.focusWidget : true
-        todoWidget = typeof d.todoWidget === "boolean" ? d.todoWidget : true
-        habitsWidget = typeof d.habitsWidget === "boolean" ? d.habitsWidget : true
-        mediaWidget = typeof d.mediaWidget === "boolean" ? d.mediaWidget : true
-        wifi = typeof d.wifi === "boolean" ? d.wifi : true
-        bluetooth = typeof d.bluetooth === "boolean" ? d.bluetooth : true
-        vpn = typeof d.vpn === "boolean" ? d.vpn : true
-        brightness = typeof d.brightness === "boolean" ? d.brightness : true
-        powerProfile = typeof d.powerProfile === "boolean" ? d.powerProfile : true
-        nightLight = typeof d.nightLight === "boolean" ? d.nightLight : true
-        keepAwake = typeof d.keepAwake === "boolean" ? d.keepAwake : true
-        screenshot = typeof d.screenshot === "boolean" ? d.screenshot : true
-        pill = typeof d.pill === "boolean" ? d.pill : false
-        cornerRadius = typeof d.cornerRadius === "number" && d.cornerRadius >= 0 ? d.cornerRadius : 26
+        const r = Schema.parse(t)
+        saved = r.values
+        extra = r.extra
+        for (const s of Schema.SETTINGS)
+            root[s.key] = r.values[s.key]
+    }
+
+    // Changes one setting and writes the file; the watcher reloads the same content afterwards,
+    // which changes nothing. It writes what the file said plus this one value, not the running
+    // values, so an IPC toggle is not made permanent by changing something else.
+    function set(key, value) {
+        const s = Schema.find(key)
+        if (!s)
+            return
+        const v = Schema.normalize(s, value)
+        if (v === undefined)
+            return
+        root[key] = v
+        saved = Object.assign({}, saved, { [key]: v })
+        file.setText(Schema.serialize(saved, extra))
     }
 
     // qs ipc call pill toggle
@@ -77,7 +82,9 @@ Singleton {
     }
 
     FileView {
+        id: file
         path: root.path
+        atomicWrites: true
         watchChanges: true
         onFileChanged: reload()
         onLoaded: root.parse(text())

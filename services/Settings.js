@@ -1,0 +1,79 @@
+.pragma library
+
+// Every setting in settings.json: its key, type and default, for a number its range, and a
+// label and group for the settings panel. UserSettings reads, checks and writes the file
+// through this list, so a new setting is one entry here and one property there.
+// No QML types, so the list can be checked with plain node.
+const SETTINGS = [
+    // the bar and its panels
+    { key: "pill", type: "bool", def: false, group: "bar", label: "Floating pill" },
+    { key: "cornerRadius", type: "number", def: 26, min: 0, max: 40, group: "bar", label: "Corner radius" },
+
+    // the corner widgets and the media player
+    { key: "usageRing", type: "bool", def: true, group: "widgets", label: "Usage ring" },
+    { key: "focusWidget", type: "bool", def: true, group: "widgets", label: "Focus" },
+    { key: "todoWidget", type: "bool", def: true, group: "widgets", label: "Todo" },
+    { key: "habitsWidget", type: "bool", def: true, group: "widgets", label: "Habits" },
+    { key: "mediaWidget", type: "bool", def: true, group: "widgets", label: "Media player" },
+
+    // what the control panel offers
+    { key: "wifi", type: "bool", def: true, group: "controlCenter", label: "Wi-Fi" },
+    { key: "bluetooth", type: "bool", def: true, group: "controlCenter", label: "Bluetooth" },
+    { key: "vpn", type: "bool", def: true, group: "controlCenter", label: "VPN" },
+    { key: "brightness", type: "bool", def: true, group: "controlCenter", label: "Display" },
+    { key: "powerProfile", type: "bool", def: true, group: "controlCenter", label: "Power profile" },
+    { key: "nightLight", type: "bool", def: true, group: "controlCenter", label: "Night light" },
+    { key: "keepAwake", type: "bool", def: true, group: "controlCenter", label: "Keep awake" },
+    { key: "screenshot", type: "bool", def: true, group: "controlCenter", label: "Screenshot" }
+]
+
+function find(key) {
+    return SETTINGS.find(s => s.key === key)
+}
+
+function defaultOf(key) {
+    const s = find(key)
+    return s ? s.def : undefined
+}
+
+// `v` as the setting takes it, or undefined for the wrong type. A number is held to its range.
+function normalize(s, v) {
+    if (s.type === "bool")
+        return typeof v === "boolean" ? v : undefined
+    if (s.type === "number") {
+        if (typeof v !== "number" || !isFinite(v))
+            return undefined
+        return Math.min(s.max, Math.max(s.min, v))
+    }
+    return undefined
+}
+
+// The file's text as { values, extra }: a value for every setting (the default for one that is
+// missing or of the wrong type, and for a bad file), and the keys of the file that are not
+// settings, so that writing the file back does not lose them.
+function parse(text) {
+    let d = null
+    try {
+        d = JSON.parse(text)
+    } catch (e) {
+        d = null
+    }
+    if (typeof d !== "object" || d === null || Array.isArray(d))
+        d = {}
+
+    const values = {}
+    for (const s of SETTINGS) {
+        const v = normalize(s, d[s.key])
+        values[s.key] = v === undefined ? s.def : v
+    }
+    const extra = {}
+    for (const k of Object.keys(d))
+        if (!find(k))
+            extra[k] = d[k]
+    return { values: values, extra: extra }
+}
+
+// the text of the file: every setting, in the order of the list, then the extra keys
+function serialize(values, extra) {
+    return JSON.stringify(Object.assign({}, values, extra), null, 2) + "\n"
+}
