@@ -15,6 +15,7 @@ import "./widgets/habits"
 import "./widgets/layout"
 import "./widgets/lock"
 import "./widgets/power_menu"
+import "./widgets/settings"
 import "./widgets/todo"
 import "./widgets/usage"
 import "./widgets/wallpaper"
@@ -28,6 +29,8 @@ ShellRoot {
     AppLauncher {}
 
     PowerMenu {}
+
+    SettingsWindow {}
 
     Dashboard {}
 
