@@ -46,6 +46,8 @@ Singleton {
     property bool keepAwake: Schema.defaultOf("keepAwake")
     property bool screenshot: Schema.defaultOf("screenshot")
     property bool workspaces: Schema.defaultOf("workspaces")
+    property bool battery: Schema.defaultOf("battery")
+    property bool network: Schema.defaultOf("network")
     property bool wave: Schema.defaultOf("wave")
     property bool recording: Schema.defaultOf("recording")
     property bool pomo: Schema.defaultOf("pomo")

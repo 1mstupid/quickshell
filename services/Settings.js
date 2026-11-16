@@ -24,6 +24,8 @@ const SETTINGS = [
     { key: "workspaces", type: "bool", def: false, group: "bar", label: "Workspaces Module" },
     { key: "recording", type: "bool", def: false, group: "bar", label: "Recording Module" },
     { key: "pomo", type: "bool", def: false, group: "bar", label: "Pomodoro Module" },
+    { key: "network", type: "bool", def: false, group: "bar", label: "Network Module" },
+    { key: "battery", type: "bool", def: false, group: "bar", label: "Battery Module" },
 
 
     { key: "cornerRadius", type: "number", def: 26, min: 0, max: 40, step: 1, unit: "px", group: "bar", label: "Corner radius" },
