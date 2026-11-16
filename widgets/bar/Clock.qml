@@ -30,7 +30,7 @@ Item {
         Text {
             id: timeText
             anchors.verticalCenter: parent.verticalCenter
-            text: Qt.formatDateTime(clock.date, "h:mm AP")
+            text: Qt.formatDateTime(clock.date, UserSettings.clockFormat)
             font.family: Theme.fontFamilyAlt
             font.pixelSize: 15
             font.bold: true
