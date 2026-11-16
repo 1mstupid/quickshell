@@ -2,17 +2,19 @@ import QtQuick
 import "../../services"
 
 // One setting, from its entry in Settings.js (`def`): a switch for a bool, a slider with its
-// value for a number. The value is read from UserSettings, or from WidgetLayout for a widget
-// (which layout.json can override), so the row follows the file when it is edited by hand.
+// value for a number, a field for a text. The value is read from UserSettings, or from
+// WidgetLayout for a widget (which layout.json can override), so the row follows the file
+// when it is edited by hand.
 Item {
     id: row
 
     required property var def
 
     readonly property bool isBool: def.type === "bool"
+    readonly property bool isText: def.type === "text"
     readonly property var value: def.layout ? WidgetLayout.shown(def.layout) : UserSettings[def.key]
 
-    implicitHeight: isBool ? 44 : 66
+    implicitHeight: isBool || isText ? 44 : 66
 
     // a number from the position on the track, held to the range and the step
     function at(x, w) {
@@ -23,7 +25,7 @@ Item {
 
     Text {
         x: 14
-        y: row.isBool ? (row.height - height) / 2 : 12
+        y: row.isBool || row.isText ? (row.height - height) / 2 : 12
         text: row.def.label
         color: Theme.fg
         font.family: Theme.fontFamilySans
@@ -44,8 +46,50 @@ Item {
         }
     }
 
+    // the text is written when the field is left or Enter is pressed, not at every key, and
+    // Escape puts the old text back; a text that is not accepted (empty) does the same
+    Rectangle {
+        visible: row.isText
+        anchors.right: parent.right
+        anchors.rightMargin: 14
+        anchors.verticalCenter: parent.verticalCenter
+        width: Math.round(parent.width * 0.5)
+        height: 28
+        radius: 8
+        color: Qt.alpha(Theme.fg, 0.08)
+        border.width: field.activeFocus ? 1 : 0
+        border.color: Theme.accent
+
+        TextInput {
+            id: field
+            anchors.fill: parent
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
+            verticalAlignment: TextInput.AlignVCenter
+            clip: true
+            selectByMouse: true
+            text: row.isText ? row.value : ""
+            color: Theme.fg
+            selectionColor: Theme.accent
+            selectedTextColor: Theme.bg
+            font.family: Theme.fontFamilySans
+            font.pixelSize: 12
+
+            function revert() { text = Qt.binding(() => row.isText ? row.value : "") }
+            onEditingFinished: {
+                if (text.trim() !== row.value)
+                    UserSettings.set(row.def.key, text)
+                revert()
+            }
+            Keys.onEscapePressed: event => {
+                revert()
+                event.accepted = false
+            }
+        }
+    }
+
     Text {
-        visible: !row.isBool
+        visible: !row.isBool && !row.isText
         anchors.right: parent.right
         anchors.rightMargin: 14
         y: 12
@@ -57,7 +101,7 @@ Item {
 
     Rectangle {
         id: track
-        visible: !row.isBool
+        visible: !row.isBool && !row.isText
         x: 14
         y: 40
         width: parent.width - 28
@@ -67,7 +111,7 @@ Item {
         clip: true
 
         Rectangle {
-            width: row.isBool ? 0 : parent.width * (row.value - row.def.min) / (row.def.max - row.def.min)
+            width: row.isBool || row.isText ? 0 : parent.width * (row.value - row.def.min) / (row.def.max - row.def.min)
             height: parent.height
             radius: parent.radius
             color: Theme.accent
@@ -77,7 +121,7 @@ Item {
     // Dragging changes the running value, so the shell follows the hand; the file is written
     // once, when the button goes up.
     MouseArea {
-        enabled: !row.isBool
+        enabled: !row.isBool && !row.isText
         anchors.fill: track
         anchors.topMargin: -10
         anchors.bottomMargin: -10

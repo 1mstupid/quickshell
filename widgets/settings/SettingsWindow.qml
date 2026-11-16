@@ -105,8 +105,12 @@ PanelWindow {
         opacity: root.t
         scale: 0.97 + 0.03 * root.t
 
-        // clicks on the window stay on it, not on the catcher behind
-        MouseArea { anchors.fill: parent }
+        // clicks on the window stay on it, not on the catcher behind; one that is not on a field
+        // takes the focus back, which ends the editing of a text
+        MouseArea {
+            anchors.fill: parent
+            onPressed: keys.forceActiveFocus()
+        }
 
         Item {
             id: keys
@@ -172,7 +176,11 @@ PanelWindow {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: root.group = page.modelData.id
+                        onClicked: {
+                            // first, so a text being edited is written before its page goes
+                            keys.forceActiveFocus()
+                            root.group = page.modelData.id
+                        }
                     }
                 }
             }

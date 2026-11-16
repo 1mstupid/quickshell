@@ -85,7 +85,7 @@ Item {
 
     Text {
         visible: root.primary
-        text: Qt.formatDateTime(clock.date, "HH:mm")
+        text: Qt.formatDateTime(clock.date, UserSettings.clockFormat)
         color: Qt.alpha(Theme.fg, 0.9)
         font.family: Theme.fontFamilyDisplay
         font.bold: true
@@ -229,7 +229,7 @@ Item {
 
             Text {
                 anchors.centerIn: parent
-                text: Qt.formatDateTime(clock.date, "HH:mm")
+                text: Qt.formatDateTime(clock.date, UserSettings.clockFormat)
                 color: "white"
                 font.pixelSize: 64
             }
