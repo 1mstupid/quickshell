@@ -8,15 +8,17 @@ import "../../services/menu"
 import "../notch"
 import "../bar/media"
 import "../drawer"
+import "../bar"
 
 // The focus notch: the bar's center pill grows into the task timer and, on a
 // click, into a panel with a row of page buttons along the top. Hover the pill
-// and it widens into a strip with the task in focus, the time spent on it so
-// far (or, for a block of the schedule, what is left of it and when it ends),
-// and pause and done; with nothing in focus it offers the block the schedule
-// has on now. Click the strip (or run `qs ipc call focusnotch toggle`)
-// and it opens further. A header switches between Home, Work and Ports; Work holds the
-// Day, Week and Focus pages, and a small switch on a row under the tabs picks between them:
+// and it widens into a strip. With a task in focus the strip shows it, the time
+// spent on it so far (or, for a block of the schedule, what is left of it and
+// when it ends), and pause and done. With nothing in focus it shows the clock,
+// the date, the now-playing track and the workspaces. Click the strip (or run
+// `qs ipc call focusnotch toggle`) and it opens further. A header switches between
+// Home, Work and Ports; Work holds the Day, Week and Focus pages, and a small switch
+// on a row under the tabs picks between them:
 //   Home   the now-playing card on the left, and the day on the right: the date,
 //          what is on now and what comes next.
 //   Day    what is left to do: todo.md's tasks together with today's blocks from
@@ -380,7 +382,7 @@ PanelWindow {
 
     Notch {
         bodyWidth: card.width
-        bodyHeight: card.height
+        bodyHeight: card.height + 18
         x: card.x - bodyX
         y: card.y
     }
@@ -446,7 +448,7 @@ PanelWindow {
             width: root.hoverW
             height: root.hoverH
             x: (card.width - width) / 2
-            opacity: Math.max(0, (root.grow - 0.5) * 2) * Math.max(0, 1 - root.expand * 2)
+            opacity: Math.max(0, (root.grow - 0.5) * 2) * Math.max(0, 1 - root.expand * 2) * (root.focusOn ? 1 : 0)
             visible: opacity > 0
 
             Row {
@@ -552,13 +554,127 @@ PanelWindow {
                         main: true
                         onClicked: TaskFocus.complete()
                     }
-                    IconButton {
-                        visible: !root.focusOn && root.nextRow !== null
-                        glyph: "󰐊"
-                        main: true
-                        onClicked: root.focusRow(root.nextRow)
+                }
+            }
+        }
+
+        // ── The idle strip: shown on hover while nothing is in focus ───────
+        Item {
+            id: idleStrip
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: root.hoverW
+            height: root.hoverH + 10
+            x: (card.width - width) / 2
+            opacity: Math.max(0, (root.grow - 0.5) * 2) * Math.max(0, 1 - root.expand * 2) * (root.focusOn ? 0 : 1)
+            visible: opacity > 0
+
+            // the clock ticks on the minute, not every second: no polling
+            SystemClock {
+                id: idleClock
+                precision: SystemClock.Minutes
+            }
+            // the same MPRIS state the bar's media wave and the Home page read
+            MediaState { id: idleMedia }
+
+            Column {
+                anchors.left: parent.left
+                anchors.leftMargin: 22
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 2
+
+                Text {
+                    text: Qt.formatDateTime(idleClock.date, UserSettings.clockFormat)
+                    color: Theme.fg
+                    font.family: Theme.fontFamilyDisplay
+                    font.pixelSize: 34
+                    font.weight: Font.DemiBold
+                }
+                Text {
+                    text: Qt.formatDate(idleClock.date, "dddd, MMMM d")
+                    color: Qt.alpha(Theme.fg, 0.55)
+                    font.family: Theme.fontFamilySans
+                    font.pixelSize: 11
+                }
+            }
+
+            Rectangle {
+                x: 250
+                y: 14
+                width: 1
+                height: parent.height - 28
+                color: Qt.alpha(Theme.fg, 0.12)
+            }
+
+            Row {
+                id: idleMediaRow
+                anchors.right: parent.right
+                anchors.rightMargin: 22
+                anchors.top: parent.top
+                anchors.topMargin: 14
+                spacing: 10
+
+                Rectangle {
+                    id: idleArt
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 36
+                    height: 36
+                    radius: 8
+                    color: Qt.alpha(Theme.fg, 0.08)
+
+                    // rounding by mask, since clip only cuts square corners
+                    Item {
+                        id: idleArtMask
+                        anchors.fill: parent
+                        visible: false
+                        layer.enabled: true
+                        Rectangle { anchors.fill: parent; radius: idleArt.radius; color: "white" }
+                    }
+                    Image {
+                        anchors.fill: parent
+                        source: idleMedia.player?.trackArtUrl ?? ""
+                        fillMode: Image.PreserveAspectCrop
+                        visible: status === Image.Ready
+                        layer.enabled: true
+                        layer.effect: MultiEffect {
+                            maskEnabled: true
+                            maskSource: idleArtMask
+                        }
                     }
                 }
+
+                Column {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 130
+                    spacing: 2
+
+                    Text {
+                        width: parent.width
+                        text: idleMedia.present ? (idleMedia.player?.trackTitle ?? "") : "Nothing playing"
+                        color: idleMedia.present ? Theme.fg : Qt.alpha(Theme.fg, 0.5)
+                        font.family: Theme.fontFamilySans
+                        font.pixelSize: 13
+                        font.weight: idleMedia.present ? Font.DemiBold : Font.Normal
+                        elide: Text.ElideRight
+                    }
+                    Text {
+                        width: parent.width
+                        visible: idleMedia.present
+                        text: idleMedia.artistText
+                        color: Qt.alpha(Theme.fg, 0.6)
+                        font.family: Theme.fontFamilySans
+                        font.pixelSize: 11
+                        elide: Text.ElideRight
+                    }
+                }
+            }
+
+            // the bar's workspace capsules for this screen, under the track
+            Workspaces {
+                anchors.right: parent.right
+                anchors.rightMargin: 22
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 14
+                outputName: PillState.originName
             }
         }
 
