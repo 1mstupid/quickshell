@@ -18,6 +18,8 @@ import "Settings.js" as Schema
 // The rounding of the notch and of every panel that grows from it, in pixels, is
 // {"cornerRadius": 26}; it never goes past half the shorter side of what it rounds, so
 // the small bar pill is a capsule and the radius opens up as a panel grows.
+// Fonts are {"bodyFont": "SFProText Nerd Font", "displayFont": "SFProDisplay Nerd Font"}, and the
+// clocks {"clock24": true}.
 // A missing file, a bad file or a missing key keeps the default, and so does a value of the
 // wrong type; a number outside its range is held to it. The file is read on start and whenever
 // it changes. `set(key, value)` changes one setting and writes the file, and keys that
@@ -43,6 +45,12 @@ Singleton {
     property bool nightLight: Schema.defaultOf("nightLight")
     property bool keepAwake: Schema.defaultOf("keepAwake")
     property bool screenshot: Schema.defaultOf("screenshot")
+    // the faces of the text: the body font and the one for the big figures
+    property string bodyFont: Schema.defaultOf("bodyFont")
+    property string displayFont: Schema.defaultOf("displayFont")
+    // 24 hours on the clocks, or 12 with AM and PM
+    property bool clock24: Schema.defaultOf("clock24")
+    readonly property string clockFormat: clock24 ? "HH:mm" : "h:mm AP"
     // the bar and its panels as a floating pill, without the screen border
     property bool pill: Schema.defaultOf("pill")
     // 26 is the control panel's, the one the others follow

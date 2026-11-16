@@ -42,14 +42,15 @@ Singleton {
     // spacing, larger x-height), Display for 20 px and up. Nearly all the
     // shell's text is 9 to 15 px, so Text is the default and Display is kept for
     // the big figures. Both are the Nerd Font builds, so icon glyphs work in either.
-    readonly property string fontFamily: "SFProText Nerd Font"
-    readonly property string fontFamilyAlt: "SFProText Nerd Font"
+    // They are the `bodyFont` and `displayFont` settings (the defaults are the SF Pro ones above).
+    readonly property string fontFamily: UserSettings.bodyFont
+    readonly property string fontFamilyAlt: UserSettings.bodyFont
     // proportional face for titles and labels; glyph icons stay on fontFamily
-    readonly property string fontFamilySans: "SFProText Nerd Font"
+    readonly property string fontFamilySans: UserSettings.bodyFont
     // numbers and times
-    readonly property string fontFamilyNum: "SFProText Nerd Font"
+    readonly property string fontFamilyNum: UserSettings.bodyFont
     // text at 20 px and up: the timer readouts and the big totals
-    readonly property string fontFamilyDisplay: "SFProDisplay Nerd Font"
+    readonly property string fontFamilyDisplay: UserSettings.displayFont
     readonly property real autoScale: {
         const s = Quickshell.screens.length > 0 ? Quickshell.screens[0] : null
         const h = s ? s.height : 1080
