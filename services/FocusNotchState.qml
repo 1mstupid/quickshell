@@ -47,6 +47,12 @@ Singleton {
             showControl()
     }
 
+    // the usage page, from `qs ipc call focusnotch usage`; opens it on its own
+    function showUsage() {
+        page = "usage"
+        show()
+    }
+
     function toggle() { openRequested = !openRequested }
     // open on Home, where the notifications are; closes if already there
     function toggleHome() {
@@ -65,5 +71,6 @@ Singleton {
         function toggle(): void { root.toggle() }
         function show(): void { root.show() }
         function hide(): void { root.hide() }
+        function usage(): void { root.showUsage() }
     }
 }

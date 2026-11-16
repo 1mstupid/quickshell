@@ -8,7 +8,6 @@ import "./services"
 import "./widgets/app_launcher"
 import "./widgets/bar"
 import "./widgets/bar/media"
-import "./widgets/dashboard"
 import "./widgets/focus_notch"
 import "./widgets/border"
 import "./widgets/habits"
@@ -32,7 +31,6 @@ ShellRoot {
 
     SettingsWindow {}
 
-    Dashboard {}
 
     FocusNotch {}
 

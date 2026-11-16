@@ -3,7 +3,7 @@ import Quickshell.Services.Mpris
 
 
 // Shared now-playing state (MPRIS), no visuals. The bar's Media pill and
-// the dashboard's Media page each own one, so they follow the same players
+// the notch's Home page each own one, so they follow the same players
 // but keep their own pinned player and dismissed state.
 Item {
     id: root
