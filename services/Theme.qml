@@ -69,14 +69,17 @@ Singleton {
     // the scheme in use, written by the colorscheme and wallpaper pickers; none, or one that is
     // not in the list (the wallpaper's own), is dark
     FileView {
-        path: Quickshell.env("HOME") + "/.local/xdg/config/colorscheme-current"
-        watchChanges: true
-        onFileChanged: reload()
-        onLoaded: {
-            const at = Schemes.indexOfId(text().trim())
-            root.light = at >= 0 && Schemes.SCHEMES[at].light === true
-        }
-        onLoadFailed: root.light = false
+      path: Quickshell.env("HOME") + "/.local/xdg/config/colorscheme-current"
+      watchChanges: true
+
+      onFileChanged: reload()
+
+      onLoaded: {
+          const id = text().trim()
+          const at = Schemes.indexOfId(id)
+
+          console.log("Colorscheme:", id, "Index:", at)
+      }
     }
 
     FileView {
