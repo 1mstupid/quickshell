@@ -382,7 +382,7 @@ PanelWindow {
 
     Notch {
         bodyWidth: card.width
-        bodyHeight: card.height
+        bodyHeight: card.height + 18
         x: card.x - bodyX
         y: card.y
     }
@@ -561,8 +561,9 @@ PanelWindow {
         // ── The idle strip: shown on hover while nothing is in focus ───────
         Item {
             id: idleStrip
+            anchors.horizontalCenter: parent.horizontalCenter
             width: root.hoverW
-            height: root.hoverH
+            height: root.hoverH + 10
             x: (card.width - width) / 2
             opacity: Math.max(0, (root.grow - 0.5) * 2) * Math.max(0, 1 - root.expand * 2) * (root.focusOn ? 0 : 1)
             visible: opacity > 0
