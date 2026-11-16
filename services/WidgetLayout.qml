@@ -25,7 +25,8 @@ Singleton {
         habits: "top-right",
         focus: "bottom-left",
         usage: "bottom-right",
-        media: "bottom-center"
+        media: "bottom-center",
+        lyrics: "bottom-center"
     })
     // the glyph each widget is listed under in the layout bar
     readonly property var glyphs: ({
@@ -33,7 +34,8 @@ Singleton {
         habits: "󰄳",
         focus: "󰔟",
         usage: "󰄪",
-        media: "󰝚"
+        media: "󰝚",
+        lyrics: "󰎈"
     })
 
     property var entries: ({})
@@ -47,7 +49,8 @@ Singleton {
         habits: UserSettings.habitsWidget,
         focus: UserSettings.focusWidget,
         usage: UserSettings.usageRing,
-        media: UserSettings.mediaWidget
+        media: UserSettings.mediaWidget,
+        lyrics: false
     })
 
     function parse(t) {

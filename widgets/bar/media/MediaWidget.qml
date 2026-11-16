@@ -4,7 +4,6 @@ import Quickshell.Io
 import QtQuick
 import QtQuick.Effects
 import "../../../services"
-import "./LyricsMath.js" as LyricsMath
 
 PanelWindow {
     id: root
@@ -42,16 +41,6 @@ PanelWindow {
     readonly property int discD: 300
     readonly property int discLower: 0
 
-    property bool lyricsOn: false
-
-    // ── Lyrics state ───────────────────────────────────────────────────────
-    property var lyrics: []
-    property string lyricsKey: ""
-    property string fetchKey: ""
-    property var cache: ({})
-    property string lyricStatus: ""
-    property int lyricIdx: -1
-
     // Local smooth position tracker for live updating during playback
     property real livePos: 0.0
 
@@ -67,174 +56,12 @@ PanelWindow {
         }
     }
 
-    Timer {
-        interval: 50
-        repeat: true
-        running: media.playing && root.lyricsOn && root.visible
-        onTriggered: {
-            root.livePos += 0.05
-        }
-    }
-
     IpcHandler {
         target: "media"
         function toggle(): void { WidgetLayout.toggle("media") }
         function show(): void { if (!WidgetLayout.shown("media")) WidgetLayout.toggle("media") }
         function hide(): void { if (WidgetLayout.shown("media")) WidgetLayout.toggle("media") }
         function kill(): void { media.kill() }
-    }
-
-    // ── Integrated LyricsMath Helpers ───────────────────────────────────────
-
-    function loadLyrics() {
-        const title = media.player?.trackTitle ?? ""
-        const artist = media.artistText
-        if (!lyricsOn || title === "") {
-            lyricStatus = ""
-            return
-        }
-        
-        const key = LyricsMath.trackKey(artist, title, media.len)
-        if (key === lyricsKey)
-            return
-        lyricsKey = key
-        
-        if (cache[key] !== undefined) {
-            lyrics = cache[key]
-            lyricStatus = lyrics.length ? "" : "none"
-            return
-        }
-        
-        lyrics = []
-        lyricStatus = "searching"
-        fetchKey = key
-
-        const cands = LyricsMath.candidates(artist, title)
-        const queryArtist = cands.length > 0 ? cands[0].artist : artist
-        const queryTitle = cands.length > 0 ? cands[0].title : title
-
-        const args = ["curl", "-sG", "--max-time", "8", "https://lrclib.net/api/get",
-            "--data-urlencode", "track_name=" + queryTitle,
-            "--data-urlencode", "artist_name=" + queryArtist]
-        if (media.len > 0)
-            args.push("--data-urlencode", "duration=" + Math.round(media.len))
-
-        fetchProc.running = false
-        fetchProc.command = args
-        fetchProc.running = true
-    }
-
-    function activeLineProgress() {
-        if (lyricIdx < 0 || lyricIdx >= lyrics.length) return 0.0
-        let currentLine = lyrics[lyricIdx]
-        if (!currentLine || !currentLine.text) return 0.0
-
-        let nextLine = lyrics[lyricIdx + 1]
-        let room = nextLine ? (nextLine.t - currentLine.t) : 6.0
-        
-        let rate = LyricsMath.songRate(lyrics)
-        let spanDuration = LyricsMath.sungSpan(currentLine.text, room, rate, currentLine.end)
-        
-        let toks = LyricsMath.tokens(currentLine.text)
-        let sp = LyricsMath.spansFor(toks, currentLine.t, spanDuration, currentLine.marks)
-        
-        let activeWordIdx = LyricsMath.wordAt(sp, root.livePos)
-        if (activeWordIdx < 0) return 0.0
-        if (activeWordIdx >= sp.length - 1) return 1.0
-
-        let hopProgress = LyricsMath.hop(sp, activeWordIdx, root.livePos)
-        return (activeWordIdx + hopProgress) / sp.length
-    }
-
-    Process {
-        id: fetchProc
-        stdout: StdioCollector {
-            onStreamFinished: {
-                let parsed = []
-                try {
-                    const rawLrc = JSON.parse(text).syncedLyrics ?? ""
-                    parsed = LyricsMath.parseLrc(rawLrc)
-                    parsed = LyricsMath.foldEchoes(parsed)
-                } catch (e) {
-                    parsed = []
-                }
-
-                const c = Object.assign({}, root.cache)
-                c[root.fetchKey] = parsed
-                root.cache = c
-
-                if (root.fetchKey === root.lyricsKey) {
-                    root.lyrics = parsed
-                    root.lyricStatus = parsed.length ? "" : "none"
-                }
-            }
-        }
-    }
-
-    onLyricsOnChanged: loadLyrics()
-
-    Connections {
-        target: media.player
-        function onTrackTitleChanged() {
-            root.lyricsKey = ""
-            root.loadLyrics()
-        }
-    }
-
-    Timer {
-        id: lyricTimer
-        interval: 50
-        repeat: true
-        running: root.lyricsOn && root.visible
-        triggeredOnStart: true
-        onTriggered: {
-            root.lyricIdx = LyricsMath.lineIndexAt(root.lyrics, root.livePos)
-        }
-    }
-
-    // ── Custom Karaoke Fill Component (Fixed for Long Strings) ─────────────
-    component KaraokeFillText: Item {
-        id: kText
-        property string text: ""
-        property real progress: 0.0
-        property color restingColor: Qt.alpha(Theme.fg, 0.35)
-        property color activeColor: Theme.fg
-        property int fontSize: 15
-        property font customFont: Qt.font({ family: Theme.fontFamily, pixelSize: fontSize })
-
-        implicitHeight: baseText.implicitHeight
-
-        Text {
-            id: baseText
-            anchors.verticalCenter: parent.verticalCenter
-            width: parent.width
-            horizontalAlignment: Text.AlignHCenter
-            elide: Text.ElideRight
-            text: kText.text
-            color: kText.restingColor
-            font: kText.customFont
-        }
-
-        Item {
-            id: fillMask
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.left: parent.left
-            width: baseText.width * Math.max(0.0, Math.min(1.0, kText.progress))
-            height: baseText.height
-            clip: true
-
-            Text {
-                id: activeText
-                x: 0
-                y: (fillMask.height - height) / 2
-                width: baseText.width
-                horizontalAlignment: Text.AlignHCenter
-                elide: Text.ElideRight
-                text: kText.text
-                color: kText.activeColor
-                font: kText.customFont
-            }
-        }
     }
 
     // ── Transport buttons ──────────────────────────────────────────────────
@@ -389,7 +216,6 @@ PanelWindow {
             }
 
             Text {
-                visible: !root.lyricsOn
                 width: parent.width
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
@@ -401,59 +227,12 @@ PanelWindow {
 
             // --- Normal Mode: Track Title (Upgraded to MarqueeText) ---
             MarqueeText {
-                visible: !root.lyricsOn
                 width: parent.width
                 height: 20
                 text: media.player?.trackTitle ?? ""
                 color: Theme.fg
                 font.family: Theme.fontFamily
                 font.pixelSize: 16
-            }
-
-            ListView {
-                id: lyricsView
-                visible: root.lyricsOn && root.lyrics.length > 0
-                width: parent.width
-                height: 48
-                clip: true
-                model: root.lyrics
-
-                currentIndex: root.lyricIdx
-                preferredHighlightBegin: height / 2 - 12
-                preferredHighlightEnd: height / 2 + 12
-                highlightRangeMode: ListView.ApplyRange
-                highlightMoveDuration: 200
-
-                delegate: Item {
-                    required property int index
-                    required property var modelData
-
-                    width: lyricsView.width
-                    height: 24
-
-                    readonly property bool isActive: index === root.lyricIdx
-
-                    KaraokeFillText {
-                        anchors.centerIn: parent
-                        width: parent.width
-                        text: modelData.text
-                        fontSize: isActive ? 15 : 14
-                        customFont: Qt.font({ family: Theme.fontFamily, pixelSize: fontSize, bold: isActive })
-                        progress: isActive ? root.activeLineProgress() : (index < root.lyricIdx ? 1.0 : 0.0)
-                        restingColor: Qt.alpha(Theme.fg, 0.35)
-                        activeColor: Theme.fg
-                    }
-                }
-            }
-
-            Text {
-                visible: root.lyricsOn && (root.lyricStatus !== "" || root.lyrics.length === 0)
-                width: parent.width
-                horizontalAlignment: Text.AlignHCenter
-                text: root.lyricStatus === "searching" ? "searching…" : root.lyricStatus === "none" ? "no synced lyrics" : ""
-                color: Qt.alpha(Theme.fg, 0.5)
-                font.family: Theme.fontFamily
-                font.pixelSize: 13
             }
 
             Item {
@@ -543,32 +322,6 @@ PanelWindow {
                         onTapped: media.player.next()
                     }
 
-                    Rectangle {
-                        id: lyricsPill
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 44
-                        height: 20
-                        radius: 6
-                        color: root.lyricsOn ? Qt.alpha(Theme.fg, 0.25)
-                               : lyricsMa.containsMouse ? Qt.alpha(Theme.fg, 0.16)
-                               : Qt.alpha(Theme.fg, 0.08)
-                        Behavior on color { ColorAnimation { duration: 120 } }
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: "lyrics"
-                            color: Theme.fg
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 11
-                        }
-                        MouseArea {
-                            id: lyricsMa
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root.lyricsOn = !root.lyricsOn
-                        }
-                    }
                 }
             }
         }

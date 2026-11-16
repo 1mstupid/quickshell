@@ -12,6 +12,7 @@ import "./widgets/focus_notch"
 import "./widgets/border"
 import "./widgets/habits"
 import "./widgets/layout"
+import "./widgets/lyrics"
 import "./widgets/lock"
 import "./widgets/power_menu"
 import "./widgets/settings"
@@ -35,6 +36,8 @@ ShellRoot {
     FocusNotch {}
 
     MediaWidget {}
+
+    LyricsWidget {}
 
     Usage {}
 
