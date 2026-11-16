@@ -45,6 +45,10 @@ Singleton {
     property bool nightLight: Schema.defaultOf("nightLight")
     property bool keepAwake: Schema.defaultOf("keepAwake")
     property bool screenshot: Schema.defaultOf("screenshot")
+    property bool workspaces: Schema.defaultOf("workspaces")
+    property bool wave: Schema.defaultOf("wave")
+    property bool recording: Schema.defaultOf("recording")
+    property bool pomo: Schema.defaultOf("pomo")
     // the faces of the text: the body font and the one for the big figures
     property string bodyFont: Schema.defaultOf("bodyFont")
     property string displayFont: Schema.defaultOf("displayFont")

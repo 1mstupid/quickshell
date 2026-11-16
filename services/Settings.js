@@ -20,6 +20,12 @@ const GROUPS = [
 const SETTINGS = [
     // the bar and its panels
     { key: "pill", type: "bool", def: false, group: "bar", label: "Floating pill" },
+    { key: "wave", type: "bool", def: false, group: "bar", label: "Media Module" },
+    { key: "workspaces", type: "bool", def: false, group: "bar", label: "Workspaces Module" },
+    { key: "recording", type: "bool", def: false, group: "bar", label: "Recording Module" },
+    { key: "pomo", type: "bool", def: false, group: "bar", label: "Pomodoro Module" },
+
+
     { key: "cornerRadius", type: "number", def: 26, min: 0, max: 40, step: 1, unit: "px", group: "bar", label: "Corner radius" },
 
     // fonts: the body font is all the text and the icons, so it should be a Nerd Font; the display

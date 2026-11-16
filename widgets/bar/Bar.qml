@@ -55,7 +55,8 @@ PanelWindow {
     Rectangle {
         id: pill
 
-        readonly property int pad: Math.round(12 * Theme.barScale)
+        readonly property int pad: Math.round(10 * Theme.barScale)
+        readonly property int innerGap: Math.round(6 * Theme.barScale)
         readonly property bool timerShown: Pomodoro.active || Pomodoro.done
 
         // volume readout replaces the contents while it is shown; panels
@@ -65,9 +66,14 @@ PanelWindow {
         readonly property bool lockOn: Locks.shown && !PillState.active && !Volume.shown
         readonly property bool contentHidden: PillState.active || Volume.shown || Locks.shown
 
-        // each side reserves its own content width; the larger one is used on
-        // both sides, so the clock stays centered
-        readonly property int side: Math.max(workspaces.implicitWidth, rightRow.implicitWidth)
+        // Only count width + innerGap if that side actually has visible content
+        readonly property int leftW: (workspaces.visible && workspaces.implicitWidth > 0)
+            ? workspaces.implicitWidth + innerGap : 0
+        readonly property int rightW: (rightRow.visible && rightRow.implicitWidth > 0)
+            ? rightRow.implicitWidth + innerGap : 0
+
+        // Symmetrical side width keeps the clock dead-center; collapses to 0 when only the clock is shown
+        readonly property int side: Math.max(leftW, rightW)
 
         y: Overview.open ? -(height + root.topGap) : root.topGap
         Behavior on y {
@@ -121,52 +127,56 @@ PanelWindow {
 
             opacity: pill.contentHidden ? 0 : 1
             Behavior on opacity { NumberAnimation { duration: 120 } }
+            visible: UserSettings.workspaces
         }
 
         // right: media wave, recorder, pomodoro ring, the notification glyph, then the control icon
-        RowLayout {
+        Row {
             id: rightRow
             anchors.verticalCenter: parent.verticalCenter
             anchors.right: parent.right
             anchors.rightMargin: pill.pad
-            spacing: 8
+            spacing: Math.round(4 * Theme.barScale)
 
             opacity: pill.contentHidden ? 0 : 1
             Behavior on opacity { NumberAnimation { duration: 120 } }
 
-            // recording indicator; click stops it
+            // media wave
             MediaWave {
-                Layout.alignment: Qt.AlignVCenter
+                anchors.verticalCenter: parent.verticalCenter
+                visible: UserSettings.wave
             }
+
+            // recording indicator; click stops it
             Item {
                 id: recIndicator
-                Layout.alignment: Qt.AlignVCenter
-                implicitWidth: recRow.implicitWidth
-                implicitHeight: recRow.implicitHeight
+                anchors.verticalCenter: parent.verticalCenter
+                width: recRow.implicitWidth
+                height: recRow.implicitHeight
                 opacity: recorder.recording ? 1 : 0
-                visible: opacity > 0
+                visible: UserSettings.recording && opacity > 0
 
                 Behavior on opacity {
                     NumberAnimation { duration: 150; easing.type: Easing.OutQuad }
                 }
 
-                RowLayout {
+                Row {
                     id: recRow
-                    spacing: 5
+                    spacing: 4
 
                     Text {
-                        Layout.alignment: Qt.AlignVCenter
+                        anchors.verticalCenter: parent.verticalCenter
                         text: recorder.fmt(recorder.elapsed)
                         font.family: Theme.fontFamilyAlt
-                        font.pixelSize: 12
+                        font.pixelSize: 11
                         font.bold: true
                         color: Theme.red
                     }
                     Rectangle {
-                        Layout.alignment: Qt.AlignVCenter
-                        implicitWidth: 6
-                        implicitHeight: 6
-                        radius: 3
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 5
+                        height: 5
+                        radius: 2.5
                         color: Theme.red
 
                         SequentialAnimation on opacity {
@@ -189,11 +199,11 @@ PanelWindow {
             // pomodoro ring; click pauses or resumes, or dismisses when finished
             Item {
                 id: timerDot
-                Layout.alignment: Qt.AlignVCenter
-                implicitWidth: 16
-                implicitHeight: 16
+                anchors.verticalCenter: parent.verticalCenter
+                width: 14
+                height: 14
                 opacity: pill.timerShown ? 1 : 0
-                visible: opacity > 0
+                visible: UserSettings.pomo && opacity > 0
 
                 Behavior on opacity {
                     NumberAnimation { duration: 150; easing.type: Easing.OutQuad }
@@ -202,8 +212,8 @@ PanelWindow {
                 Canvas {
                     id: ring
                     anchors.centerIn: parent
-                    width: 14
-                    height: 14
+                    width: 13
+                    height: 13
 
                     readonly property color ringColor: Pomodoro.done ? Theme.red
                         : Pomodoro.paused ? Theme.disabled : Theme.accent
@@ -215,7 +225,7 @@ PanelWindow {
                         const r = c - 1.5
                         const f = Pomodoro.fraction
                         ctx.reset()
-                        ctx.lineWidth = 2
+                        ctx.lineWidth = 1.75
 
                         ctx.strokeStyle = String(Qt.alpha(Theme.fg, 0.15))
                         ctx.beginPath()
@@ -248,9 +258,9 @@ PanelWindow {
             // seen. Click opens the focus notch on Home (origin screen only).
             Item {
                 id: bell
-                Layout.alignment: Qt.AlignVCenter
-                implicitWidth: 22
-                implicitHeight: 22
+                anchors.verticalCenter: parent.verticalCenter
+                width: 18
+                height: 18
                 opacity: Notifications.toastCount > 0 ? 1 : 0
                 visible: opacity > 0
                 Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
@@ -302,7 +312,7 @@ PanelWindow {
                     text: "󰂚"
                     color: bell.tint
                     font.family: Theme.fontFamily
-                    font.pixelSize: 12
+                    font.pixelSize: 11
                 }
                 MouseArea {
                     anchors.fill: parent
@@ -319,10 +329,10 @@ PanelWindow {
             // control icon: click opens the drawer (origin screen only)
             Item {
                 id: control
-                Layout.alignment: Qt.AlignVCenter
+                anchors.verticalCenter: parent.verticalCenter
                 visible: false
-                implicitWidth: controlIcon.implicitWidth
-                implicitHeight: controlIcon.implicitHeight
+                width: controlIcon.implicitWidth
+                height: controlIcon.implicitHeight
 
                 Text {
                     id: controlIcon
