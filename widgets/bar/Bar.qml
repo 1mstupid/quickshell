@@ -142,6 +142,16 @@ PanelWindow {
             Behavior on opacity { NumberAnimation { duration: 120 } }
 
             // media wave
+            Network {
+                anchors.verticalCenter: parent.verticalCenter
+                visible: UserSettings.network ?? true
+            }
+
+            Battery {
+                anchors.verticalCenter: parent.verticalCenter
+                showPercentage: false // set to true if you want "85%" next to the icon
+                visible: hasBattery && (UserSettings.battery ?? true)
+            }
             MediaWave {
                 anchors.verticalCenter: parent.verticalCenter
                 visible: UserSettings.wave
