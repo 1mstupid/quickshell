@@ -33,7 +33,7 @@ PanelWindow {
     color: "transparent"
 
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: root.visible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: root.visible && PillState.owner === "wallpapers" ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     WlrLayershell.namespace: "quickshell-wallpapers"
 
     // the panel, and the layout inside it: pad, header, gap, carousel, gap, name, pad
@@ -57,6 +57,14 @@ PanelWindow {
     property real gap: 12
     property real minScale: 0.6
     property real scaleStep: 0.3
+
+    // where the card grows from: the pill, or the card of the panel that gave way to this one
+    property real startW: PillState.pillWidth
+    property real startH: PillState.pillHeight
+    // 1 while the images show; they fade first when another panel takes the pill
+    property real imagesOut: 1
+    // taking over another card, so the outline fades in with the morph
+    property bool taken: false
 
     // 0 = the bar pill, 1 = the full band
     property real t: 0
@@ -194,14 +202,23 @@ PanelWindow {
     Connections {
         target: PillState
         function onOwnerChanged() {
-            if (PillState.owner !== "wallpapers" && root.visible)
-                root.close()
+            if (PillState.owner !== "wallpapers" && root.visible) {
+                // a panel took the pill: hand our card over, or shrink back when nothing did
+                if (PillState.owner !== "") root.giveWay()
+                else root.close()
+            }
         }
     }
 
     function openPicker() {
         focusCurrent()
         PillState.owner = "wallpapers"
+        const from = PillState.takeOver()
+        startW = from.w
+        startH = from.h
+        taken = from.taken
+        giveWayAnim.stop()
+        imagesOut = 1
         visible = true
         morph.stop()
         morph.from = root.t
@@ -209,7 +226,16 @@ PanelWindow {
         morph.start()
     }
 
+    // another panel took the pill: the images fade, then the card shrinks back into the pill
+    function giveWay() {
+        morph.stop()
+        giveWayAnim.restart()
+    }
+
     function close() {
+        startW = PillState.pillWidth
+        startH = PillState.pillHeight
+        taken = false
         morph.stop()
         morph.from = root.t
         morph.to = 0
@@ -241,6 +267,27 @@ PanelWindow {
         function toggle(): void { root.toggle() }
         function random(): void { root.applyRandom() }
         function set(path: string): void { root.apply(path) }
+    }
+
+    // the band is much wider than the pill, so it fades its images first and then
+    // shrinks back into the pill, where the next panel grows from
+    SequentialAnimation {
+        id: giveWayAnim
+        NumberAnimation {
+            target: root
+            property: "imagesOut"
+            to: 0
+            duration: PillState.morphMs * 0.4
+            easing.type: Easing.OutQuad
+        }
+        NumberAnimation {
+            target: root
+            property: "t"
+            to: 0
+            duration: PillState.morphMs * 0.6
+            easing.type: Easing.InOutCubic
+        }
+        ScriptAction { script: { root.visible = false } }
     }
 
     // grows the card from the pill (t=0) into the band (t=1); on the way back
@@ -351,6 +398,7 @@ PanelWindow {
     // the outline is a notch, drawn behind the card and sized to it
     Notch {
         id: outline
+        opacity: root.taken ? root.t : 1
         bodyWidth: card.width
         bodyHeight: card.height
         x: card.x - bodyX
@@ -361,8 +409,8 @@ PanelWindow {
     Rectangle {
         id: card
 
-        readonly property real fromW: PillState.pillWidth
-        readonly property real fromH: PillState.pillHeight
+        readonly property real fromW: root.startW
+        readonly property real fromH: root.startH
 
         width: fromW + (root.bandWidth - fromW) * root.t
         height: fromH + (root.bandHeight - fromH) * root.t
@@ -466,7 +514,7 @@ PanelWindow {
         width: Math.max(0, card.width - 2 * root.pad)
         height: root.carouselH
         clip: true
-        opacity: Math.max(0, (root.t - 0.5) * 2)
+        opacity: Math.min(root.imagesOut, Math.max(0, (root.t - 0.5) * 2))
 
         // animated centre position, so moving between cards glides
         property real pos: root.currentIndex

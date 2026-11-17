@@ -15,6 +15,23 @@ QtObject {
     // how long a panel takes to grow out of the pill, and to go back: the same for all of them
     readonly property int morphMs: 320
 
+    // The card a panel gave up when another panel took the pill. The next panel grows out of
+    // it instead of out of the pill, so the two hand over without a pill-sized step. Cleared
+    // once nothing owns the pill, so a stale card never starts a later panel.
+    property real takeoverW: 0
+    property real takeoverH: 0
+    onOwnerChanged: if (owner === "") { takeoverW = 0; takeoverH = 0 }
+
+    // the size a panel starts growing from, read once by the panel that opens: the card
+    // it takes over, else the pill
+    function takeOver() {
+        const from = takeoverW > 0 ? { w: takeoverW, h: takeoverH, taken: true }
+                                   : { w: pillWidth, h: pillHeight, taken: false }
+        takeoverW = 0
+        takeoverH = 0
+        return from
+    }
+
     // morph progress of the owning panel, 0 = pill, 1 = full panel
     property real progress: 0
 

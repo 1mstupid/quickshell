@@ -285,6 +285,20 @@ PanelWindow {
         goTo(1, next === "open" ? 1 : 0)
     }
 
+    // another panel took the pill: hand this card over and step aside at once
+    function giveWay() {
+        PillState.takeoverW = card.width
+        PillState.takeoverH = card.height
+        growAnim.stop()
+        expandAnim.stop()
+        grow = 0
+        expand = 0
+        stage = ""
+        armed = false
+        FocusNotchState.openRequested = false
+        visible = false
+    }
+
     function close() {
         if (stage === "")
             return
@@ -366,7 +380,9 @@ PanelWindow {
         target: PillState
         function onOwnerChanged() {
             if (PillState.owner !== "focus" && root.stage !== "") {
-                root.close()
+                // a panel took the pill: hand our card over, or shrink back when nothing did
+                if (PillState.owner !== "") root.giveWay()
+                else root.close()
             }
         }
     }

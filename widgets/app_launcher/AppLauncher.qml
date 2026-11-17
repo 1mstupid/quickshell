@@ -25,7 +25,7 @@ PanelWindow {
     exclusionMode: ExclusionMode.Ignore
 
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: root.visible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: root.visible && PillState.owner === "applauncher" ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     WlrLayershell.namespace: "quickshell-launcher"
 
     IpcHandler {
@@ -40,6 +40,14 @@ PanelWindow {
     // 12 top + 34 search + 8 gap + 8 gap + 16 footer + 12 bottom, plus the rows
     readonly property int chromeH: 90
     readonly property int maxPanelH: chromeH + maxVisible * itemH
+
+    // where the card grows from: the pill, or the card of the panel that gave way to this one
+    property real startW: PillState.pillWidth
+    property real startH: PillState.pillHeight
+    // 1 while shown; fades to 0 when another panel takes the pill
+    property real fadeOut: 1
+    // taking over another card, so the outline fades in with the morph
+    property bool taken: false
 
     // 0 = the bar pill, 1 = the full panel
     property real t: 0
@@ -167,6 +175,12 @@ PanelWindow {
     // ── Open / close ───────────────────────────────────────────────────────
     function openLauncher() {
         PillState.owner = "applauncher";
+        const from = PillState.takeOver();
+        startW = from.w;
+        startH = from.h;
+        taken = from.taken;
+        fadeOutAnim.stop();
+        fadeOut = 1;
         mode = "";
         searchInput.text = "";
         if (ClipboardHistory.reload) ClipboardHistory.reload();
@@ -177,11 +191,38 @@ PanelWindow {
         morph.start();
     }
 
+    // another panel took the pill: hand this card over and step aside at once
+    function giveWay() {
+        PillState.takeoverW = card.width;
+        PillState.takeoverH = card.height;
+        morph.stop();
+        fadeOutAnim.restart();
+    }
+
     function close() {
+        startW = PillState.pillWidth;
+        startH = PillState.pillHeight;
+        taken = false;
         morph.stop();
         morph.from = root.t;
         morph.to = 0;
         morph.start();
+    }
+
+    // the card that gave way fades out while the one taking over fades in, so the two cross
+    NumberAnimation {
+        id: fadeOutAnim
+        target: root
+        property: "fadeOut"
+        to: 0
+        duration: PillState.morphMs
+        easing.type: Easing.InOutCubic
+        onFinished: {
+            if (root.fadeOut <= 0) {
+                root.visible = false
+                root.t = 0
+            }
+        }
     }
 
     NumberAnimation {
@@ -213,8 +254,11 @@ PanelWindow {
     Connections {
         target: PillState
         function onOwnerChanged() {
-            if (PillState.owner !== "applauncher" && root.visible)
+            if (PillState.owner !== "applauncher" && root.visible) {
+                // a panel took the pill: hand our card over; the flag then runs the usual close
+                if (PillState.owner !== "") root.giveWay();
                 AppLauncherState.launcherVisible = false;
+            }
         }
     }
 
@@ -293,6 +337,7 @@ PanelWindow {
     // ── Card ───────────────────────────────────────────────────────────────
     Notch {
         id: outline
+        opacity: root.fadeOut * (root.taken ? root.t : 1)
         bodyWidth: card.width
         bodyHeight: card.height
         x: card.x - bodyX
@@ -301,9 +346,10 @@ PanelWindow {
 
     Rectangle {
         id: card
+        opacity: root.fadeOut
 
-        readonly property real fromW: PillState.pillWidth
-        readonly property real fromH: PillState.pillHeight
+        readonly property real fromW: root.startW
+        readonly property real fromH: root.startH
 
         width: fromW + (root.panelW - fromW) * root.t
         height: fromH + (root.panelH - fromH) * root.t
