@@ -34,6 +34,12 @@ Singleton {
     // the defaults are the list's, so that there is one place for them
     property bool usageRing: Schema.defaultOf("usageRing")
     property bool focusWidget: Schema.defaultOf("focusWidget")
+    property bool focusNotch: Schema.defaultOf("focusNotch")
+    property bool focusHome: Schema.defaultOf("focusHome")
+    property bool focusWork: Schema.defaultOf("focusWork")
+    property bool focusPorts: Schema.defaultOf("focusPorts")
+    property bool focusUsage: Schema.defaultOf("focusUsage")
+    property bool focusShare: Schema.defaultOf("focusShare")
     property bool todoWidget: Schema.defaultOf("todoWidget")
     property bool habitsWidget: Schema.defaultOf("habitsWidget")
     property bool mediaWidget: Schema.defaultOf("mediaWidget")

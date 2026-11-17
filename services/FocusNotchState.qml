@@ -19,6 +19,22 @@ Singleton {
     property string page: "home"
     function setPage(key) { page = key }
 
+    // the pages the settings leave on: a page that is off is left out of the strip and the
+    // wheel, and with the notch off or no page left, the notch does not open
+    function pageOn(key) {
+        switch (key) {
+        case "home": return UserSettings.focusHome
+        case "work": case "day": case "week": case "focus": return UserSettings.focusWork
+        case "ports": return UserSettings.focusPorts
+        case "usage": return UserSettings.focusUsage
+        case "share": return UserSettings.focusShare
+        default: return true
+        }
+    }
+    readonly property bool available: UserSettings.focusNotch
+        && (UserSettings.focusHome || UserSettings.focusWork || UserSettings.focusPorts
+            || UserSettings.focusUsage || UserSettings.focusShare)
+
     // The control panel is a page with no tab: the gear on the header opens it, and
     // `before` is the page it goes back to.
     property string before: "home"

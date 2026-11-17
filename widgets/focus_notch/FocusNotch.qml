@@ -84,8 +84,15 @@ PanelWindow {
     property string stage: ""
     // the open panel's page: "home", "day", "week", "focus", "ports", "usage" or "control", remembered
     // across openings (the control page is not: it is left when the panel closes)
-    readonly property string tab: FocusNotchState.page
-    readonly property var pages: ["home", "day", "week", "focus", "ports", "usage", "share"]
+    // a page the settings turn off is not shown; the first one that is on takes its place
+    readonly property string tab: FocusNotchState.pageOn(FocusNotchState.page) ? FocusNotchState.page : (pages[0] ?? "home")
+    readonly property var pages: ["home", "day", "week", "focus", "ports", "usage", "share"].filter(FocusNotchState.pageOn)
+    // the strip's tabs, minus the pages the settings turn off
+    readonly property var tabList: [{ key: "home", glyph: "󰋜", name: "Home" },
+                                    { key: "work", glyph: "󰸗", name: "Work" },
+                                    { key: "ports", glyph: "󰈀", name: "Ports" },
+                                    { key: "usage", glyph: "󰄧", name: "Usage" },
+                                    { key: "share", glyph: "󰈔", name: "Share" }].filter(t => FocusNotchState.pageOn(t.key))
     readonly property int pageIndex: Math.max(0, pages.indexOf(tab))
     // Work is Day or Week; the Work tab returns to the one last shown
     property string lastWork: "day"
@@ -267,7 +274,7 @@ PanelWindow {
     }
 
     // ── Open / close ───────────────────────────────────────────────────────
-    readonly property bool canTake: PillState.owner === "" && !Overview.open
+    readonly property bool canTake: PillState.owner === "" && !Overview.open && FocusNotchState.available
 
     function goTo(g, e) {
         growAnim.stop()
@@ -365,7 +372,10 @@ PanelWindow {
             }
         }
         function onOpenRequestedChanged() {
-            if (FocusNotchState.openRequested) {
+            // the notch is off or has no page on: a request to open it is dropped
+            if (FocusNotchState.openRequested && !FocusNotchState.available) {
+                FocusNotchState.openRequested = false
+            } else if (FocusNotchState.openRequested) {
                 // the control panel takes the pill from another panel, as it did as a window
                 if (root.stage !== "open" && (root.canTake || root.stage === "hover"
                         || FocusNotchState.page === "control"))
@@ -719,11 +729,7 @@ PanelWindow {
                     spacing: 2
 
                     Repeater {
-                        model: [{ key: "home", glyph: "󰋜", name: "Home" },
-                                { key: "work", glyph: "󰸗", name: "Work" },
-                                { key: "ports", glyph: "󰈀", name: "Ports" },
-                                { key: "usage", glyph: "󰄧", name: "Usage" },
-                                { key: "share", glyph: "󰈔", name: "Share" }]
+                        model: root.tabList
 
                         Rectangle {
                             id: tabButton
