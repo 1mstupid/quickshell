@@ -297,26 +297,21 @@ PanelWindow {
     // ── Navigation ─────────────────────────────────────────────────────────
     function shareSelected() {
         var r = results[selectedIndex];
-        if (!r) return;
+        // Only proceed if it's actually a file result
+        if (!r || r.kind !== "file") return;
 
-        // Determine what path/value to share based on result type
-        var targetPath = "";
-        if (r.kind === "file") {
-            targetPath = r.value;
-        } else if (r.kind === "app" && r.entry && r.entry.path) {
-            // If it's an app, you can share its desktop file or path if available
-            targetPath = r.entry.path;
-        } else if (r.kind === "clipboard" && typeof r.value === "string") {
-            // Optional: If you want to share text/clipboard items, you could write to a temp file, 
-            // but LocalSend is typically for files. We'll stick to file/path types.
-            return;
-        }
-
+        var targetPath = r.value;
         if (targetPath !== "") {
-            Share.addFile(targetPath);
-            Share.open();
-            // If you want it to trigger sending immediately:
-            // Share.send();
+            ShareService.addFile(targetPath);
+            ShareService.open();
+
+            // Automatically trigger the send process if a device IP is set in settings.json
+            if (ShareService.selectedDevice !== "") {
+                ShareService.send();
+            } else {
+                console.log("Share warning: 'shareDevice' is not configured in settings.json");
+            }
+
             AppLauncherState.hide();
         }
     }
