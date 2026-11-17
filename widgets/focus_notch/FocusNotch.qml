@@ -85,7 +85,7 @@ PanelWindow {
     // the open panel's page: "home", "day", "week", "focus", "ports", "usage" or "control", remembered
     // across openings (the control page is not: it is left when the panel closes)
     readonly property string tab: FocusNotchState.page
-    readonly property var pages: ["home", "day", "week", "focus", "ports", "usage"]
+    readonly property var pages: ["home", "day", "week", "focus", "ports", "usage", "share"]
     readonly property int pageIndex: Math.max(0, pages.indexOf(tab))
     // Work is Day or Week; the Work tab returns to the one last shown
     property string lastWork: "day"
@@ -721,7 +721,8 @@ PanelWindow {
                         model: [{ key: "home", glyph: "󰋜", name: "Home" },
                                 { key: "work", glyph: "󰸗", name: "Work" },
                                 { key: "ports", glyph: "󰈀", name: "Ports" },
-                                { key: "usage", glyph: "󰄧", name: "Usage" }]
+                                { key: "usage", glyph: "󰄧", name: "Usage" },
+                                { key: "share", glyph: "󰈔", name: "Share" }]
 
                         Rectangle {
                             id: tabButton
@@ -2049,6 +2050,14 @@ PanelWindow {
             // ── Usage: time per app, from the usage data ───────────────────
             UsagePage {
                 visible: root.tab === "usage"
+                y: 40
+                width: panel.width
+                height: panel.height - y
+            }
+
+            // ── Share: the files queued for a LocalSend send ───────────────
+            SharePage {
+                visible: root.tab === "share"
                 y: 40
                 width: panel.width
                 height: panel.height - y
