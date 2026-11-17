@@ -268,8 +268,29 @@ PanelWindow {
         TaskFocus.focus(r)
     }
 
+    // A task with a planned block in schedule.md clears only once half of that
+    // time is spent; a task without one clears at any time.
+    function clearableAt(title, spentMin) {
+        const planned = Schedule.minutesFor(title)
+        return planned === 0 || spentMin >= planned / 2
+    }
+
+    // time spent on a row, including the live run when it is the task in focus
+    function rowSpentMin(r) {
+        return (r.task ? r.task.spent : 0) + (TaskFocus.sameTask(r) ? TaskFocus.elapsedMs / 60000 : 0)
+    }
+
+    function rowClearable(r) {
+        return clearableAt(r.title, rowSpentMin(r))
+    }
+
+    readonly property bool focusClearable: focusOn
+        && clearableAt(TaskFocus.title, (TaskFocus.item ? TaskFocus.item.spent : 0) + TaskFocus.elapsedMs / 60000)
+
     // ticks a row; a block of the schedule is added to the file already ticked
     function tickRow(r) {
+        if (!rowClearable(r))
+            return
         if (r.kind === "slot")
             Todo.materialize(r, true)
         else
@@ -592,7 +613,7 @@ PanelWindow {
                         onClicked: TaskFocus.toggle()
                     }
                     IconButton {
-                        visible: root.focusOn
+                        visible: root.focusClearable
                         glyph: "󰄬"
                         main: true
                         onClicked: TaskFocus.complete()
@@ -1550,7 +1571,7 @@ PanelWindow {
                                 width: 16
                                 horizontalAlignment: Text.AlignHCenter
                                 text: "󰄬"
-                                opacity: rowHover.hovered ? 1 : 0
+                                opacity: rowHover.hovered && root.rowClearable(dayRowItem.modelData) ? 1 : 0
                                 color: tickMouse.containsMouse ? Theme.accent : Qt.alpha(Theme.fg, 0.7)
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.iconSize
@@ -1560,7 +1581,7 @@ PanelWindow {
                                     id: tickMouse
                                     anchors.fill: parent
                                     anchors.margins: -5
-                                    enabled: rowHover.hovered
+                                    enabled: rowHover.hovered && root.rowClearable(dayRowItem.modelData)
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: root.tickRow(dayRowItem.modelData)
@@ -1756,6 +1777,7 @@ PanelWindow {
                             onClicked: TaskFocus.toggle()
                         }
                         PillButton {
+                            visible: root.focusClearable
                             label: "Done"
                             glyph: "󰄬"
                             main: true
