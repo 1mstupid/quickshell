@@ -2,6 +2,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "menu"
 
 // App focus time, from `umbriel subscribe windows`. The window with
 // active: true holds keyboard focus, and its elapsed time goes to its app_id.
@@ -11,8 +12,9 @@ import Quickshell.Io
 // app-usage.json; categories in app-categories, one "app_id category" line each;
 // limits in app-limits, one "app_id minutes" line each; schedules in
 // app-schedules, one "target HH:MM-HH:MM[,HH:MM-HH:MM] [days]" line each
-// (target can be an app_id, prefix*, or @Category). A limit notifies at 80%
-// and at 100%, once each.
+// (target can be an app_id, prefix*, or @Category); task-gate lists targets
+// that stay closed while todo.md owes work (see taskGated). A limit notifies
+// at 80% and at 100%, once each.
 Singleton {
     id: root
 
@@ -32,6 +34,9 @@ Singleton {
     property var limits: ({})
     // { "@Games": [{ windows: [{ start: 540, end: 1020 }], days: [1,2,3,4,5] }] }
     property var schedules: ({})
+    // targets closed while tasks are owed, and the minutes that clear one
+    property var taskGateTargets: []
+    property int taskGateMinutes: 10
     // { "helium": "Internet" } from app-categories; unlisted apps are "Other"
     property var categories: ({})
     // app ids whose focus time counts toward the focus widget; a pomodoro always counts
@@ -119,15 +124,34 @@ Singleton {
         return false
     }
 
+    // task gate: while todo.md owes work, the gated targets stay closed. A task
+    // is owed when it is open and has less than taskGateMinutes of time (done
+    // counts as enough). Time on the task in focus counts live, so the way to
+    // unlock an app is to work on the task, not to tick it in a blocked app.
+    function tasksOwed() {
+        return Todo.upcoming.some(t => {
+            const live = TaskFocus.sameTask(t) ? TaskFocus.elapsedMs / 60000 : 0
+            return t.spent + live < taskGateMinutes
+        })
+    }
+
+    function taskGated(app) {
+        if (!app || taskGateTargets.length === 0)
+            return false
+        return taskGateTargets.some(t => matchesTarget(t, app)) && tasksOwed()
+    }
+
     // ask each open window of a blocked app to close, retrying every 10 s
     // while it stays open (an app may show a save prompt first). Blocked means
-    // over its limit, outside focus mode during a work session, or in a scheduled block.
+    // over its limit, outside focus mode during a work session, in a scheduled
+    // block, or gated by unfinished tasks.
     function enforce(list) {
         const now = Date.now()
         const next = {}
         for (const w of list) {
             const last = closeSent[w.id] ?? 0
-            if ((blocked(w.app_id) || outOfFocus(w.app_id) || scheduledBlock(w.app_id)) && now - last >= 10000) {
+            if ((blocked(w.app_id) || outOfFocus(w.app_id) || scheduledBlock(w.app_id)
+                    || taskGated(w.app_id)) && now - last >= 10000) {
                 Quickshell.execDetached(["umbriel", "msg", "window-close:" + w.id])
                 next[w.id] = now
             } else if (last) {
@@ -456,6 +480,27 @@ Singleton {
         enforce(lastWindows)
     }
 
+    // "minutes N" sets how long a task needs (default 10); every other line is a
+    // target, as in app-schedules. No file, or no targets, gates nothing.
+    function parseTaskGate(t) {
+        const targets = []
+        let minutes = 10
+        for (const raw of t.split("\n")) {
+            const line = raw.replace(/#.*$/, "").trim()
+            if (!line) continue
+            const p = line.split(/\s+/)
+            if (p[0] === "minutes" && p.length >= 2) {
+                const n = parseInt(p[1])
+                if (n > 0 && n <= 240) minutes = n
+            } else {
+                targets.push(p[0])
+            }
+        }
+        taskGateTargets = targets
+        taskGateMinutes = minutes
+        enforce(lastWindows)
+    }
+
     Component.onCompleted: revision++
 
     IpcHandler {
@@ -540,6 +585,15 @@ Singleton {
         onFileChanged: reload()
         onLoaded: root.parseSchedules(text())
         onLoadFailed: root.schedules = {}
+    }
+
+    // one target per line, see parseTaskGate; a missing file gates nothing
+    FileView {
+        path: root.dir + "/task-gate"
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: root.parseTaskGate(text())
+        onLoadFailed: root.parseTaskGate("")
     }
 
     // one "app_id category" per line; a missing file means everything is "Other"
