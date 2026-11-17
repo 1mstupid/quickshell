@@ -41,6 +41,10 @@ PanelWindow {
     readonly property int chromeH: 90
     readonly property int maxPanelH: chromeH + maxVisible * itemH
 
+    // where the card grows from: the pill, or the card of the panel that gave way to this one
+    property real startW: PillState.pillWidth
+    property real startH: PillState.pillHeight
+
     // 0 = the bar pill, 1 = the full panel
     property real t: 0
 
@@ -167,6 +171,9 @@ PanelWindow {
     // ── Open / close ───────────────────────────────────────────────────────
     function openLauncher() {
         PillState.owner = "applauncher";
+        const from = PillState.takeOver();
+        startW = from.w;
+        startH = from.h;
         mode = "";
         searchInput.text = "";
         if (ClipboardHistory.reload) ClipboardHistory.reload();
@@ -177,7 +184,18 @@ PanelWindow {
         morph.start();
     }
 
+    // another panel took the pill: hand this card over and step aside at once
+    function giveWay() {
+        PillState.takeoverW = card.width;
+        PillState.takeoverH = card.height;
+        morph.stop();
+        root.t = 0;
+        visible = false;
+    }
+
     function close() {
+        startW = PillState.pillWidth;
+        startH = PillState.pillHeight;
         morph.stop();
         morph.from = root.t;
         morph.to = 0;
@@ -213,8 +231,11 @@ PanelWindow {
     Connections {
         target: PillState
         function onOwnerChanged() {
-            if (PillState.owner !== "applauncher" && root.visible)
+            if (PillState.owner !== "applauncher" && root.visible) {
+                // a panel took the pill: hand our card over; the flag then runs the usual close
+                if (PillState.owner !== "") root.giveWay();
                 AppLauncherState.launcherVisible = false;
+            }
         }
     }
 
@@ -302,8 +323,8 @@ PanelWindow {
     Rectangle {
         id: card
 
-        readonly property real fromW: PillState.pillWidth
-        readonly property real fromH: PillState.pillHeight
+        readonly property real fromW: root.startW
+        readonly property real fromH: root.startH
 
         width: fromW + (root.panelW - fromW) * root.t
         height: fromH + (root.panelH - fromH) * root.t

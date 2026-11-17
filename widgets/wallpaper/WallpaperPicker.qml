@@ -58,6 +58,10 @@ PanelWindow {
     property real minScale: 0.6
     property real scaleStep: 0.3
 
+    // where the card grows from: the pill, or the card of the panel that gave way to this one
+    property real startW: PillState.pillWidth
+    property real startH: PillState.pillHeight
+
     // 0 = the bar pill, 1 = the full band
     property real t: 0
 
@@ -194,14 +198,20 @@ PanelWindow {
     Connections {
         target: PillState
         function onOwnerChanged() {
-            if (PillState.owner !== "wallpapers" && root.visible)
-                root.close()
+            if (PillState.owner !== "wallpapers" && root.visible) {
+                // a panel took the pill: hand our card over, or shrink back when nothing did
+                if (PillState.owner !== "") root.giveWay()
+                else root.close()
+            }
         }
     }
 
     function openPicker() {
         focusCurrent()
         PillState.owner = "wallpapers"
+        const from = PillState.takeOver()
+        startW = from.w
+        startH = from.h
         visible = true
         morph.stop()
         morph.from = root.t
@@ -209,7 +219,18 @@ PanelWindow {
         morph.start()
     }
 
+    // another panel took the pill: hand this card over and step aside at once
+    function giveWay() {
+        PillState.takeoverW = card.width
+        PillState.takeoverH = card.height
+        morph.stop()
+        root.t = 0
+        visible = false
+    }
+
     function close() {
+        startW = PillState.pillWidth
+        startH = PillState.pillHeight
         morph.stop()
         morph.from = root.t
         morph.to = 0
@@ -361,8 +382,8 @@ PanelWindow {
     Rectangle {
         id: card
 
-        readonly property real fromW: PillState.pillWidth
-        readonly property real fromH: PillState.pillHeight
+        readonly property real fromW: root.startW
+        readonly property real fromH: root.startH
 
         width: fromW + (root.bandWidth - fromW) * root.t
         height: fromH + (root.bandHeight - fromH) * root.t

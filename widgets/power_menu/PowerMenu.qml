@@ -33,6 +33,10 @@ PanelWindow {
     readonly property int panelW: 236
     readonly property int panelH: 104
 
+    // where the card grows from: the pill, or the card of the panel that gave way to this one
+    property real startW: PillState.pillWidth
+    property real startH: PillState.pillHeight
+
     // 0 = the bar pill, 1 = the full menu
     property real t: 0
 
@@ -97,8 +101,20 @@ PanelWindow {
     }
 
     // ── Open / close ─────────────────────────────────────────────────────────
+    // another panel took the pill: hand this card over and step aside at once
+    function giveWay() {
+        PillState.takeoverW = card.width
+        PillState.takeoverH = card.height
+        morph.stop()
+        root.t = 0
+        visible = false
+    }
+
     function openMenu() {
         PillState.owner = "powermenu"
+        const from = PillState.takeOver()
+        startW = from.w
+        startH = from.h
         visible = true
         uptimeProc.running = true
         morph.stop()
@@ -108,6 +124,8 @@ PanelWindow {
     }
 
     function closeMenu() {
+        startW = PillState.pillWidth
+        startH = PillState.pillHeight
         selectedIndex = 0
         cancelHold()
         morph.stop()
@@ -145,8 +163,11 @@ PanelWindow {
     Connections {
         target: PillState
         function onOwnerChanged() {
-            if (PillState.owner !== "powermenu" && root.visible)
+            if (PillState.owner !== "powermenu" && root.visible) {
+                // a panel took the pill: hand our card over; the flag then runs the usual close
+                if (PillState.owner !== "") root.giveWay()
                 PowerMenuState.hide()
+            }
         }
     }
 
@@ -212,8 +233,8 @@ PanelWindow {
     Rectangle {
         id: card
 
-        readonly property real fromW: PillState.pillWidth
-        readonly property real fromH: PillState.pillHeight
+        readonly property real fromW: root.startW
+        readonly property real fromH: root.startH
 
         width: fromW + (root.panelW - fromW) * root.t
         height: fromH + (root.panelH - fromH) * root.t
