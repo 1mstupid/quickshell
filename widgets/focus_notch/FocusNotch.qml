@@ -268,10 +268,10 @@ PanelWindow {
         TaskFocus.focus(r)
     }
 
-    // A task with a planned block in schedule.md clears only once half of that
-    // time is spent; a task without one clears at any time.
-    function clearableAt(title, spentMin) {
-        const planned = Schedule.minutesFor(title)
+    // A task clears once half its expected time is spent. Expected time is the
+    // =estimate typed on the task, else the length of its schedule block; a task
+    // with neither clears at any time.
+    function clearableAt(planned, spentMin) {
         return planned === 0 || spentMin >= planned / 2
     }
 
@@ -281,11 +281,13 @@ PanelWindow {
     }
 
     function rowClearable(r) {
-        return clearableAt(r.title, rowSpentMin(r))
+        const planned = r.task && r.task.estimate > 0 ? r.task.estimate : Schedule.minutesFor(r.title)
+        return clearableAt(planned, rowSpentMin(r))
     }
 
-    readonly property bool focusClearable: focusOn
-        && clearableAt(TaskFocus.title, (TaskFocus.item ? TaskFocus.item.spent : 0) + TaskFocus.elapsedMs / 60000)
+    readonly property bool focusClearable: focusOn && clearableAt(
+        TaskFocus.item && TaskFocus.item.estimate > 0 ? TaskFocus.item.estimate : Schedule.minutesFor(TaskFocus.title),
+        (TaskFocus.item ? TaskFocus.item.spent : 0) + TaskFocus.elapsedMs / 60000)
 
     // ticks a row; a block of the schedule is added to the file already ticked
     function tickRow(r) {
@@ -1599,7 +1601,7 @@ PanelWindow {
                         font.pixelSize: 12
                     }
 
-                    // adds a task to today, typed in todo.md's own syntax: Call mom @16:30 p2
+                    // adds a task to today, typed in todo.md's own syntax: Call mom @16:30 =45m p2
                     Rectangle {
                         id: addRow
                         anchors.left: parent.left
@@ -1667,7 +1669,7 @@ PanelWindow {
                             anchors.right: parent.right
                             anchors.rightMargin: 10
                             visible: input.text === ""
-                            text: "@16:30  p2"
+                            text: "@16:30  =45m  p2"
                             color: Qt.alpha(Theme.fg, 0.3)
                             font.family: Theme.fontFamilyNum
                             font.pixelSize: 11

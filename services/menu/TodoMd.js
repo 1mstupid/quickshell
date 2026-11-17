@@ -13,8 +13,9 @@
 // the date is ignored. Any other heading ends that day, so tasks under it, or
 // above the first date heading, have no due date and are skipped. After the
 // title come optional tokens, in any order: @HH:MM is the hour of the day it is
-// due, p1 to p3 is the priority, and ~1h05m (or ~45m) is the time spent on it,
-// which the task timer writes.
+// due, p1 to p3 is the priority, ~1h05m (or ~45m) is the time spent on it,
+// which the task timer writes, and =1h05m (or =45m) is the expected time the
+// task needs, typed by hand.
 
 const dateRe = /^##\s+(\d{4}-\d{2}-\d{2})(?:\s|$)/
 const headingRe = /^#{1,6}(?:\s|$)/
@@ -22,6 +23,7 @@ const taskRe = /^- \[( |x|X)\]\s+(\S.*?)\s*$/
 const timeRe = /\s+@([01]?\d|2[0-3]):([0-5]\d)$/
 const prioRe = /\s+p([1-3])$/
 const spentRe = /\s+~(?:(\d+)h)?(?:(\d+)m)?$/
+const estimateRe = /\s+=(?:(\d+)h)?(?:(\d+)m)?$/
 
 // the trailing token on s, or null: { kind, index } with `index` where its
 // leading whitespace starts, plus time, priority or minutes by kind
@@ -35,6 +37,9 @@ function peel(s) {
     m = s.match(spentRe)
     if (m && (m[1] !== undefined || m[2] !== undefined))
         return { kind: "spent", index: m.index, minutes: (parseInt(m[1]) || 0) * 60 + (parseInt(m[2]) || 0) }
+    m = s.match(estimateRe)
+    if (m && (m[1] !== undefined || m[2] !== undefined))
+        return { kind: "estimate", index: m.index, minutes: (parseInt(m[1]) || 0) * 60 + (parseInt(m[2]) || 0) }
     return null
 }
 
@@ -74,6 +79,7 @@ function parse(text) {
                 priority: got.priority ? got.priority.priority : 0,
                 time: got.time ? got.time.time : "",
                 spent: got.spent ? got.spent.minutes : 0,
+                estimate: got.estimate ? got.estimate.minutes : 0,
                 line: i,
                 raw: lines[i]
             })
