@@ -58,8 +58,6 @@ PanelWindow {
     property real startH: PillState.pillHeight
     // 1 while the swatches show; they fade first when another panel takes the pill
     property real imagesOut: 1
-    // taking over another card, so the outline fades in with the morph
-    property bool taken: false
 
     // 0 = the bar pill, 1 = the full band
     property real t: 0
@@ -169,7 +167,6 @@ PanelWindow {
         const from = PillState.takeOver()
         startW = from.w
         startH = from.h
-        taken = from.taken
         imagesOut = 1
         visible = true
         morph.stop()
@@ -192,7 +189,6 @@ PanelWindow {
     function close() {
         startW = PillState.pillWidth
         startH = PillState.pillHeight
-        taken = false
         morph.stop()
         morph.from = root.t
         morph.to = 0
@@ -381,7 +377,6 @@ PanelWindow {
     // the outline is a notch, drawn behind the card and sized to it
     Notch {
         id: outline
-        opacity: root.taken ? root.t : 1
         bodyWidth: card.width
         bodyHeight: card.height
         x: card.x - bodyX
