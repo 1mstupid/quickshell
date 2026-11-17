@@ -24,19 +24,23 @@ Singleton {
 
     // the share panel is open; a drag that leaves without a drop closes it after a short wait
     property bool panelOpen: false
+    // a drop happened during this drag, so the exit that follows it must not close the panel
+    property bool dropped: false
 
     function open() {
         closeTimer.stop()
+        dropped = false
         panelOpen = true
     }
 
     function scheduleClose() {
-        if (panelOpen)
+        if (panelOpen && !dropped)
             closeTimer.restart()
     }
 
     function cancelClose() {
         closeTimer.stop()
+        dropped = false
     }
 
     function close() {
@@ -59,6 +63,7 @@ Singleton {
 
     // drop URLs are file:// URIs; anything else is ignored
     function addUrls(urls) {
+        dropped = true
         for (let i = 0; i < urls.length; i++) {
             const s = String(urls[i])
             if (s.indexOf("file://") !== 0)
