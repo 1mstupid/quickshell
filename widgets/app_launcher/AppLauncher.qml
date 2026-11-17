@@ -595,7 +595,10 @@ PanelWindow {
                         Drag.active: rowMouse.drag.active
                         Drag.dragType: Drag.Automatic
                         Drag.supportedActions: Qt.CopyAction
-                        Drag.mimeData: ({ "text/uri-list": root.fileUri(appRow.modelData.value) + "\r\n" })
+                        // the binding is evaluated for every row, so only file rows get a payload
+                        Drag.mimeData: appRow.modelData.kind === "file"
+                            ? ({ "text/uri-list": root.fileUri(appRow.modelData.value) + "\r\n" })
+                            : ({})
                     }
 
                     MouseArea {
