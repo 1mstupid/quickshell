@@ -56,8 +56,8 @@ PanelWindow {
     // where the card grows from: the pill, or the card of the panel that gave way to this one
     property real startW: PillState.pillWidth
     property real startH: PillState.pillHeight
-    // 1 while shown; fades to 0 when another panel takes the pill
-    property real fadeOut: 1
+    // 1 while the swatches show; they fade first when another panel takes the pill
+    property real imagesOut: 1
     // taking over another card, so the outline fades in with the morph
     property bool taken: false
 
@@ -169,8 +169,8 @@ PanelWindow {
         startW = from.w
         startH = from.h
         taken = from.taken
-        fadeOutAnim.stop()
-        fadeOut = 1
+        giveWayAnim.stop()
+        imagesOut = 1
         visible = true
         morph.stop()
         morph.from = root.t
@@ -178,12 +178,10 @@ PanelWindow {
         morph.start()
     }
 
-    // another panel took the pill: hand this card over and step aside at once
+    // another panel took the pill: the swatches fade, then the card shrinks back into the pill
     function giveWay() {
-        PillState.takeoverW = card.width
-        PillState.takeoverH = card.height
         morph.stop()
-        fadeOutAnim.restart()
+        giveWayAnim.restart()
     }
 
     function close() {
@@ -234,20 +232,24 @@ PanelWindow {
         }
     }
 
-    // the card that gave way fades out while the one taking over fades in, so the two cross
-    NumberAnimation {
-        id: fadeOutAnim
-        target: root
-        property: "fadeOut"
-        to: 0
-        duration: PillState.morphMs
-        easing.type: Easing.InOutCubic
-        onFinished: {
-            if (root.fadeOut <= 0) {
-                root.visible = false
-                root.t = 0
-            }
+    // the swatches fade first, then the band shrinks back into the pill, where the next panel grows from
+    SequentialAnimation {
+        id: giveWayAnim
+        NumberAnimation {
+            target: root
+            property: "imagesOut"
+            to: 0
+            duration: PillState.morphMs * 0.4
+            easing.type: Easing.OutQuad
         }
+        NumberAnimation {
+            target: root
+            property: "t"
+            to: 0
+            duration: PillState.morphMs * 0.6
+            easing.type: Easing.InOutCubic
+        }
+        ScriptAction { script: { root.visible = false } }
     }
 
     // grows the card from the pill (t=0) into the band (t=1); on the way back
@@ -394,7 +396,7 @@ PanelWindow {
     // the outline is a notch, drawn behind the card and sized to it
     Notch {
         id: outline
-        opacity: root.fadeOut * (root.taken ? root.t : 1)
+        opacity: root.taken ? root.t : 1
         bodyWidth: card.width
         bodyHeight: card.height
         x: card.x - bodyX
@@ -404,7 +406,6 @@ PanelWindow {
     // the card gives the layout its geometry; the notch above is what's drawn
     Rectangle {
         id: card
-        opacity: root.fadeOut
 
         readonly property real fromW: root.startW
         readonly property real fromH: root.startH
@@ -489,7 +490,7 @@ PanelWindow {
         width: Math.max(0, card.width - 2 * root.pad)
         height: root.listH
         clip: true
-        opacity: Math.max(0, (root.t - 0.5) * 2)
+        opacity: Math.min(root.imagesOut, Math.max(0, (root.t - 0.5) * 2))
 
         Text {
             visible: root.shown.length === 0
