@@ -276,6 +276,11 @@ PanelWindow {
         }
     }
 
+    // file:// URI of one absolute path, each segment escaped so spaces and '#' survive
+    function fileUri(path) {
+        return "file://" + path.split("/").map(encodeURIComponent).join("/");
+    }
+
     function activate(r) {
         if (!r)
             return;
@@ -501,6 +506,9 @@ PanelWindow {
                     radius: 10
                     color: root.selectedIndex === index ? root.accentFill : "transparent"
                     Behavior on color { ColorAnimation { duration: 100 } }
+                    // dims while the row is being dragged out, so the pick-up is visible
+                    opacity: dragHandler.active ? 0.4 : 1
+                    Behavior on opacity { NumberAnimation { duration: 100 } }
 
                     readonly property bool sel: root.selectedIndex === index
 
@@ -580,12 +588,40 @@ PanelWindow {
                         font.pixelSize: 12
                     }
 
-                    MouseArea {
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        onEntered: root.selectedIndex = appRow.index
-                        onClicked: root.activate(appRow.modelData)
+                    // a file row can be dragged into another window; the drag only
+                    // starts past the system threshold, so a click still activates it
+                    // Drag-and-drop source
+                    DragHandler {
+                        id: dragHandler
+                        target: null
                     }
+
+                    Drag.active: dragHandler.active
+                    Drag.dragType: Drag.Automatic
+                    Drag.supportedActions: Qt.CopyAction
+
+                    Drag.mimeData: appRow.modelData.kind === "file"
+                        ? ({
+                            "text/uri-list": root.fileUri(appRow.modelData.value) + "\r\n"
+                        })
+                        : ({})
+
+                    Drag.hotSpot.x: dragHandler.centroid.position.x
+                    Drag.hotSpot.y: dragHandler.centroid.position.y
+
+                    // Hover detection
+                    HoverHandler {
+                        onHoveredChanged: {
+                            if (hovered)
+                                root.selectedIndex = appRow.index
+                        }
+                    }
+
+                    // Click detection
+                    TapHandler {
+                        onTapped: root.activate(appRow.modelData)
+                    }
+
                 }
             }
 
