@@ -218,6 +218,26 @@ test("withSpent round-trips through parse", () => {
     assert.deepStrictEqual([next.title, next.time, next.priority, next.spent], ["Write the report", "15:00", 2, 42])
 })
 
+test("the =estimate token is read in any order and kept by withSpent", () => {
+    const t = Todo.parse([
+        "## 2026-11-08",
+        "- [ ] Read paper =45m",
+        "- [ ] Report =1h05m @15:00 ~10m p2",
+        "- [ ] Solve x =",
+        "- [ ] Plain task",
+        ""
+    ].join("\n"))
+    assert.deepStrictEqual(t.map(x => [x.title, x.estimate, x.spent]), [
+        ["Read paper", 45, 0],
+        ["Report", 65, 10],
+        ["Solve x =", 0, 0],
+        ["Plain task", 0, 0]
+    ])
+    const next = Todo.parse("## 2026-11-08\n" + Todo.withSpent(t[1].raw, 30))[0]
+    assert.deepStrictEqual([next.title, next.estimate, next.spent, next.time, next.priority],
+        ["Report", 65, 30, "15:00", 2])
+})
+
 test("upcoming: timed tasks come first within a day, earliest first", () => {
     const text = [
         "## 2026-11-07",

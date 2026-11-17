@@ -268,8 +268,31 @@ PanelWindow {
         TaskFocus.focus(r)
     }
 
+    // A task clears once half its expected time is spent. Expected time is the
+    // =estimate typed on the task, else the length of its schedule block; a task
+    // with neither clears at any time.
+    function clearableAt(planned, spentMin) {
+        return planned === 0 || spentMin >= planned / 2
+    }
+
+    // time spent on a row, including the live run when it is the task in focus
+    function rowSpentMin(r) {
+        return (r.task ? r.task.spent : 0) + (TaskFocus.sameTask(r) ? TaskFocus.elapsedMs / 60000 : 0)
+    }
+
+    function rowClearable(r) {
+        const planned = r.task && r.task.estimate > 0 ? r.task.estimate : Schedule.minutesFor(r.title)
+        return clearableAt(planned, rowSpentMin(r))
+    }
+
+    readonly property bool focusClearable: focusOn && clearableAt(
+        TaskFocus.item && TaskFocus.item.estimate > 0 ? TaskFocus.item.estimate : Schedule.minutesFor(TaskFocus.title),
+        (TaskFocus.item ? TaskFocus.item.spent : 0) + TaskFocus.elapsedMs / 60000)
+
     // ticks a row; a block of the schedule is added to the file already ticked
     function tickRow(r) {
+        if (!rowClearable(r))
+            return
         if (r.kind === "slot")
             Todo.materialize(r, true)
         else
@@ -592,7 +615,7 @@ PanelWindow {
                         onClicked: TaskFocus.toggle()
                     }
                     IconButton {
-                        visible: root.focusOn
+                        visible: root.focusClearable
                         glyph: "󰄬"
                         main: true
                         onClicked: TaskFocus.complete()
@@ -1550,7 +1573,7 @@ PanelWindow {
                                 width: 16
                                 horizontalAlignment: Text.AlignHCenter
                                 text: "󰄬"
-                                opacity: rowHover.hovered ? 1 : 0
+                                opacity: rowHover.hovered && root.rowClearable(dayRowItem.modelData) ? 1 : 0
                                 color: tickMouse.containsMouse ? Theme.accent : Qt.alpha(Theme.fg, 0.7)
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.iconSize
@@ -1560,7 +1583,7 @@ PanelWindow {
                                     id: tickMouse
                                     anchors.fill: parent
                                     anchors.margins: -5
-                                    enabled: rowHover.hovered
+                                    enabled: rowHover.hovered && root.rowClearable(dayRowItem.modelData)
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: root.tickRow(dayRowItem.modelData)
@@ -1578,7 +1601,7 @@ PanelWindow {
                         font.pixelSize: 12
                     }
 
-                    // adds a task to today, typed in todo.md's own syntax: Call mom @16:30 p2
+                    // adds a task to today, typed in todo.md's own syntax: Call mom @16:30 =45m p2
                     Rectangle {
                         id: addRow
                         anchors.left: parent.left
@@ -1646,7 +1669,7 @@ PanelWindow {
                             anchors.right: parent.right
                             anchors.rightMargin: 10
                             visible: input.text === ""
-                            text: "@16:30  p2"
+                            text: "@16:30  =45m  p2"
                             color: Qt.alpha(Theme.fg, 0.3)
                             font.family: Theme.fontFamilyNum
                             font.pixelSize: 11
@@ -1756,6 +1779,7 @@ PanelWindow {
                             onClicked: TaskFocus.toggle()
                         }
                         PillButton {
+                            visible: root.focusClearable
                             label: "Done"
                             glyph: "󰄬"
                             main: true
