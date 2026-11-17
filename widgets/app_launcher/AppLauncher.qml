@@ -276,6 +276,11 @@ PanelWindow {
         }
     }
 
+    // file:// URI of one absolute path, each segment escaped so spaces and '#' survive
+    function fileUri(path) {
+        return "file://" + path.split("/").map(encodeURIComponent).join("/");
+    }
+
     function activate(r) {
         if (!r)
             return;
@@ -580,9 +585,24 @@ PanelWindow {
                         font.pixelSize: 12
                     }
 
+                    // a file row can be dragged into another window; the drag only
+                    // starts past the system threshold, so a click still activates it
+                    Item {
+                        id: dragSource
+                        width: 1
+                        height: 1
+                        opacity: 0
+                        Drag.active: rowMouse.drag.active
+                        Drag.dragType: Drag.Automatic
+                        Drag.supportedActions: Qt.CopyAction
+                        Drag.mimeData: ({ "text/uri-list": root.fileUri(appRow.modelData.value) + "\r\n" })
+                    }
+
                     MouseArea {
+                        id: rowMouse
                         anchors.fill: parent
                         hoverEnabled: true
+                        drag.target: appRow.modelData.kind === "file" ? dragSource : null
                         onEntered: root.selectedIndex = appRow.index
                         onClicked: root.activate(appRow.modelData)
                     }
