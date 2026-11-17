@@ -506,6 +506,9 @@ PanelWindow {
                     radius: 10
                     color: root.selectedIndex === index ? root.accentFill : "transparent"
                     Behavior on color { ColorAnimation { duration: 100 } }
+                    // dims while the row is being dragged out, so the pick-up is visible
+                    opacity: dragHandler.active ? 0.4 : 1
+                    Behavior on opacity { NumberAnimation { duration: 100 } }
 
                     readonly property bool sel: root.selectedIndex === index
 
