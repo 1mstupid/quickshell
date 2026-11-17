@@ -189,11 +189,11 @@ PanelWindow {
         }
     }
 
+    // the folder is rescanned once the card has grown, not while it grows: starting the
+    // scan during the morph made the opening stutter
     onVisibleChanged: {
-        if (visible) {
-            lister.running = true
+        if (visible)
             keyHost.forceActiveFocus()
-        }
     }
 
     // another panel took the pill, so this one gives way
@@ -283,6 +283,8 @@ PanelWindow {
                 root.visible = false
                 if (PillState.owner === "wallpapers")
                     PillState.owner = ""
+            } else {
+                lister.running = true
             }
         }
     }
