@@ -7,6 +7,16 @@ Item {
 
     implicitWidth: row.implicitWidth + 16
     implicitHeight: 15
+    onXChanged: updatePillState()
+    onYChanged: updatePillState()
+    Component.onCompleted: updatePillState()
+
+    function updatePillState() {
+        // Map this item's center or top-left to global coordinates
+        let globalPos = mapToItem(null, 0, 0) 
+        PillState.clockX = globalPos.x + (width / 2)
+        PillState.clockY = globalPos.y + (height / 2)
+    }
 
     SystemClock {
         id: clock

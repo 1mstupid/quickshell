@@ -587,28 +587,38 @@ PanelWindow {
 
                     // a file row can be dragged into another window; the drag only
                     // starts past the system threshold, so a click still activates it
-                    Item {
-                        id: dragSource
-                        width: 1
-                        height: 1
-                        opacity: 0
-                        Drag.active: rowMouse.drag.active
-                        Drag.dragType: Drag.Automatic
-                        Drag.supportedActions: Qt.CopyAction
-                        // the binding is evaluated for every row, so only file rows get a payload
-                        Drag.mimeData: appRow.modelData.kind === "file"
-                            ? ({ "text/uri-list": root.fileUri(appRow.modelData.value) + "\r\n" })
-                            : ({})
+                    // Drag-and-drop source
+                    DragHandler {
+                        id: dragHandler
+                        target: null
                     }
 
-                    MouseArea {
-                        id: rowMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        drag.target: appRow.modelData.kind === "file" ? dragSource : null
-                        onEntered: root.selectedIndex = appRow.index
-                        onClicked: root.activate(appRow.modelData)
+                    Drag.active: dragHandler.active
+                    Drag.dragType: Drag.Automatic
+                    Drag.supportedActions: Qt.CopyAction
+
+                    Drag.mimeData: appRow.modelData.kind === "file"
+                        ? ({
+                            "text/uri-list": root.fileUri(appRow.modelData.value) + "\r\n"
+                        })
+                        : ({})
+
+                    Drag.hotSpot.x: dragHandler.centroid.position.x
+                    Drag.hotSpot.y: dragHandler.centroid.position.y
+
+                    // Hover detection
+                    HoverHandler {
+                        onHoveredChanged: {
+                            if (hovered)
+                                root.selectedIndex = appRow.index
+                        }
                     }
+
+                    // Click detection
+                    TapHandler {
+                        onTapped: root.activate(appRow.modelData)
+                    }
+
                 }
             }
 

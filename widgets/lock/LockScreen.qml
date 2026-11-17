@@ -87,9 +87,6 @@ Item {
         sourceSize.width: root.width
         sourceSize.height: root.height
         fillMode: Image.PreserveAspectCrop
-        asynchronous: true
-        opacity: (status === Image.Ready ? 1 : 0) * root.t
-        Behavior on opacity { NumberAnimation { duration: 200 } }
     }
 
     Rectangle {
@@ -106,11 +103,20 @@ Item {
         font.family: Theme.fontFamilyDisplay
         font.bold: true
         font.pixelSize: Math.round(root.height * 0.28)
-        scale: 0.06 + 0.94 * root.t
-        opacity: root.t
-        x: (root.width - width) / 2
-        y: (PillState.pillTop + PillState.pillHeight / 2 - height / 2) * (1 - root.t)
-            + (root.height / 2 - height / 2) * root.t
+        
+        transformOrigin: Item.Center
+        scale: 0.08 + 0.92 * root.t
+        opacity: Math.min(1, root.t * 1.5)
+
+        // Screen center vs Exact Notch body center (accounting for shoulders via bodyX)
+        readonly property real screenCenterX: root.width / 2
+        readonly property real screenCenterY: root.height / 2
+
+        readonly property real notchCenterX: notch.x + notch.bodyX + notch.bodyWidth / 2
+        readonly property real notchCenterY: notch.y + notch.bodyHeight / 2
+
+        x: (screenCenterX * root.t + notchCenterX * (1 - root.t)) - (width / 2)
+        y: (screenCenterY * root.t + notchCenterY * (1 - root.t)) - (height / 2)
     }
 
     // Fixed-size notch matching the bar pill exactly
