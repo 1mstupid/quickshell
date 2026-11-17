@@ -25,7 +25,8 @@ QtObject {
     // the size a panel starts growing from, read once by the panel that opens: the card
     // it takes over, else the pill
     function takeOver() {
-        const from = takeoverW > 0 ? { w: takeoverW, h: takeoverH } : { w: pillWidth, h: pillHeight }
+        const from = takeoverW > 0 ? { w: takeoverW, h: takeoverH, taken: true }
+                                   : { w: pillWidth, h: pillHeight, taken: false }
         takeoverW = 0
         takeoverH = 0
         return from

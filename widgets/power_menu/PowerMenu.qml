@@ -26,7 +26,7 @@ PanelWindow {
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: root.visible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: root.visible && PillState.owner === "powermenu" ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     WlrLayershell.namespace: "qs-powermenu-noanim"
 
     // 4 × 40 buttons, 3 gaps of 10, side margins; the uptime above and the name below
@@ -36,6 +36,10 @@ PanelWindow {
     // where the card grows from: the pill, or the card of the panel that gave way to this one
     property real startW: PillState.pillWidth
     property real startH: PillState.pillHeight
+    // 1 while shown; fades to 0 when another panel takes the pill
+    property real fadeOut: 1
+    // taking over another card, so the outline fades in with the morph
+    property bool taken: false
 
     // 0 = the bar pill, 1 = the full menu
     property real t: 0
@@ -106,8 +110,7 @@ PanelWindow {
         PillState.takeoverW = card.width
         PillState.takeoverH = card.height
         morph.stop()
-        root.t = 0
-        visible = false
+        fadeOutAnim.restart()
     }
 
     function openMenu() {
@@ -115,6 +118,9 @@ PanelWindow {
         const from = PillState.takeOver()
         startW = from.w
         startH = from.h
+        taken = from.taken
+        fadeOutAnim.stop()
+        fadeOut = 1
         visible = true
         uptimeProc.running = true
         morph.stop()
@@ -126,12 +132,29 @@ PanelWindow {
     function closeMenu() {
         startW = PillState.pillWidth
         startH = PillState.pillHeight
+        taken = false
         selectedIndex = 0
         cancelHold()
         morph.stop()
         morph.from = root.t
         morph.to = 0
         morph.start()
+    }
+
+    // the card that gave way fades out while the one taking over fades in, so the two cross
+    NumberAnimation {
+        id: fadeOutAnim
+        target: root
+        property: "fadeOut"
+        to: 0
+        duration: PillState.morphMs
+        easing.type: Easing.InOutCubic
+        onFinished: {
+            if (root.fadeOut <= 0) {
+                root.visible = false
+                root.t = 0
+            }
+        }
     }
 
     NumberAnimation {
@@ -224,6 +247,7 @@ PanelWindow {
 
     Notch {
         id: outline
+        opacity: root.fadeOut * (root.taken ? root.t : 1)
         bodyWidth: card.width
         bodyHeight: card.height
         x: card.x - bodyX
@@ -232,6 +256,7 @@ PanelWindow {
 
     Rectangle {
         id: card
+        opacity: root.fadeOut
 
         readonly property real fromW: root.startW
         readonly property real fromH: root.startH
