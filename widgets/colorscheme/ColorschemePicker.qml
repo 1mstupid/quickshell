@@ -164,7 +164,8 @@ PanelWindow {
 
     function openPicker() {
         focusCurrent()
-        PillState.owner = "colorschemes"
+        if (!PillState.claim("colorschemes"))
+            return
         const from = PillState.takeOver()
         startW = from.w
         startH = from.h

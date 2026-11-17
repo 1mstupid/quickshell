@@ -279,7 +279,8 @@ PanelWindow {
     }
 
     function show(next) {
-        PillState.owner = "focus"
+        if (!PillState.claim("focus"))
+            return
         visible = true
         stage = next
         goTo(1, next === "open" ? 1 : 0)

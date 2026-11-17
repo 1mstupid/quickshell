@@ -32,7 +32,10 @@ PanelWindow {
     property real t: 0
 
     function openPanel() {
-        PillState.owner = "share"
+        if (!PillState.claim("share")) {
+            ShareService.close()
+            return
+        }
         visible = true
         morph.stop()
         morph.from = root.t

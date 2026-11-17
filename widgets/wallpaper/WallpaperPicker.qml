@@ -212,7 +212,8 @@ PanelWindow {
 
     function openPicker() {
         focusCurrent()
-        PillState.owner = "wallpapers"
+        if (!PillState.claim("wallpapers"))
+            return
         const from = PillState.takeOver()
         startW = from.w
         startH = from.h
