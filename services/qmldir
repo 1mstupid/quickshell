@@ -6,6 +6,7 @@ singleton Notifications Notifications.qml
 singleton Pomodoro Pomodoro.qml
 singleton Volume Volume.qml
 singleton AppUsage AppUsage.qml
+singleton ShareService ShareService.qml
 singleton SleepReminder SleepReminder.qml
 singleton ClipboardHistory ClipboardHistory.qml
 singleton DrawerState DrawerState.qml
