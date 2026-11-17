@@ -120,6 +120,9 @@ PanelWindow {
     // 0 = the bar pill, 1 = the strip; 0 = the strip, 1 = the full panel
     property real grow: 0
     property real expand: 0
+    // the card the previous panel gave up; the panel grows from it instead of from the strip
+    property real takeW: 0
+    property real takeH: 0
 
     // ── Data ───────────────────────────────────────────────────────────────
     // what is left to do: overdue and today's tasks from todo.md, together with
@@ -288,15 +291,21 @@ PanelWindow {
     function show(next) {
         if (!PillState.claim("focus"))
             return
+        // a card the previous panel gave up: grow from it, with the strip kept hidden
+        const from = PillState.takeOver()
+        takeW = from.taken ? from.w : 0
+        takeH = from.taken ? from.h : 0
         visible = true
         stage = next
-        goTo(1, next === "open" ? 1 : 0)
+        goTo(from.taken ? 0 : 1, next === "open" ? 1 : 0)
     }
 
     // another panel took the pill: hand this card over and step aside at once
     function giveWay() {
         PillState.takeoverW = card.width
         PillState.takeoverH = card.height
+        takeW = 0
+        takeH = 0
         growAnim.stop()
         expandAnim.stop()
         grow = 0
@@ -313,6 +322,9 @@ PanelWindow {
         stage = ""
         armed = false
         FocusNotchState.openRequested = false
+        // closing shrinks back into the strip, as it does when it was not a takeover
+        takeW = 0
+        takeH = 0
         goTo(0, 0)
     }
 
@@ -421,8 +433,11 @@ PanelWindow {
         readonly property real stripW: PillState.pillWidth + (root.hoverW - PillState.pillWidth) * root.grow
         readonly property real stripH: PillState.pillHeight + (root.hoverH - PillState.pillHeight) * root.grow
 
-        width: stripW + (root.shownW - stripW) * root.expand
-        height: stripH + (root.shownH - stripH) * root.expand
+        readonly property real startW: root.takeW > 0 ? root.takeW : stripW
+        readonly property real startH: root.takeH > 0 ? root.takeH : stripH
+
+        width: startW + (root.shownW - startW) * root.expand
+        height: startH + (root.shownH - startH) * root.expand
         x: (root.width - width) / 2
         y: PillState.pillTop
         color: "transparent"
