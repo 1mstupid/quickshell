@@ -277,7 +277,8 @@ PanelWindow {
         target: root
         property: "fadeOut"
         to: 0
-        duration: PillState.morphMs
+        // the band is much wider than the pill, so the old card clears sooner
+        duration: PillState.morphMs / 2
         easing.type: Easing.InOutCubic
         onFinished: {
             if (root.fadeOut <= 0) {
