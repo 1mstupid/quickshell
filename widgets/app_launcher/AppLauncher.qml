@@ -44,10 +44,6 @@ PanelWindow {
     // where the card grows from: the pill, or the card of the panel that gave way to this one
     property real startW: PillState.pillWidth
     property real startH: PillState.pillHeight
-    // 1 while shown; fades to 0 when another panel takes the pill
-    property real fadeOut: 1
-    // taking over another card, so the outline fades in with the morph
-    property bool taken: false
 
     // 0 = the bar pill, 1 = the full panel
     property real t: 0
@@ -179,9 +175,6 @@ PanelWindow {
         const from = PillState.takeOver();
         startW = from.w;
         startH = from.h;
-        taken = from.taken;
-        fadeOutAnim.stop();
-        fadeOut = 1;
         mode = "";
         searchInput.text = "";
         if (ClipboardHistory.reload) ClipboardHistory.reload();
@@ -192,38 +185,26 @@ PanelWindow {
         morph.start();
     }
 
-    // another panel took the pill: hand this card over and step aside at once
+    // another panel took the pill: hand this card over and step aside at once, so the next
+    // panel grows from the card's current size instead of from the pill
     function giveWay() {
         PillState.takeoverW = card.width;
         PillState.takeoverH = card.height;
         morph.stop();
-        fadeOutAnim.restart();
+        visible = false;
+        t = 0;
     }
 
     function close() {
+        // a card that already gave way is hidden; the launcher closing after it has nothing to shrink
+        if (!visible)
+            return;
         startW = PillState.pillWidth;
         startH = PillState.pillHeight;
-        taken = false;
         morph.stop();
         morph.from = root.t;
         morph.to = 0;
         morph.start();
-    }
-
-    // the card that gave way fades out while the one taking over fades in, so the two cross
-    NumberAnimation {
-        id: fadeOutAnim
-        target: root
-        property: "fadeOut"
-        to: 0
-        duration: PillState.morphMs
-        easing.type: Easing.InOutCubic
-        onFinished: {
-            if (root.fadeOut <= 0) {
-                root.visible = false
-                root.t = 0
-            }
-        }
     }
 
     NumberAnimation {
@@ -343,7 +324,6 @@ PanelWindow {
     // ── Card ───────────────────────────────────────────────────────────────
     Notch {
         id: outline
-        opacity: root.fadeOut * (root.taken ? root.t : 1)
         bodyWidth: card.width
         bodyHeight: card.height
         x: card.x - bodyX
@@ -352,7 +332,6 @@ PanelWindow {
 
     Rectangle {
         id: card
-        opacity: root.fadeOut
 
         readonly property real fromW: root.startW
         readonly property real fromH: root.startH
