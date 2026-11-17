@@ -91,9 +91,12 @@ Item {
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 14
         elide: Text.ElideRight
-        text: ShareService.sending ? "Sending…"
+        text: ShareService.expanding ? "Preparing files…"
+            : ShareService.sending ? "Sending…"
             : ShareService.selectedDevice === "" ? "set shareDevice in settings"
-            : ShareService.lastError
+            : ShareService.lastError !== "" ? ShareService.lastError
+            : ShareService.queuedFiles.length > 0 ? ShareService.totalFileCount + " files (" + ShareService.formatSize(ShareService.totalSize) + ")"
+            : ""
         color: Qt.alpha(Theme.fg, 0.5)
         font.family: Theme.fontFamilySans
         font.pixelSize: 11
@@ -110,11 +113,13 @@ Item {
 
         PillButton {
             label: "Cancel"
+            enabled: !ShareService.sending && !ShareService.expanding
             onClicked: ShareService.clearQueue()
         }
         PillButton {
             label: "Send"
             main: true
+            enabled: !ShareService.sending && !ShareService.expanding
             onClicked: ShareService.send()
         }
     }
