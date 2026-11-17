@@ -8,7 +8,7 @@ import Quickshell
 QtObject {
     id: root
 
-    // which panel owns the pill: "", "wallpapers", "colorschemes", "applauncher", "clipboard", "focus", or "lock"
+    // which panel owns the pill: "", "wallpapers", "colorschemes", "applauncher", "clipboard", "focus", "share", or "lock"
     property string owner: ""
     readonly property bool active: owner !== ""
 

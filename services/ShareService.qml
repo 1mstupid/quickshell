@@ -3,25 +3,72 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Outgoing file shares through localsend-cli. Files queue here and go in one
-// send to the phone's IP. The CLI can't find devices on this network, so the
-// IP is set by hand, e.g. the phone's Tailscale address.
+// Outgoing file shares through localsend-cli. Files queue here and go in one send to
+// the phone's IP. The CLI can't find devices on this network, so the IP is fixed in
+// settings.json, e.g. {"shareDevice": "100.117.26.7"} (a Tailscale address). A file
+// dragged onto the bar pill or the share panel queues it and opens the panel.
 Singleton {
     id: root
 
+    // the destination; empty until settings.json names one
+    readonly property string selectedDevice: {
+        const d = UserSettings.extra.shareDevice
+        return typeof d === "string" ? d.trim() : ""
+    }
+
     // paths waiting to be sent, in the order they were added
     property var queuedFiles: []
-    // IP of the destination phone; empty until one is chosen
-    property string selectedDevice: ""
     property bool sending: false
     // why the last send failed; empty after a success or before any send
     property string lastError: ""
+
+    // the share panel is open; a drag that leaves without a drop closes it after a short wait
+    property bool panelOpen: false
+
+    function open() {
+        closeTimer.stop()
+        panelOpen = true
+    }
+
+    function scheduleClose() {
+        if (panelOpen)
+            closeTimer.restart()
+    }
+
+    function cancelClose() {
+        closeTimer.stop()
+    }
+
+    function close() {
+        closeTimer.stop()
+        panelOpen = false
+    }
+
+    Timer {
+        id: closeTimer
+        interval: 300
+        onTriggered: root.close()
+    }
 
     // a path already in the queue is not added twice
     function addFile(path) {
         if (path === "" || queuedFiles.indexOf(path) >= 0)
             return
         queuedFiles = queuedFiles.concat([path])
+    }
+
+    // drop URLs are file:// URIs; anything else is ignored
+    function addUrls(urls) {
+        for (let i = 0; i < urls.length; i++) {
+            const s = String(urls[i])
+            if (s.indexOf("file://") !== 0)
+                continue
+            try {
+                addFile(decodeURIComponent(s.slice(7)))
+            } catch (e) {
+                // a malformed escape: skip this one
+            }
+        }
     }
 
     function removeFile(path) {
@@ -51,6 +98,7 @@ Singleton {
             root.sending = false
             if (exitCode === 0) {
                 root.clearQueue()
+                root.close()
                 return
             }
             const err = sendErr.text.trim() || sendOut.text.trim()
