@@ -76,30 +76,6 @@ const SCHEMES = [
         }
     },
     {
-        id: "catppuccin-macchiato", name: "Catppuccin Macchiato",
-        dark: {
-            palette: ["#24273a", "#1e2030", "#cad3f5", "#363a4f", "#8aadf4", "#f5a97f", "#ed8796", "#6e738d"],
-            ansi: ["#494d64", "#ed8796", "#a6da95", "#eed49f", "#8aadf4", "#f5bde6", "#8bd5ca", "#b8c0e0",
-                   "#5b6078", "#ed8796", "#a6da95", "#eed49f", "#8aadf4", "#f5bde6", "#8bd5ca", "#a5adcb"]
-        }
-    },
-    {
-        id: "catppuccin-frappe", name: "Catppuccin Frappé",
-        dark: {
-            palette: ["#303446", "#292c3c", "#c6d0f5", "#414559", "#8caaee", "#ef9f76", "#e78284", "#737994"],
-            ansi: ["#51576d", "#e78284", "#a6d189", "#e5c890", "#8caaee", "#f4b8e4", "#81c8be", "#b5bfe2",
-                   "#626880", "#e78284", "#a6d189", "#e5c890", "#8caaee", "#f4b8e4", "#81c8be", "#a5adce"]
-        }
-    },
-    {
-        id: "dracula", name: "Dracula",
-        dark: {
-            palette: ["#282a36", "#21222c", "#f8f8f2", "#44475a", "#8be9fd", "#ffb86c", "#ff5555", "#6272a4"],
-            ansi: ["#21222c", "#ff5555", "#50fa7b", "#f1fa8c", "#8be9fd", "#ff79c6", "#8be9fd", "#f8f8f2",
-                   "#6272a4", "#ff5555", "#50fa7b", "#f1fa8c", "#8be9fd", "#ff79c6", "#8be9fd", "#ffffff"]
-        }
-    },
-    {
         id: "solarized", name: "Solarized",
         dark: {
             palette: ["#002b36", "#073642", "#839496", "#586e75", "#268bd2", "#cb4b16", "#dc322f", "#657b83"],
