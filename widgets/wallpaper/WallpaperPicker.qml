@@ -218,7 +218,6 @@ PanelWindow {
         startW = from.w
         startH = from.h
         taken = from.taken
-        giveWayAnim.stop()
         imagesOut = 1
         visible = true
         morph.stop()
@@ -227,10 +226,15 @@ PanelWindow {
         morph.start()
     }
 
-    // another panel took the pill: the images fade, then the card shrinks back into the pill
+    // another panel took the pill: hand this card over and step aside at once, so the next
+    // panel grows from the card's current size instead of from the pill
     function giveWay() {
+        PillState.takeoverW = card.width
+        PillState.takeoverH = card.height
         morph.stop()
-        giveWayAnim.restart()
+        visible = false
+        t = 0
+        imagesOut = 1
     }
 
     function close() {
@@ -268,27 +272,6 @@ PanelWindow {
         function toggle(): void { root.toggle() }
         function random(): void { root.applyRandom() }
         function set(path: string): void { root.apply(path) }
-    }
-
-    // the band is much wider than the pill, so it fades its images first and then
-    // shrinks back into the pill, where the next panel grows from
-    SequentialAnimation {
-        id: giveWayAnim
-        NumberAnimation {
-            target: root
-            property: "imagesOut"
-            to: 0
-            duration: PillState.morphMs * 0.4
-            easing.type: Easing.OutQuad
-        }
-        NumberAnimation {
-            target: root
-            property: "t"
-            to: 0
-            duration: PillState.morphMs * 0.6
-            easing.type: Easing.InOutCubic
-        }
-        ScriptAction { script: { root.visible = false } }
     }
 
     // grows the card from the pill (t=0) into the band (t=1); on the way back
