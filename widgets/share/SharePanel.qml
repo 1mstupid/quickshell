@@ -25,7 +25,7 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "qs-share"
 
-    readonly property int panelW: 360
+    readonly property int panelW: 240
     readonly property int panelH: 96
 
     // 0 = the bar pill, 1 = the full panel
@@ -130,24 +130,6 @@ PanelWindow {
             anchors.centerIn: parent
             spacing: 10
             opacity: Math.max(0, (root.t - 0.5) * 2)
-
-            // the tray is a placeholder for now: a bordered box and its name
-            Rectangle {
-                width: 130
-                height: 64
-                radius: 14
-                color: "transparent"
-                border.width: 1
-                border.color: Qt.alpha(Theme.fg, 0.2)
-
-                Text {
-                    anchors.centerIn: parent
-                    text: "Files Tray"
-                    color: Qt.alpha(Theme.fg, 0.5)
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 11
-                }
-            }
 
             // the LocalSend area: a click sends the whole queue
             Rectangle {
