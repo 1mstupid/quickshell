@@ -174,7 +174,8 @@ PanelWindow {
 
     // ── Open / close ───────────────────────────────────────────────────────
     function openLauncher() {
-        PillState.owner = "applauncher";
+        if (!PillState.claim("applauncher"))
+            return;
         const from = PillState.takeOver();
         startW = from.w;
         startH = from.h;

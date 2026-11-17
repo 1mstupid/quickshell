@@ -114,7 +114,8 @@ PanelWindow {
     }
 
     function openMenu() {
-        PillState.owner = "powermenu"
+        if (!PillState.claim("powermenu"))
+            return
         const from = PillState.takeOver()
         startW = from.w
         startH = from.h
