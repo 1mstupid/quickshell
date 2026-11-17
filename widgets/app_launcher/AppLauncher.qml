@@ -295,6 +295,31 @@ PanelWindow {
     }
 
     // ── Navigation ─────────────────────────────────────────────────────────
+    function shareSelected() {
+        var r = results[selectedIndex];
+        if (!r) return;
+
+        // Determine what path/value to share based on result type
+        var targetPath = "";
+        if (r.kind === "file") {
+            targetPath = r.value;
+        } else if (r.kind === "app" && r.entry && r.entry.path) {
+            // If it's an app, you can share its desktop file or path if available
+            targetPath = r.entry.path;
+        } else if (r.kind === "clipboard" && typeof r.value === "string") {
+            // Optional: If you want to share text/clipboard items, you could write to a temp file, 
+            // but LocalSend is typically for files. We'll stick to file/path types.
+            return;
+        }
+
+        if (targetPath !== "") {
+            Share.addFile(targetPath);
+            Share.open();
+            // If you want it to trigger sending immediately:
+            // Share.send();
+            AppLauncherState.hide();
+        }
+    }
     function navigate(delta) {
         if (results.length === 0)
             return;
@@ -417,6 +442,12 @@ PanelWindow {
                             event.accepted = true;
                         } else if (event.key === Qt.Key_Down || event.key === Qt.Key_Tab) {
                             root.navigate(1);
+                            event.accepted = true;
+                        } else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && 
+                                   (event.modifiers & Qt.ControlModifier) && 
+                                   (event.modifiers & Qt.ShiftModifier)) {
+                            // Ctrl+Shift+Enter -> Share feature
+                            root.shareSelected();
                             event.accepted = true;
                         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                             root.activate(root.results[root.selectedIndex]);
@@ -610,9 +641,9 @@ PanelWindow {
                 width: parent.width
                 horizontalAlignment: Text.AlignHCenter
                 text: root.mode === "calc" ? "↵ copy    ⌫ back    esc close" : 
-                      root.mode === "file" ? "↵ open    ⌫ back    esc close" : 
+                      root.mode === "file" ? "↵ open    ⇧^↵ share    ⌫ back    esc close" : 
                       root.mode === "clipboard" ? "↵ copy    ^⌫ delete    ⌫ back    esc close" : 
-                      "↑↓ move    ↵ launch    esc close"
+                      "↑↓ move    ↵ launch    ⇧^↵ share    esc close"
                 color: Theme.fg
                 opacity: 0.25
                 font.family: Theme.fontFamilyAlt
