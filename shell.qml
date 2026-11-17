@@ -20,6 +20,7 @@ import "./widgets/todo"
 import "./widgets/usage"
 import "./widgets/wallpaper"
 import "./widgets/colorscheme"
+import "./widgets/share"
 
 ShellRoot {
 
@@ -29,6 +30,8 @@ ShellRoot {
     AppLauncher {}
 
     PowerMenu {}
+
+    SharePanel {}
 
     SettingsWindow {}
 

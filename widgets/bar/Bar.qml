@@ -117,6 +117,19 @@ PanelWindow {
             bodyHeight: pill.height
         }
 
+        // a file dragged onto the pill opens the share panel and joins its queue (origin screen only)
+        DropArea {
+            anchors.fill: parent
+            enabled: root.isOrigin
+            keys: ["text/uri-list"]
+            onEntered: ShareService.open()
+            onExited: ShareService.scheduleClose()
+            onDropped: drop => {
+                ShareService.addUrls(drop.urls)
+                drop.accept(Qt.CopyAction)
+            }
+        }
+
         // left: workspace dots
         Workspaces {
             id: workspaces
