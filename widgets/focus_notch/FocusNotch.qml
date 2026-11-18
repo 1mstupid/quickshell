@@ -73,11 +73,11 @@ PanelWindow {
     // only a change on an open panel is eased; opening goes straight to the size
     Behavior on shownW {
         enabled: root.expand > 0.99
-        NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+        NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
     }
     Behavior on shownH {
         enabled: root.expand > 0.99
-        NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+        NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
     }
 
     // "" closed, "hover" the strip, "open" the full panel
@@ -355,7 +355,7 @@ PanelWindow {
         id: growAnim
         target: root
         property: "grow"
-        duration: 260
+        duration: 160
         easing.type: Easing.InOutCubic
         onFinished: {
             if (root.stage === "" && root.grow < 0.01) {
@@ -372,7 +372,9 @@ PanelWindow {
         target: root
         property: "expand"
         duration: PillState.morphMs
-        easing.type: Easing.InOutCubic
+        easing.type: to === 1 ? PillState.openEase : Easing.InOutCubic
+        easing.amplitude: PillState.easeAmplitude
+        easing.period: PillState.easePeriod
     }
 
     // the pointer has to rest on the pill a moment, so passing over it on the
