@@ -92,7 +92,11 @@ PanelWindow {
              : lockOn ? lockRow.implicitWidth + 4 * pad
              : mediaOn ? mediaRow.implicitWidth + 4 * pad
              : clock.implicitWidth + 2 * (pad + side)
-        height: Theme.effectiveBarHeight
+        // the track readout grows the pill a little so the cover can be larger
+        height: mediaOn ? Math.round(40 * Theme.barScale) : Theme.effectiveBarHeight
+        Behavior on height {
+            NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+        }
 
         // the notch is painted by the Canvas below, so the rectangle itself stays clear
         color: "transparent"
@@ -467,7 +471,7 @@ PanelWindow {
 
             Image {
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.round(20 * Theme.barScale)
+                width: Math.round(30 * Theme.barScale)
                 height: width
                 source: media.player?.trackArtUrl ?? ""
                 sourceSize.width: 40

@@ -58,7 +58,7 @@ Item {
     }
     Timer {
         id: announceTimer
-        interval: 3000
+        interval: 5000
         onTriggered: root.announced = false
     }
 
