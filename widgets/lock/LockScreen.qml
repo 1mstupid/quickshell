@@ -13,8 +13,8 @@ Item {
 
     // 0 = desktop/bar state, 1 = settled lockscreen
     property real t: 0
-    // where the pill sits in the lock state: just under the clock
-    readonly property real lockTop: height / 2 + timeText.height / 2 + 16
+    // the pill stays at the top and drops a little in the lock state
+    readonly property real lockTop: PillState.pillTop + 20
     Behavior on t {
         NumberAnimation {
             duration: PillState.morphMs
