@@ -13,6 +13,8 @@ Item {
 
     // 0 = desktop/bar state, 1 = settled lockscreen
     property real t: 0
+    // where the pill sits in the lock state: just under the clock
+    readonly property real lockTop: height / 2 + timeText.height / 2 + 16
     Behavior on t {
         NumberAnimation {
             duration: PillState.morphMs
@@ -89,14 +91,21 @@ Item {
         fillMode: Image.PreserveAspectCrop
     }
 
-    Rectangle {
+    // Dims toward the edges and leaves the clock and pill clear, instead of a flat veil
+    RadialGradient {
         anchors.fill: parent
-        color: Qt.alpha(Theme.bg, 0.65)
+        horizontalRadius: root.width * 0.75
+        verticalRadius: root.height * 0.75
         opacity: root.t
+        gradient: Gradient {
+            GradientStop { position: 0.25; color: Qt.alpha(Theme.bg, 0) }
+            GradientStop { position: 1.0; color: Qt.alpha(Theme.bg, 0.75) }
+        }
     }
 
     // Center clock emerges from the notch and returns to it on unlock
     Text {
+        id: timeText
         visible: root.primary
         text: Qt.formatDateTime(clock.date, UserSettings.clockFormat)
         color: Qt.alpha(Theme.fg, 0.9)
@@ -127,21 +136,26 @@ Item {
         readonly property int dotsCount: Math.min(root.lock.buffer.length, 24)
         readonly property real dotsWidth: dotsCount > 0 ? (dotsCount * 6 + (dotsCount - 1) * 5) : 0
         readonly property real capsWidth: capsLabel.visible ? (capsLabel.implicitWidth + 12) : 0
-        // icon (12 + 14) + leftMargin (10) + dots + rightMargin (12) + caps
-        readonly property real neededWidth: 46 + dotsWidth + capsWidth + 12
+        // the glyph alone until something is typed, then the dots take its place
+        readonly property real contentWidth: dotsCount > 0 ? dotsWidth : 14
+        // leftMargin (12) + content + rightMargin (12) + caps
+        readonly property real neededWidth: 24 + contentWidth + capsWidth
 
-        visible: root.primary
-        bodyWidth: Math.max(PillState.pillWidth, neededWidth)
-        bodyHeight: PillState.pillHeight
-        x: (root.width - bodyWidth) / 2 - bodyX + root.shake
-        y: PillState.pillTop
-
-        Behavior on bodyWidth {
+        // eases when typing starts or stops; bodyWidth moves between the bar's pill and this
+        property real fitWidth: neededWidth
+        Behavior on fitWidth {
             NumberAnimation {
                 duration: 140
                 easing.type: Easing.OutCubic
             }
         }
+
+        visible: root.primary
+        bodyWidth: PillState.pillWidth + (fitWidth - PillState.pillWidth) * root.t
+        bodyHeight: PillState.pillHeight
+        x: (root.width - bodyWidth) / 2 - bodyX + root.shake
+        // unlocking returns it to the bar's place, through the same progress t
+        y: PillState.pillTop + (root.lockTop - PillState.pillTop) * root.t
     }
 
     // Password content inside the pill silhouette
@@ -158,6 +172,7 @@ Item {
             id: icon
             x: 12
             anchors.verticalCenter: parent.verticalCenter
+            visible: root.lock.buffer.length === 0
             text: "󰌾"
             color: root.lock.failed ? Theme.alert : Qt.alpha(Theme.fg, 0.6)
             font.family: Theme.fontFamily
@@ -173,23 +188,9 @@ Item {
             }
         }
 
-        Text {
-            visible: root.lock.buffer.length === 0
-            anchors.left: icon.right
-            anchors.leftMargin: 8
-            anchors.right: capsLabel.visible ? capsLabel.left : parent.right
-            anchors.rightMargin: 10
-            anchors.verticalCenter: parent.verticalCenter
-            elide: Text.ElideRight
-            text: root.lock.failed ? "" : ""
-            color: root.lock.failed ? Theme.alert : Qt.alpha(Theme.fg, 0.4)
-            font.family: Theme.fontFamilySans
-            font.pixelSize: 12
-        }
-
         Row {
-            anchors.left: icon.right
-            anchors.leftMargin: 10
+            anchors.left: parent.left
+            anchors.leftMargin: 12
             anchors.verticalCenter: parent.verticalCenter
             spacing: 5
 
