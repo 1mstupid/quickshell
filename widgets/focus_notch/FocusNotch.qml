@@ -373,7 +373,6 @@ PanelWindow {
         property: "expand"
         duration: PillState.morphMs
         easing.type: to === 1 ? PillState.openEase : Easing.InOutCubic
-        easing.amplitude: PillState.easeAmplitude
         easing.period: PillState.easePeriod
     }
 
