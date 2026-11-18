@@ -14,5 +14,6 @@ pkgs.mkShell {
     networkmanager
     findutils
     util-linux
+    python3
   ];
 }
