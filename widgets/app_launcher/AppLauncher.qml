@@ -49,7 +49,7 @@ PanelWindow {
         NumberAnimation { duration: 250; easing.type: Easing.OutCubic }
     }
 
-    // ── State ──────────────────────────────────────────────────────────────
+    // ── State ────────────────────────────────______________________________
     property string searchQuery: ""
     property int selectedIndex: 0
     property int selectionAnchor: -1
@@ -58,6 +58,88 @@ PanelWindow {
     readonly property bool isSearching: searchQuery.trim() !== ""
     property string mode: ""
     readonly property var modeInfo: Modes.find(mode)
+
+    // Clipboard tracking properties for copy/cut/paste
+    property string fileClipboardAction: ""
+    property var fileClipboardPaths: []
+
+    function copySelectedFiles() {
+        var targets = selectedFiles.length > 0 ? selectedFiles : (results[selectedIndex] && results[selectedIndex].kind === "file" ? [results[selectedIndex].value] : []);
+        if (targets.length === 0) return;
+
+        fileClipboardAction = "copy";
+        fileClipboardPaths = targets;
+
+        var uriList = targets.map(p => fileUri(p)).join("\n");
+        Quickshell.execDetached(["wl-copy", "--type", "text/uri-list", uriList]);
+        
+        selectedFiles = [];
+        selectionAnchor = -1;
+    }
+
+    function cutSelectedFiles() {
+        var targets = selectedFiles.length > 0 ? selectedFiles : (results[selectedIndex] && results[selectedIndex].kind === "file" ? [results[selectedIndex].value] : []);
+        if (targets.length === 0) return;
+
+        fileClipboardAction = "cut";
+        fileClipboardPaths = targets;
+
+        var uriList = targets.map(p => fileUri(p)).join("\n");
+        Quickshell.execDetached(["wl-copy", "--type", "text/uri-list", uriList]);
+
+        selectedFiles = [];
+        selectionAnchor = -1;
+    }
+
+    function pasteFilesIntoCurrentDirectory() {
+        if (fileClipboardPaths.length === 0 || mode !== "file") return;
+
+        var q = searchQuery.trim();
+        var targetDir = "";
+
+        // 1. Resolve current directory from searchQuery
+        if (q === "" || q === "~") {
+            targetDir = Quickshell.env("HOME") || "/home";
+        } else if (q.startsWith("~")) {
+            targetDir = q.replace("~", Quickshell.env("HOME") || "/home");
+        } else if (q.endsWith("/")) {
+            targetDir = q;
+        } else {
+            var lastSlash = q.lastIndexOf("/");
+            if (lastSlash !== -1) {
+                targetDir = q.substring(0, lastSlash + 1);
+            } else {
+                targetDir = Quickshell.env("HOME") + "/";
+            }
+        }
+
+        // Ensure targetDir is an absolute path for gio
+        if (targetDir.startsWith("./")) {
+            targetDir = (Quickshell.env("HOME") || "/") + targetDir.substring(1);
+        }
+
+        console.log("Pasting into target directory:", targetDir);
+        console.log("Files to paste:", fileClipboardPaths);
+
+        var cmd = [];
+        if (fileClipboardAction === "cut") {
+            cmd = ["gio", "move"].concat(fileClipboardPaths).concat([targetDir]);
+        } else {
+            cmd = ["gio", "copy"].concat(fileClipboardPaths).concat([targetDir]);
+        }
+
+        Quickshell.execDetached(cmd);
+
+        if (fileClipboardAction === "cut") {
+            fileClipboardPaths = [];
+            fileClipboardAction = "";
+        }
+
+        // Trigger a refresh of the file list view
+        var refreshQ = searchQuery;
+        searchQuery = "";
+        searchQuery = refreshQ;
+    }
 
     property var results: {
         var q = searchQuery.trim();
@@ -96,10 +178,7 @@ PanelWindow {
     onResultsChanged: {
       selectedIndex = 0;
       selectionAnchor = -1;
-
-        // Keep selections while navigating between directories.
-        // Remove this reset if you want selections to persist across searches too.
-      }
+    }
     
     function toggleFileSelection(path) {
         var next = selectedFiles.slice();
@@ -121,11 +200,6 @@ PanelWindow {
             return false;
 
         var q = searchQuery.trim();
-        var c = Modes.fileSearchClassify
-            ? Modes.fileSearchClassify(q)
-            : null;
-
-        // Only navigate when the input represents a directory.
         if (q.charAt(0) !== "/" && q.charAt(0) !== "~")
             return false;
 
@@ -136,7 +210,6 @@ PanelWindow {
             return false;
 
         var parent = path.slice(0, slash + 1);
-
         if (parent === "")
             parent = "/";
 
@@ -348,8 +421,6 @@ PanelWindow {
         AppLauncherState.hide();
     }
 
-
-
     function navigate(delta, isShiftPressed) {
         if (results.length === 0) return;
 
@@ -382,15 +453,12 @@ PanelWindow {
 
             selectedFiles = next;
         } else {
-            // Preserve selected files when moving normally.
             selectionAnchor = -1;
             selectedIndex = nextIndex;
         }
 
         listView.positionViewAtIndex(selectedIndex, ListView.Contain);
     }
-
-
 
     readonly property color accentFill: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.18)
 
@@ -491,6 +559,15 @@ PanelWindow {
                         } else if (event.key === Qt.Key_Down || event.key === Qt.Key_Tab) {
                             root.navigate(1, shiftPressed);
                             event.accepted = true;
+                        } else if (ctrlPressed && event.key === Qt.Key_C && root.mode === "file") {
+                            root.copySelectedFiles();
+                            event.accepted = true;
+                        } else if (ctrlPressed && event.key === Qt.Key_X && root.mode === "file") {
+                            root.cutSelectedFiles();
+                            event.accepted = true;
+                        } else if (ctrlPressed && event.key === Qt.Key_P && root.mode === "file") {
+                            root.pasteFilesIntoCurrentDirectory();
+                            event.accepted = true;
                         } else if (ctrlPressed && event.key === Qt.Key_D) {
                             root.navigate(root.maxVisible, shiftPressed);
                             event.accepted = true;
@@ -554,7 +631,7 @@ PanelWindow {
                     anchors.right: parent.right
                     anchors.rightMargin: 14
                     anchors.verticalCenter: parent.verticalCenter
-                    text: root.mode !== "" ? (root.mode === "clipboard" ? root.results.length + " / " + ClipboardHistory.entries.length : (root.selectedFiles.length > 0 ? root.selectedFiles.length + " selected" : "")) : root.results.length + " / " + DesktopEntries.applications.values.length
+                    text: root.mode !== "" ? (root.mode === "clipboard" ? root.results.length + " / " + ClipboardHistory.entries.length : (root.fileClipboardPaths.length > 0 ? (root.fileClipboardAction === "cut" ? "✂️ " : "📋 ") + root.fileClipboardPaths.length + " staged" : (root.selectedFiles.length > 0 ? root.selectedFiles.length + " selected" : ""))) : root.results.length + " / " + DesktopEntries.applications.values.length
                     color: Theme.fg
                     opacity: 0.35
                     font.family: Theme.fontFamilyAlt
@@ -744,7 +821,7 @@ PanelWindow {
                 width: parent.width
                 horizontalAlignment: Text.AlignHCenter
                 text: root.mode === "calc" ? "↵ copy    ⌫ back    esc close" : 
-                      root.mode === "file" ? "↵ open    ⌫ delete    esc close" : 
+                      root.mode === "file" ? (root.fileClipboardPaths.length > 0 ? "↵ open    ^c copy    ^x cut    ^p paste here    ⌫ delete    esc close" : "↵ open    ^c copy    ^x cut    ⌫ delete    esc close") : 
                       root.mode === "clipboard" ? "↵ copy    ^⌫ delete    ⌫ back    esc close" : 
                       "↑↓ move    ↵ launch    esc close"
                 color: Theme.fg
