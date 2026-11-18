@@ -240,7 +240,7 @@ PanelWindow {
         target: root
         property: "t"
         duration: PillState.morphMs
-        easing.type: to === 1 ? PillState.openEase : Easing.InOutCubic
+        easing.type: PillState.openEase
         easing.period: PillState.easePeriod
         onFinished: {
             if (root.t < 0.5) {
@@ -391,8 +391,8 @@ PanelWindow {
         readonly property real fromW: root.startW
         readonly property real fromH: root.startH
 
-        width: fromW + (root.bandWidth - fromW) * root.t
-        height: fromH + (root.bandHeight - fromH) * root.t
+        width: fromW + (root.bandWidth - fromW) * Math.max(0, root.t)
+        height: fromH + (root.bandHeight - fromH) * Math.max(0, root.t)
         x: (root.width - width) / 2
         y: PillState.pillTop
         color: Theme.bg
