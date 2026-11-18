@@ -19,7 +19,7 @@ Item {
     // a number from the position on the track, held to the range and the step
     function at(x, w) {
         const f = Math.max(0, Math.min(1, x / w))
-        const stepped = Number((Math.round((def.min + f * (def.max - def.min)) / def.step) * def.step).toFixed(3))
+        const stepped = Math.round((def.min + f * (def.max - def.min)) / def.step) * def.step
         return Math.max(def.min, Math.min(def.max, stepped))
     }
 

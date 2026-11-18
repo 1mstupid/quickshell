@@ -35,11 +35,6 @@ const SETTINGS = [
     { key: "bodyFont", type: "text", def: "SFProText Nerd Font", group: "appearance", label: "Body font" },
     { key: "displayFont", type: "text", def: "SFProDisplay Nerd Font", group: "appearance", label: "Display font" },
 
-    // how long a panel takes to open and close, and how much its grow bounces: the period of the
-    // elastic curve, where a shorter one bounces more (0.4 is about 27% past the target)
-    { key: "morphMs", type: "number", def: 180, min: 60, max: 600, step: 10, unit: "ms", group: "appearance", label: "Panel speed" },
-    { key: "morphPeriod", type: "number", def: 0.4, min: 0.3, max: 1.2, step: 0.05, group: "appearance", label: "Panel bounce" },
-
     // 12 or 24 hours on the clocks (the bar and the lock screen)
     { key: "clock24", type: "bool", def: false, group: "clock", label: "24-hour clock" },
 
