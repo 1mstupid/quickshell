@@ -9,7 +9,7 @@ import "../../services/Settings.js" as Schema
 // pages and the settings of the page beside it. `qs ipc call settings toggle` opens and closes
 // it; Escape and a click outside close it too. What it shows is the list in Settings.js: a page
 // for each group, a row for each setting in it. A setting is changed in UserSettings, which
-// writes settings.json, so the file and the panel never disagree.
+// writes config.toml, so the file and the panel never disagree.
 PanelWindow {
     id: root
 

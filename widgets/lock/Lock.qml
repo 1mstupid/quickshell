@@ -22,7 +22,7 @@ Scope {
     readonly property string pamService: "quickshell"
 
     FileView {
-        path: Quickshell.env("HOME") + "/.local/xdg/config/wallpaper-current"
+        path: Quickshell.env("HOME") + "/.local/state/lumin/wallpaper-current"
         watchChanges: true
         onFileChanged: reload()
         onLoaded: root.wallpaperPath = text().trim()

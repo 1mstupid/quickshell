@@ -10,7 +10,7 @@ Singleton {
     property var recentIds: []
 
     readonly property string recentsPath:
-        Quickshell.env("HOME") + "/.local/xdg/config/app-launcher-recents"
+        Quickshell.env("HOME") + "/.local/state/lumin/app-launcher-recents"
 
     // one JSON array of desktop-entry ids, most recent first
     FileView {
@@ -30,7 +30,7 @@ Singleton {
     Component.onCompleted: {
         // FileView won't create the directory on write
         Quickshell.execDetached(["mkdir", "-p",
-            Quickshell.env("HOME") + "/.local/xdg/config"])
+            Quickshell.env("HOME") + "/.local/state/lumin"])
     }
 
     function toggle() { launcherVisible = !launcherVisible }

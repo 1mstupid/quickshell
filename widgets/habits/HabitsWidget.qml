@@ -101,7 +101,7 @@ PanelWindow {
                 visible: root.count === 0
                 width: col.width
                 wrapMode: Text.WordWrap
-                text: "No habits yet.\nAdd them to ~/.local/xdg/config/habits.json"
+                text: "No habits yet.\nAdd them to ~/.local/state/lumin/habits.json"
                 color: Theme.disabled
                 font.family: Theme.fontFamily
                 font.pixelSize: 11

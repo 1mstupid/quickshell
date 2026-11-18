@@ -4,32 +4,25 @@ import Quickshell
 import Quickshell.Io
 import "Settings.js" as Schema
 
-// The settings, read from ~/.local/xdg/config/settings.json. What can be set, with its type
-// and default, is listed in Settings.js. Widget visibility:
-//   {"usageRing": true, "focusWidget": true, "todoWidget": true, "habitsWidget": true,
-//    "mediaWidget": true}
-// and what the control drawer offers (brightness and powerProfile also need the
-// hardware, so a desktop shows neither whatever the file says):
-//   {"wifi": true, "bluetooth": true, "vpn": true, "brightness": true, "powerProfile": true,
-//    "nightLight": true, "keepAwake": true, "screenshot": true}
+// The settings, from the [settings] table of ~/.config/lumin/config.toml (see Config). What can
+// be set, with its type and default, is listed in Settings.js. Widget visibility, what the
+// control drawer offers (brightness and powerProfile also need the hardware), the shape of
+// the bar (pill = true makes the notch a floating pill and hides the screen border; it is off
+// when missing), the rounding in pixels (cornerRadius = 26, which never goes past half the
+// shorter side of what it rounds), the fonts (bodyFont, displayFont) and clock24 are all keys
+// of that table, for example:
+//   [settings]
+//   pill = true
+//   cornerRadius = 26
+//   usageRing = true
 // (bluetooth and vpn also need an adapter and a VPN profile to show)
-// and the shape of the bar: {"pill": true} makes the notch a floating pill and hides
-// the screen border. Unlike the others it is off when missing.
-// The rounding of the notch and of every panel that grows from it, in pixels, is
-// {"cornerRadius": 26}; it never goes past half the shorter side of what it rounds, so
-// the small bar pill is a capsule and the radius opens up as a panel grows.
-// Fonts are {"bodyFont": "SFProText Nerd Font", "displayFont": "SFProDisplay Nerd Font"}, and the
-// clocks {"clock24": true}.
-// A missing file, a bad file or a missing key keeps the default, and so does a value of the
-// wrong type; a number outside its range is held to it. The file is read on start and whenever
-// it changes. `set(key, value)` changes one setting and writes the file, and keys that
-// Settings.js does not list are kept. The IPC toggles change the running value only, so the
-// file stays the source of truth. The four corner widgets are the exception: once
-// layout.json has a `visible` for one, that wins, and their toggles write it (see WidgetLayout).
+// A missing table, a missing key, or a value of the wrong type keeps the default; a number
+// outside its range is held to it. `set(key, value)` changes one setting in the file, which is
+// read back afterwards. The IPC toggles change the running value only, so the file stays the
+// source of truth. The four corner widgets are the exception: once layout.json has a `visible`
+// for one, that wins, and their toggles write it (see WidgetLayout).
 Singleton {
     id: root
-
-    readonly property string path: Quickshell.env("HOME") + "/.local/xdg/config/settings.json"
 
     // the defaults are the list's, so that there is one place for them
     property bool usageRing: Schema.defaultOf("usageRing")
@@ -69,21 +62,16 @@ Singleton {
     // 26 is the control panel's, the one the others follow
     property real cornerRadius: Schema.defaultOf("cornerRadius")
 
-    // what the file last said, for every setting, and its keys that are not settings
-    property var saved: Schema.parse("").values
-    property var extra: ({})
-
-    function parse(t) {
-        const r = Schema.parse(t)
-        saved = r.values
-        extra = r.extra
-        for (const s of Schema.SETTINGS)
-            root[s.key] = r.values[s.key]
+    // takes the [settings] table; a key that is missing or of the wrong type keeps its default
+    function parse(table) {
+        for (const s of Schema.SETTINGS) {
+            const v = Schema.normalize(s, table?.[s.key])
+            root[s.key] = v === undefined ? s.def : v
+        }
     }
 
-    // Changes one setting and writes the file; the watcher reloads the same content afterwards,
-    // which changes nothing. It writes what the file said plus this one value, not the running
-    // values, so an IPC toggle is not made permanent by changing something else.
+    // Changes one setting in config.toml. Only that key is written, so an IPC toggle is not made
+    // permanent by changing something else.
     function set(key, value) {
         const s = Schema.find(key)
         if (!s)
@@ -92,23 +80,17 @@ Singleton {
         if (v === undefined)
             return
         root[key] = v
-        saved = Object.assign({}, saved, { [key]: v })
-        file.setText(Schema.serialize(saved, extra))
+        Config.set("settings", key, v)
+    }
+
+    Connections {
+        target: Config
+        function onDataChanged() { root.parse(Config.data.settings) }
     }
 
     // qs ipc call pill toggle
     IpcHandler {
         target: "pill"
         function toggle(): void { root.pill = !root.pill }
-    }
-
-    FileView {
-        id: file
-        path: root.path
-        atomicWrites: true
-        watchChanges: true
-        onFileChanged: reload()
-        onLoaded: root.parse(text())
-        onLoadFailed: root.parse("")
     }
 }

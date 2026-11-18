@@ -343,7 +343,7 @@ PanelWindow {
         if (ShareService.selectedDevice !== "") {
             ShareService.send();
         } else {
-            console.log("Share warning: 'shareDevice' is not configured in settings.json");
+            console.log("Share warning: 'shareDevice' is not configured in config.toml ([settings])");
         }
         AppLauncherState.hide();
     }

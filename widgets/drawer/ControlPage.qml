@@ -8,7 +8,7 @@ import "../../services/menu"
 // header opens it from any page (and leaves it again), and so does
 // `qs ipc call drawer toggle`; it has no tab of its own. Tiles for the quick switches,
 // sliders for display and sound, and the power profile. Brightness and the profile only
-// show on hardware that has them, and every item can be turned off in settings.json.
+// show on hardware that has them, and every item can be turned off in config.toml.
 // The Wi-Fi and Bluetooth tiles switch on a tap and open their list from the
 // arrow; the VPN tile opens its list. A list replaces the switches until Back.
 // The arrow on Sound opens the per-app volumes. The notch sizes its card to this page:

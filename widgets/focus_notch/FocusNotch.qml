@@ -204,7 +204,7 @@ PanelWindow {
         return { rows: out, today: today, week: week }
     }
 
-    // Free time: what is left before bedtime (the `bed` line of sleep-reminder) once the
+    // Free time: what is left before bedtime (the `bed` key of the [sleep] table) once the
     // open rows are done. A block of the schedule counts what is left of its length after
     // the time spent on it; a block that has run over counts nothing, so it never makes
     // the total negative. No bedtime, or past it, and there is nothing to show.

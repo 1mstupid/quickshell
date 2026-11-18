@@ -16,7 +16,7 @@ import Quickshell.Io
 Singleton {
     id: root
 
-    readonly property string stateFile: Quickshell.env("HOME") + "/.local/xdg/config/task-focus"
+    readonly property string stateFile: Quickshell.env("HOME") + "/.local/state/lumin/task-focus"
 
     property string due: ""
     property string title: ""

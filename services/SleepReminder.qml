@@ -3,15 +3,13 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Bedtime reminders, read from ~/.local/xdg/config/sleep-reminder:
-//   warn 20:00
-//   bed 21:00
-// Each line fires one notification a day when the clock reaches it. No file,
-// or a missing line, turns that reminder off.
+// Bedtime reminders, from the [sleep] table of config.toml:
+//   warn = "20:00"
+//   bed = "21:00"
+// Each one fires one notification a day when the clock reaches it. No table,
+// or a missing key, turns that reminder off.
 Singleton {
     id: root
-
-    readonly property string path: Quickshell.env("HOME") + "/.local/xdg/config/sleep-reminder"
 
     property string warnAt: ""
     property string bedAt: ""
@@ -20,20 +18,9 @@ Singleton {
 
     function dayKey() { return Qt.formatDate(new Date(), "yyyy-MM-dd") }
 
-    function parse(t) {
-        let w = ""
-        let b = ""
-        for (const line of t.split("\n")) {
-            const p = line.trim().split(/\s+/)
-            if (p.length < 2)
-                continue
-            if (p[0] === "warn")
-                w = p[1]
-            else if (p[0] === "bed")
-                b = p[1]
-        }
-        warnAt = w
-        bedAt = b
+    function apply(table) {
+        warnAt = typeof table?.warn === "string" ? table.warn : ""
+        bedAt = typeof table?.bed === "string" ? table.bed : ""
     }
 
     function tick() {
@@ -59,11 +46,8 @@ Singleton {
         onTriggered: root.tick()
     }
 
-    FileView {
-        path: root.path
-        watchChanges: true
-        onFileChanged: reload()
-        onLoaded: root.parse(text())
-        onLoadFailed: root.parse("")
+    Connections {
+        target: Config
+        function onDataChanged() { root.apply(Config.data.sleep) }
     }
 }
