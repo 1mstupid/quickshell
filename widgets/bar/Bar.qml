@@ -52,12 +52,6 @@ PanelWindow {
         id: recorder
     }
 
-    // the bar's own view of the player; no position polling, the readout does not show time
-    MediaState {
-        id: media
-        active: false
-    }
-
     Rectangle {
         id: pill
 
@@ -70,9 +64,7 @@ PanelWindow {
         readonly property bool volumeOn: Volume.shown && !PillState.active
         // lock readout, shown while Caps or Num Lock is on and the volume readout is not
         readonly property bool lockOn: Locks.shown && !PillState.active && !Volume.shown
-        // track readout, shown for a few seconds when playback starts; the volume and lock readouts take precedence
-        readonly property bool mediaOn: media.announced && !PillState.active && !Volume.shown && !Locks.shown
-        readonly property bool contentHidden: PillState.active || Volume.shown || Locks.shown || mediaOn
+        readonly property bool contentHidden: PillState.active || Volume.shown || Locks.shown
 
         // Only count width + innerGap if that side actually has visible content
         readonly property int leftW: (workspaces.visible && workspaces.implicitWidth > 0)
@@ -90,13 +82,8 @@ PanelWindow {
         anchors.horizontalCenter: parent.horizontalCenter
         width: volumeOn ? volumeRow.implicitWidth + 4 * pad
              : lockOn ? lockRow.implicitWidth + 4 * pad
-             : mediaOn ? mediaRow.implicitWidth + 4 * pad
              : clock.implicitWidth + 2 * (pad + side)
-        // the track readout grows the pill a little so the cover can be larger
-        height: mediaOn ? Math.round(40 * Theme.barScale) : Theme.effectiveBarHeight
-        Behavior on height {
-            NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
-        }
+        height: Theme.effectiveBarHeight
 
         // the notch is painted by the Canvas below, so the rectangle itself stays clear
         color: "transparent"
@@ -457,49 +444,6 @@ PanelWindow {
             font.family: Theme.fontFamilyAlt
             font.pixelSize: Theme.fontSize
             font.bold: true
-        }
-
-        // media readout: cover, title over artist, and the wave; the title scrolls when long
-        Row {
-            id: mediaRow
-            anchors.centerIn: parent
-            spacing: Math.round(8 * Theme.barScale)
-
-            opacity: pill.mediaOn ? 1 : 0
-            visible: opacity > 0
-            Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
-
-            Image {
-                anchors.verticalCenter: parent.verticalCenter
-                width: Math.round(30 * Theme.barScale)
-                height: width
-                source: media.player?.trackArtUrl ?? ""
-                sourceSize.width: 40
-                fillMode: Image.PreserveAspectCrop
-                asynchronous: true
-            }
-            Column {
-                anchors.verticalCenter: parent.verticalCenter
-
-                MarqueeText {
-                    width: Math.round(150 * Theme.barScale)
-                    text: media.player?.trackTitle ?? ""
-                    color: Theme.fg
-                    font.family: Theme.fontFamilyAlt
-                    font.pixelSize: Theme.fontSize - 2
-                    font.bold: true
-                }
-                MarqueeText {
-                    width: Math.round(150 * Theme.barScale)
-                    text: media.artistText
-                    color: Qt.alpha(Theme.fg, 0.55)
-                    font.family: Theme.fontFamilyAlt
-                    font.pixelSize: Theme.fontSize - 3
-                }
-            }
-            MediaWave {
-                anchors.verticalCenter: parent.verticalCenter
-            }
         }
 
         Clock {

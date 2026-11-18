@@ -33,34 +33,7 @@ Item {
     }
     readonly property bool playing: player !== null
         && player.playbackState === MprisPlaybackState.Playing
-    onPlayingChanged: {
-        if (playing) {
-            lastPlayer = player
-            announce()
-        }
-    }
-
-    // the bar's readout shows for a few seconds when playback starts or the
-    // track changes; not before the shell has settled, so a player that was
-    // already running at login stays quiet
-    property bool armed: false
-    property bool announced: false
-    function announce() {
-        if (!armed)
-            return
-        announced = true
-        announceTimer.restart()
-    }
-    Timer {
-        interval: 1000
-        running: true
-        onTriggered: root.armed = true
-    }
-    Timer {
-        id: announceTimer
-        interval: 5000
-        onTriggered: root.announced = false
-    }
+    onPlayingChanged: if (playing) lastPlayer = player
 
     // a track is loaded, playing or paused; stopped or no player is not
     readonly property bool hasTrack: player !== null
@@ -114,8 +87,6 @@ Item {
         function onTrackTitleChanged() {
             root.pos = root.player?.position ?? 0
             root.dismissed = false
-            if (root.playing)
-                root.announce()
         }
         function onPositionChanged() {
             root.pos = root.player?.position ?? 0
