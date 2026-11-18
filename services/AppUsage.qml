@@ -571,8 +571,8 @@ Singleton {
             const c = Config.data
             root.parseLimits(c.limits ?? {})
             root.parseSchedules(c.schedules ?? {})
-            root.parseTaskGate(c.gate ?? {})
             root.parseCategories(c.categories ?? {})
+            root.parseTaskGate(c.gate ?? {})
             const apps = c.focus?.apps
             root.focusApps = Array.isArray(apps) ? apps : []
         }
