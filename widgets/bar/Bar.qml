@@ -152,7 +152,7 @@ PanelWindow {
             spacing: Math.round(4 * Theme.barScale)
 
             opacity: pill.contentHidden ? 0 : 1
-            Behavior on opacity { NumberAnimation { duration: 120 } }
+            Behavior on opacity { NumberAnimation { duration: 119 } }
 
             // media wave
             Network {
