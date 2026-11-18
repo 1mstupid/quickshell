@@ -20,22 +20,12 @@ QtObject {
     // once nothing owns the pill, so a stale card never starts a later panel.
     property real takeoverW: 0
     property real takeoverH: 0
-    onOwnerChanged: {
-        if (owner === "") { takeoverW = 0; takeoverH = 0 }
-        lastOwnerChange = Date.now()
-    }
+    onOwnerChanged: if (owner === "") { takeoverW = 0; takeoverH = 0 }
 
-    // when the pill last changed hands; a claim that comes sooner than a morph waits
-    property real lastOwnerChange: 0
-
-    // A panel asks for the pill with its name. A switch that comes right after another one
-    // would cut that morph short, so it is refused until a morph has had time to finish.
-    // The owner already holding the pill is always allowed. The lock screen sets owner directly.
+    // A panel asks for the pill with its name. A switch always goes through at once: the
+    // panel giving way hands its card over (giveWay), so a quick switch does not cut a morph
+    // short and nothing waits. Refusing it would drop the keypress instead.
     function claim(name) {
-        if (owner === name)
-            return true
-        if (Date.now() - lastOwnerChange < morphMs)
-            return false
         owner = name
         return true
     }
