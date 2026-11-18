@@ -3,7 +3,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Habit data layer, kept in habits.json in the config directory:
+// Habit data layer, kept in habits.json in the state directory:
 //   {
 //     "day": "2026-10-24",            the day the statuses below refer to
 //     "habits": [{"id": "0", "name": "Read", "status": "completed"}],
@@ -14,7 +14,7 @@ import Quickshell.Io
 Singleton {
     id: root
 
-    readonly property string path: Quickshell.env("HOME") + "/.local/xdg/config/habits.json"
+    readonly property string path: Quickshell.env("HOME") + "/.local/state/lumin/habits.json"
     readonly property int weeks: 5
 
     property var data: ({ day: "", habits: [], history: {} })

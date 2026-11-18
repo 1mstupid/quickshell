@@ -16,7 +16,7 @@ import "Colorschemes.js" as Schemes
 // search, then closes. Every scheme goes through the same wallpaper-theme script, so the
 // files it writes stay in step; a fixed scheme hands it its own colours and the wallpaper
 // shown behind its row, drawn from its folder in ~/.local/share/wallpapers, if it has one.
-// The scheme in use is remembered in ~/.local/xdg/config/colorscheme-current, and the
+// The scheme in use is remembered in ~/.local/state/lumin/colorscheme-current, and the
 // picker opens on it.
 PanelWindow {
     id: root
@@ -76,9 +76,9 @@ PanelWindow {
     property string currentId: ""
     property string wallpaperPath: ""
     property bool lightMode: Theme.light
-    readonly property string stateFile: Quickshell.env("HOME") + "/.local/xdg/config/colorscheme-current"
-    readonly property string wallpaperFile: Quickshell.env("HOME") + "/.local/xdg/config/wallpaper-current"
-    readonly property string modeFile: Quickshell.env("HOME") + "/.local/xdg/config/colorscheme-mode"
+    readonly property string stateFile: Quickshell.env("HOME") + "/.local/state/lumin/colorscheme-current"
+    readonly property string wallpaperFile: Quickshell.env("HOME") + "/.local/state/lumin/wallpaper-current"
+    readonly property string modeFile: Quickshell.env("HOME") + "/.local/state/lumin/colorscheme-mode"
     // set while the wallpaper is being sampled
     property bool deriving: false
 
@@ -115,7 +115,7 @@ PanelWindow {
 
     // watches the global light/dark mode file written by the settings drawer
     FileView {
-        path: Quickshell.env("HOME") + "/.local/xdg/config/colorscheme-mode"
+        path: Quickshell.env("HOME") + "/.local/state/lumin/colorscheme-mode"
         watchChanges: true
         onFileChanged: reload()
         onLoaded: {

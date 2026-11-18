@@ -4,19 +4,19 @@ import Quickshell
 import Quickshell.Io
 
 // Where the corner widgets sit and whether they show, kept in
-// ~/.local/xdg/config/layout.json:
+// ~/.local/state/lumin/layout.json:
 //   {"todo": {"anchor": "top-left", "x": 0, "y": 0, "visible": true}}
 // anchor is one of top-left, top-right, bottom-left, bottom-right, or
 // bottom-center (centred, with no side margin); x and y are whole grid cells
 // (20 px at scale 1) further in from that corner, on top of the usual edge
 // inset. A missing file, entry or key keeps the default place,
 // so with no file the widgets sit where they always did. `visible` wins over
-// the widget keys in settings.json once it is set. The edit mode writes this
+// the widget keys in config.toml's [settings] table once it is set. The edit mode writes this
 // file; it can also be edited by hand.
 Singleton {
     id: root
 
-    readonly property string path: Quickshell.env("HOME") + "/.local/xdg/config/layout.json"
+    readonly property string path: Quickshell.env("HOME") + "/.local/state/lumin/layout.json"
 
     readonly property int cell: Math.round(20 * Theme.autoScale)
     readonly property var corners: ["top-left", "top-right", "bottom-left", "bottom-right", "bottom-center"]
@@ -43,7 +43,7 @@ Singleton {
     // the widget windows by id, so the edit mode can see which are showing
     property var windows: ({})
 
-    // what settings.json says, for a widget with no `visible` of its own
+    // what config.toml says, for a widget with no `visible` of its own
     readonly property var legacy: ({
         todo: UserSettings.todoWidget,
         habits: UserSettings.habitsWidget,

@@ -69,7 +69,7 @@ Singleton {
     // the scheme in use, written by the colorscheme and wallpaper pickers; none, or one that is
     // not in the list (the wallpaper's own), is dark
     FileView {
-      path: Quickshell.env("HOME") + "/.local/xdg/config/colorscheme-current"
+      path: Quickshell.env("HOME") + "/.local/state/lumin/colorscheme-current"
       watchChanges: true
 
       onFileChanged: reload()

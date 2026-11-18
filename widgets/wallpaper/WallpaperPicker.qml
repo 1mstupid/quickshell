@@ -12,7 +12,7 @@ import "Fuzzy.js" as Fuzzy
 // The wallpaper picker: a carousel of the images in ~/.local/share/wallpapers, in the
 // band that grows out of the bar pill. Type to search the file names (fuzzy, in all the
 // folders), Left and Right move, Enter applies, Escape clears the search, then closes. It
-// opens on the wallpaper in use, which is remembered in ~/.local/xdg/config/wallpaper-current,
+// opens on the wallpaper in use, which is remembered in ~/.local/state/lumin/wallpaper-current,
 // and shows the folder that wallpaper is in: a colorscheme's folder (wallpapers/<scheme>/) after
 // the scheme was chosen, since choosing one picks a wallpaper from it.
 PanelWindow {
@@ -101,10 +101,10 @@ PanelWindow {
     // the wallpaper in use. It is written to a file when one is applied, so that it
     // survives a reboot and the picker opens on it and not on the first of the list.
     property string currentPath: ""
-    readonly property string stateFile: Quickshell.env("HOME") + "/.local/xdg/config/wallpaper-current"
+    readonly property string stateFile: Quickshell.env("HOME") + "/.local/state/lumin/wallpaper-current"
     // the colorscheme in use; applying a wallpaper makes it "wallpaper" or the subfolder name
-    readonly property string schemeFile: Quickshell.env("HOME") + "/.local/xdg/config/colorscheme-current"
-    readonly property string modeFile: Quickshell.env("HOME") + "/.local/xdg/config/colorscheme-mode"
+    readonly property string schemeFile: Quickshell.env("HOME") + "/.local/state/lumin/colorscheme-current"
+    readonly property string modeFile: Quickshell.env("HOME") + "/.local/state/lumin/colorscheme-mode"
     property bool lightMode: false
     Connections {
         target: root
