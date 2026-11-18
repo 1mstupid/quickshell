@@ -37,18 +37,13 @@ PanelWindow {
     readonly property int maxVisible: 7
     readonly property int itemH: 44
     readonly property int panelW: 400
-    // 12 top + 34 search + 8 gap + 8 gap + 16 footer + 12 bottom, plus the rows
     readonly property int chromeH: 90
     readonly property int maxPanelH: chromeH + maxVisible * itemH
 
-    // where the card grows from: the pill, or the card of the panel that gave way to this one
     property real startW: PillState.pillWidth
     property real startH: PillState.pillHeight
-
-    // 0 = the bar pill, 1 = the full panel
     property real t: 0
 
-    // eases when the number of results changes
     property real panelH: chromeH + Math.max(1, Math.min(results.length, maxVisible)) * itemH
     Behavior on panelH {
         NumberAnimation { duration: 250; easing.type: Easing.OutCubic }
@@ -57,19 +52,17 @@ PanelWindow {
     // ── State ──────────────────────────────────────────────────────────────
     property string searchQuery: ""
     property int selectedIndex: 0
-    readonly property bool isSearching: searchQuery.trim() !== ""
+    property int selectionAnchor: -1
+    property var selectedFiles: []
 
-    // "" is the app list; "calc", "file", "clipboard" come from a bang (Modes.js)
+    readonly property bool isSearching: searchQuery.trim() !== ""
     property string mode: ""
     readonly property var modeInfo: Modes.find(mode)
 
-    // what the list shows, whichever mode: plain objects, so every row looks
-    // alike. kind says what Enter does: "app", "mode", "calc", "file", or "clipboard".
     property var results: {
         var q = searchQuery.trim();
 
         if (mode === "calc") {
-            // an answer for an older expression is not shown while typing
             if (Calc.result === "" || Calc.resultFor !== q)
                 return [];
             return [{ kind: "calc", title: Calc.result, subtitle: q, icon: "", glyph: modeInfo.glyph, value: Calc.result }];
@@ -90,7 +83,6 @@ PanelWindow {
             });
         }
 
-        // a half-typed bang offers the modes it could become
         var hints = Modes.hints(searchQuery);
         if (hints.length > 0) {
             return hints.map(function (m) {
@@ -101,38 +93,78 @@ PanelWindow {
         return appResults(q.toLowerCase());
     }
 
-    onResultsChanged: selectedIndex = 0
+    onResultsChanged: {
+      selectedIndex = 0;
+      selectionAnchor = -1;
 
-    // Search: filter by name / genericName / keywords, alpha sort. No query:
-    // recent apps first, then alphabetical.
+        // Keep selections while navigating between directories.
+        // Remove this reset if you want selections to persist across searches too.
+      }
+    
+    function toggleFileSelection(path) {
+        var next = selectedFiles.slice();
+        var index = next.indexOf(path);
+
+        if (index !== -1)
+            next.splice(index, 1);
+        else
+            next.push(path);
+
+        selectedFiles = next;
+
+        if (selectedFiles.length === 0)
+            selectionAnchor = -1;
+    }
+
+    function goToParentDirectory() {
+        if (mode !== "file" || searchQuery.trim() === "")
+            return false;
+
+        var q = searchQuery.trim();
+        var c = Modes.fileSearchClassify
+            ? Modes.fileSearchClassify(q)
+            : null;
+
+        // Only navigate when the input represents a directory.
+        if (q.charAt(0) !== "/" && q.charAt(0) !== "~")
+            return false;
+
+        var path = q.replace(/\/+$/, "");
+        var slash = path.lastIndexOf("/");
+
+        if (slash < 0)
+            return false;
+
+        var parent = path.slice(0, slash + 1);
+
+        if (parent === "")
+            parent = "/";
+
+        searchInput.text = parent;
+        searchInput.cursorPosition = searchInput.text.length;
+        return true;
+    }
+
     function appResults(q) {
         var vals = DesktopEntries.applications.values;
         var list;
 
         if (q !== "") {
             list = vals.filter(function (e) {
-                if (e.name.toLowerCase().indexOf(q) !== -1)
-                    return true;
-                if (e.genericName && e.genericName.toLowerCase().indexOf(q) !== -1)
-                    return true;
+                if (e.name.toLowerCase().indexOf(q) !== -1) return true;
+                if (e.genericName && e.genericName.toLowerCase().indexOf(q) !== -1) return true;
                 for (var i = 0; i < e.keywords.length; i++)
-                    if (e.keywords[i].toLowerCase().indexOf(q) !== -1)
-                        return true;
+                    if (e.keywords[i].toLowerCase().indexOf(q) !== -1) return true;
                 return false;
-            }).sort(function (a, b) {
-                return a.name.localeCompare(b.name);
-            });
+            }).sort(function (a, b) { return a.name.localeCompare(b.name); });
         } else {
             var recent = AppLauncherState.recentIds;
             list = vals.slice().sort(function (a, b) {
                 var ai = recent.indexOf(a.id);
                 var bi = recent.indexOf(b.id);
-                if (ai !== -1 && bi !== -1)
-                    return ai - bi;
-                if (ai !== -1)
-                    return -1;
-                if (bi !== -1)
-                    return 1;
+                if (ai !== -1 && bi !== -1) return ai - bi;
+                if (ai !== -1) return -1;
+                if (bi !== -1) return 1;
                 return a.name.localeCompare(b.name);
             });
         }
@@ -143,39 +175,26 @@ PanelWindow {
     }
 
     readonly property string emptyText: {
-        if (mode === "calc") {
-            if (searchQuery.trim() === "")
-                return "Type an expression";
-            return Calc.busy ? "" : "No result";
-        }
-        if (mode === "file") {
-            if (searchQuery.trim() === "")
-                return "Type a name, or / or ~ to browse";
-            return Files.busy ? "" : "Nothing found";
-        }
-        if (mode === "clipboard") {
-            return ClipboardHistory.entries.length === 0 ? "Nothing copied yet" : "No matches";
-        }
+        if (mode === "calc") return searchQuery.trim() === "" ? "Type an expression" : (Calc.busy ? "" : "No result");
+        if (mode === "file") return searchQuery.trim() === "" ? "Type a name, or / or ~ to browse" : (Files.busy ? "" : "Nothing found");
+        if (mode === "clipboard") return ClipboardHistory.entries.length === 0 ? "Nothing copied yet" : "No matches";
         return "No apps found";
     }
 
-    // one line of secondary text per app: its generic name, else its category
     function subtitleOf(entry) {
-        if (entry.genericName && entry.genericName !== "")
-            return entry.genericName;
-        if (entry.categories && entry.categories.length > 0)
-            return entry.categories[0];
+        if (entry.genericName && entry.genericName !== "") return entry.genericName;
+        if (entry.categories && entry.categories.length > 0) return entry.categories[0];
         return "";
     }
 
-    // ── Open / close ───────────────────────────────────────────────────────
     function openLauncher() {
-        if (!PillState.claim("applauncher"))
-            return;
+        if (!PillState.claim("applauncher")) return;
         const from = PillState.takeOver();
         startW = from.w;
         startH = from.h;
         mode = "";
+        selectionAnchor = -1;
+        selectedFiles = [];
         searchInput.text = "";
         if (ClipboardHistory.reload) ClipboardHistory.reload();
         visible = true;
@@ -185,8 +204,6 @@ PanelWindow {
         morph.start();
     }
 
-    // another panel took the pill: hand this card over and step aside at once, so the next
-    // panel grows from the card's current size instead of from the pill
     function giveWay() {
         PillState.takeoverW = card.width;
         PillState.takeoverH = card.height;
@@ -196,9 +213,7 @@ PanelWindow {
     }
 
     function close() {
-        // a card that already gave way is hidden; the launcher closing after it has nothing to shrink
-        if (!visible)
-            return;
+        if (!visible) return;
         startW = PillState.pillWidth;
         startH = PillState.pillHeight;
         morph.stop();
@@ -216,8 +231,7 @@ PanelWindow {
         onFinished: {
             if (root.t < 0.5) {
                 root.visible = false;
-                if (PillState.owner === "applauncher")
-                    PillState.owner = "";
+                if (PillState.owner === "applauncher") PillState.owner = "";
             }
         }
     }
@@ -225,19 +239,15 @@ PanelWindow {
     Connections {
         target: AppLauncherState
         function onLauncherVisibleChanged() {
-            if (AppLauncherState.launcherVisible)
-                root.openLauncher();
-            else
-                root.close();
+            if (AppLauncherState.launcherVisible) root.openLauncher();
+            else root.close();
         }
     }
 
-    // another panel took the pill, so this one gives way
     Connections {
         target: PillState
         function onOwnerChanged() {
             if (PillState.owner !== "applauncher" && root.visible) {
-                // a panel took the pill: hand our card over; the flag then runs the usual close
                 if (PillState.owner !== "") root.giveWay();
                 AppLauncherState.launcherVisible = false;
             }
@@ -245,27 +255,53 @@ PanelWindow {
     }
 
     onVisibleChanged: {
-        if (visible)
-            searchInput.forceActiveFocus();
+        if (visible) searchInput.forceActiveFocus();
     }
 
-    // ── Activate ───────────────────────────────────────────────────────────
     function enterMode(name) {
         mode = name;
+        selectionAnchor = -1;
+        selectedFiles = [];
         searchInput.text = "";
         if (name === "clipboard" && ClipboardHistory.reload) {
             ClipboardHistory.reload();
         }
     }
 
-    // file:// URI of one absolute path, each segment escaped so spaces and '#' survive
     function fileUri(path) {
         return "file://" + path.split("/").map(encodeURIComponent).join("/");
     }
 
+    function deleteSelectedFiles() {
+        var targets = selectedFiles.length > 0 ? selectedFiles : (results[selectedIndex] && results[selectedIndex].kind === "file" ? [results[selectedIndex].value] : []);
+        if (targets.length === 0) return;
+
+        var cmd = ["gio", "trash"].concat(targets);
+        Quickshell.execDetached(cmd);
+        selectedFiles = [];
+        selectionAnchor = -1;
+        if (mode === "file") {
+            var q = searchQuery;
+            searchQuery = "";
+            searchQuery = q;
+        }
+    }
+
     function activate(r) {
-        if (!r)
+        if (!r) return;
+        
+        if (r.kind === "file" && selectedFiles.length > 1) {
+            if (r.next !== "") {
+                searchInput.text = r.next;
+                return;
+            }
+            for (var i = 0; i < selectedFiles.length; i++) {
+                Quickshell.execDetached(["xdg-open", selectedFiles[i]]);
+            }
+            AppLauncherState.hide();
             return;
+        }
+
         if (r.kind === "app") {
             AppLauncherState.recordLaunch(r.entry.id);
             r.entry.execute();
@@ -294,38 +330,70 @@ PanelWindow {
         }
     }
 
-    // ── Navigation ─────────────────────────────────────────────────────────
     function shareSelected() {
         var r = results[selectedIndex];
-        // Only proceed if it's actually a file result
         if (!r || r.kind !== "file") return;
 
-        var targetPath = r.value;
-        if (targetPath !== "") {
-            ShareService.addFile(targetPath);
-            ShareService.open();
+        var targets = selectedFiles.length > 0 ? selectedFiles : [r.value];
+        for (var i = 0; i < targets.length; i++) {
+            ShareService.addFile(targets[i]);
+        }
+        ShareService.open();
 
-            // Automatically trigger the send process if a device IP is set in settings.json
-            if (ShareService.selectedDevice !== "") {
-                ShareService.send();
-            } else {
-                console.log("Share warning: 'shareDevice' is not configured in settings.json");
+        if (ShareService.selectedDevice !== "") {
+            ShareService.send();
+        } else {
+            console.log("Share warning: 'shareDevice' is not configured in settings.json");
+        }
+        AppLauncherState.hide();
+    }
+
+
+
+    function navigate(delta, isShiftPressed) {
+        if (results.length === 0) return;
+
+        const nextIndex = Math.max(
+            0,
+            Math.min(results.length - 1, selectedIndex + delta)
+        );
+
+        if (nextIndex === selectedIndex) return;
+
+        if (isShiftPressed && mode === "file") {
+            if (selectionAnchor === -1)
+                selectionAnchor = selectedIndex;
+
+            selectedIndex = nextIndex;
+
+            var start = Math.min(selectionAnchor, selectedIndex);
+            var end = Math.max(selectionAnchor, selectedIndex);
+
+            var next = selectedFiles.slice();
+
+            for (var i = start; i <= end; i++) {
+                var item = results[i];
+
+                if (item && item.kind === "file"
+                        && next.indexOf(item.value) === -1) {
+                    next.push(item.value);
+                }
             }
 
-            AppLauncherState.hide();
+            selectedFiles = next;
+        } else {
+            // Preserve selected files when moving normally.
+            selectionAnchor = -1;
+            selectedIndex = nextIndex;
         }
-    }
-    function navigate(delta) {
-        if (results.length === 0)
-            return;
-        selectedIndex = (selectedIndex + delta + results.length) % results.length;
+
         listView.positionViewAtIndex(selectedIndex, ListView.Contain);
     }
 
-    // ── Colours ────────────────────────────────────────────────────────────
+
+
     readonly property color accentFill: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.18)
 
-    // each mode's service only works while its mode is open
     Binding {
         target: Calc
         property: "expression"
@@ -338,10 +406,8 @@ PanelWindow {
         value: root.mode === "file" ? root.searchQuery.trim() : ""
     }
 
-    // only the card takes clicks; everything around it passes through
     mask: Region { item: outline }
 
-    // ── Card ───────────────────────────────────────────────────────────────
     Notch {
         id: outline
         bodyWidth: card.width
@@ -375,7 +441,6 @@ PanelWindow {
             spacing: 8
             opacity: Math.max(0, (root.t - 0.5) * 2)
 
-            // ── Search line ────────────────────────────────────────────────
             Item {
                 width: parent.width
                 height: 34
@@ -389,21 +454,6 @@ PanelWindow {
                     color: root.modeInfo ? Theme.primary : Qt.alpha(Theme.fg, 0.45)
                     font.family: Theme.fontFamily
                     font.pixelSize: 15
-                }
-
-                Text {
-                    anchors.left: searchGlyph.right
-                    anchors.leftMargin: 10
-                    anchors.right: countText.left
-                    anchors.rightMargin: 10
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: root.modeInfo ? root.modeInfo.placeholder : "Search apps"
-                    color: Theme.fg
-                    opacity: 0.28
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 13
-                    elide: Text.ElideRight
-                    visible: searchInput.text === ""
                 }
 
                 TextInput {
@@ -432,28 +482,67 @@ PanelWindow {
                     }
 
                     Keys.onPressed: function (event) {
+                        var shiftPressed = (event.modifiers & Qt.ShiftModifier) !== 0;
+                        var ctrlPressed = (event.modifiers & Qt.ControlModifier) !== 0;
+
                         if (event.key === Qt.Key_Up || event.key === Qt.Key_Backtab) {
-                            root.navigate(-1);
+                            root.navigate(-1, shiftPressed);
                             event.accepted = true;
                         } else if (event.key === Qt.Key_Down || event.key === Qt.Key_Tab) {
-                            root.navigate(1);
+                            root.navigate(1, shiftPressed);
                             event.accepted = true;
-                        } else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && 
-                                   (event.modifiers & Qt.ControlModifier) && 
-                                   (event.modifiers & Qt.ShiftModifier)) {
-                            // Ctrl+Shift+Enter -> Share feature
+                        } else if (ctrlPressed && event.key === Qt.Key_D) {
+                            root.navigate(root.maxVisible, shiftPressed);
+                            event.accepted = true;
+                        } else if (ctrlPressed && event.key === Qt.Key_U) {
+                            root.navigate(-root.maxVisible, shiftPressed);
+                            event.accepted = true;
+                        } else if (event.key === Qt.Key_Home) {
+                            root.navigate(-root.results.length, shiftPressed);
+                            event.accepted = true;
+                        } else if (event.key === Qt.Key_End) {
+                            root.navigate(root.results.length, shiftPressed);
+                            event.accepted = true;
+                        } else if (event.key === Qt.Key_Delete && root.mode === "file") {
+                            root.deleteSelectedFiles();
+                            event.accepted = true;
+                        } else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && ctrlPressed && shiftPressed) {
                             root.shareSelected();
                             event.accepted = true;
+                        } else if (ctrlPressed && event.key === Qt.Key_Return ||
+                                   ctrlPressed && event.key === Qt.Key_Enter) {
+                            var current = root.results[root.selectedIndex];
+
+                            if (root.mode === "file" && current && current.kind === "file") {
+                                root.toggleFileSelection(current.value);
+                                event.accepted = true;
+                            }
+                        } else if (ctrlPressed && event.key === Qt.Key_Space) {
+                            root.selectedFiles = [];
+                            root.selectionAnchor = -1;
+                            event.accepted = true;
                         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                            if (shiftPressed) {
+                                var currentItem = root.results[root.selectedIndex];
+                                if (currentItem && currentItem.kind === "file") {
+                                    if (root.selectionAnchor === -1) root.selectionAnchor = root.selectedIndex;
+                                    root.toggleFileSelection(currentItem.value);
+                                    event.accepted = true;
+                                    return;
+                                }
+                            }
                             root.activate(root.results[root.selectedIndex]);
                             event.accepted = true;
-                        } else if (event.key === Qt.Key_Delete && (event.modifiers & Qt.ControlModifier) && root.mode === "clipboard") {
+                        } else if (event.key === Qt.Key_Delete && ctrlPressed && root.mode === "clipboard") {
                             root.forgetEntry(root.results[root.selectedIndex]);
                             event.accepted = true;
-                        } else if (event.key === Qt.Key_Backspace && root.mode !== "" && text === "") {
-                            root.mode = "";
-                            event.accepted = true;
-                        } else if (event.key === Qt.Key_Escape) {
+                        } else if (event.key === Qt.Key_Backspace
+                                 && root.mode === "file"
+                                 && text === "") {
+                                    root.mode = "";
+                                    event.accepted = true;
+                                  }
+                         else if (event.key === Qt.Key_Escape) {
                             AppLauncherState.hide();
                             event.accepted = true;
                         }
@@ -465,7 +554,7 @@ PanelWindow {
                     anchors.right: parent.right
                     anchors.rightMargin: 14
                     anchors.verticalCenter: parent.verticalCenter
-                    text: root.mode !== "" ? (root.mode === "clipboard" ? root.results.length + " / " + ClipboardHistory.entries.length : "") : root.results.length + " / " + DesktopEntries.applications.values.length
+                    text: root.mode !== "" ? (root.mode === "clipboard" ? root.results.length + " / " + ClipboardHistory.entries.length : (root.selectedFiles.length > 0 ? root.selectedFiles.length + " selected" : "")) : root.results.length + " / " + DesktopEntries.applications.values.length
                     color: Theme.fg
                     opacity: 0.35
                     font.family: Theme.fontFamilyAlt
@@ -473,7 +562,6 @@ PanelWindow {
                 }
             }
 
-            // ── Result list ────────────────────────────────────────────────
             ListView {
                 id: listView
                 width: parent.width
@@ -495,10 +583,8 @@ PanelWindow {
                 MouseArea {
                     anchors.fill: parent
                     onWheel: function (wheel) {
-                        if (wheel.angleDelta.y < 0)
-                            root.navigate(1);
-                        else
-                            root.navigate(-1);
+                        if (wheel.angleDelta.y < 0) root.navigate(1, false);
+                        else root.navigate(-1, false);
                     }
                 }
 
@@ -510,10 +596,12 @@ PanelWindow {
                     width: listView.width
                     height: root.itemH
                     radius: 10
-                    color: root.selectedIndex === index ? root.accentFill : "transparent"
+                    
+                    readonly property bool isFileSelected: modelData.kind === "file" && root.selectedFiles.indexOf(modelData.value) !== -1
+                    color: root.selectedIndex === index ? root.accentFill : (isFileSelected ? Qt.alpha(Theme.primary, 0.1) : "transparent")
+                    
                     Behavior on color { ColorAnimation { duration: 100 } }
-                    // dims while the row is being dragged out, so the pick-up is visible
-                    opacity: dragHandler.active ? 0.4 : 1
+                    opacity: dragHandler.active ? 0.4 : (isFileSelected ? 0.55 : 1)
                     Behavior on opacity { NumberAnimation { duration: 100 } }
 
                     readonly property bool sel: root.selectedIndex === index
@@ -571,12 +659,17 @@ PanelWindow {
                             Text {
                                 width: parent.width
                                 visible: text !== ""
-                                text: appRow.modelData.subtitle
+                                text: appRow.modelData.kind === "file"
+                                    ? (appRow.modelData.subtitle || "File")
+                                    : appRow.modelData.kind === "folder"
+                                        ? "Folder"
+                                        : appRow.modelData.subtitle
                                 elide: Text.ElideRight
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 10
-                                color: Theme.fg
-                                opacity: 0.35
+                                color: appRow.modelData.kind === "folder"
+                                    ? Theme.primary : Theme.fg
+                                opacity: appRow.modelData.kind === "folder" ? 0.75 : 0.35
                             }
                         }
                     }
@@ -586,17 +679,23 @@ PanelWindow {
                         anchors.right: parent.right
                         anchors.rightMargin: 12
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "↵"
-                        visible: appRow.sel
-                        color: Theme.fg
-                        opacity: 0.5
+
+                        text: appRow.isFileSelected
+                            ? "✓"
+                            : appRow.modelData.kind === "folder"
+                                ? "→"
+                                : appRow.modelData.kind === "file"
+                                    ? "↵"
+                                    : "↵"
+
+                        visible: appRow.sel || appRow.isFileSelected
+                        color: appRow.modelData.kind === "folder"
+                            ? Theme.primary : Theme.fg
+                        opacity: 0.7
                         font.family: Theme.fontFamilyAlt
                         font.pixelSize: 12
                     }
 
-                    // a file row can be dragged into another window; the drag only
-                    // starts past the system threshold, so a click still activates it
-                    // Drag-and-drop source
                     DragHandler {
                         id: dragHandler
                         target: null
@@ -607,38 +706,47 @@ PanelWindow {
                     Drag.supportedActions: Qt.CopyAction
 
                     Drag.mimeData: appRow.modelData.kind === "file"
-                        ? ({
-                            "text/uri-list": root.fileUri(appRow.modelData.value) + "\r\n"
-                        })
+                        ? (() => {
+                            var urisToDrag = (root.selectedFiles.indexOf(appRow.modelData.value) !== -1 && root.selectedFiles.length > 1)
+                                ? root.selectedFiles
+                                : [appRow.modelData.value];
+                            
+                            var uriString = urisToDrag.map(p => root.fileUri(p)).join("\r\n") + "\r\n";
+                            return { "text/uri-list": uriString };
+                        })()
                         : ({})
 
                     Drag.hotSpot.x: dragHandler.centroid.position.x
                     Drag.hotSpot.y: dragHandler.centroid.position.y
 
-                    // Hover detection
                     HoverHandler {
                         onHoveredChanged: {
-                            if (hovered)
-                                root.selectedIndex = appRow.index
+                            if (hovered) root.selectedIndex = appRow.index
                         }
                     }
 
-                    // Click detection
                     TapHandler {
-                        onTapped: root.activate(appRow.modelData)
+                        onTapped: function(event) {
+                            if (event.modifiers & Qt.ShiftModifier && appRow.modelData.kind === "file") {
+                                if (root.selectionAnchor === -1) root.selectionAnchor = root.selectedIndex;
+                                root.toggleFileSelection(appRow.modelData.value);
+                            } else {
+                                root.selectionAnchor = -1;
+                                root.selectedFiles = [];
+                                root.activate(appRow.modelData);
+                            }
+                        }
                     }
-
                 }
             }
 
-            // ── Keybind footer ─────────────────────────────────────────────
             Text {
                 width: parent.width
                 horizontalAlignment: Text.AlignHCenter
                 text: root.mode === "calc" ? "↵ copy    ⌫ back    esc close" : 
-                      root.mode === "file" ? "↵ open    ⇧^↵ share    ⌫ back    esc close" : 
+                      root.mode === "file" ? "↵ open    ⌫ delete    esc close" : 
                       root.mode === "clipboard" ? "↵ copy    ^⌫ delete    ⌫ back    esc close" : 
-                      "↑↓ move    ↵ launch    ⇧^↵ share    esc close"
+                      "↑↓ move    ↵ launch    esc close"
                 color: Theme.fg
                 opacity: 0.25
                 font.family: Theme.fontFamilyAlt
