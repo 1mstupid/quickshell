@@ -61,9 +61,6 @@ Singleton {
     property bool pill: Schema.defaultOf("pill")
     // 26 is the control panel's, the one the others follow
     property real cornerRadius: Schema.defaultOf("cornerRadius")
-    // the panel morph: its time in ms, and the period of the elastic grow (see PillState)
-    property real morphMs: Schema.defaultOf("morphMs")
-    property real morphPeriod: Schema.defaultOf("morphPeriod")
 
     // takes the [settings] table; a key that is missing or of the wrong type keeps its default
     function parse(table) {
