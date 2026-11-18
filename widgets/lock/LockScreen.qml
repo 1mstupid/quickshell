@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import Quickshell
 import "../../services"
 import "../notch"
@@ -83,34 +84,26 @@ Item {
         opacity: root.t
     }
 
+    // The desktop behind the lock: blurred as the lock comes in
     Image {
         anchors.fill: parent
         source: root.lock.wallpaperPath !== "" ? "file://" + root.lock.wallpaperPath : ""
         sourceSize.width: root.width
         sourceSize.height: root.height
         fillMode: Image.PreserveAspectCrop
+        layer.enabled: true
+        layer.effect: MultiEffect {
+            blurEnabled: true
+            blurMax: 64
+            blur: root.t
+        }
     }
 
-    // Dims toward the edges and leaves the clock and pill clear, instead of a flat veil.
-    // A Canvas, as the notch is, because RadialGradient needs an extra import.
-    Canvas {
+    // A transparent veil over the blurred desktop
+    Rectangle {
         anchors.fill: parent
+        color: Qt.alpha(Theme.bg, 0.35)
         opacity: root.t
-        onWidthChanged: requestPaint()
-        onHeightChanged: requestPaint()
-        onPaint: {
-            const ctx = getContext("2d")
-            const c = Theme.bg
-            const rgba = a => "rgba(" + Math.round(c.r * 255) + "," + Math.round(c.g * 255) + ","
-                              + Math.round(c.b * 255) + "," + a + ")"
-            const r = Math.hypot(width, height) / 2 * 0.75
-            const g = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, r)
-            g.addColorStop(0.25, rgba(0))
-            g.addColorStop(1, rgba(0.75))
-            ctx.reset()
-            ctx.fillStyle = g
-            ctx.fillRect(0, 0, width, height)
-        }
     }
 
     // Center clock emerges from the notch and returns to it on unlock
@@ -119,7 +112,7 @@ Item {
         visible: root.primary
         text: Qt.formatDateTime(clock.date, UserSettings.clockFormat)
         color: Qt.alpha(Theme.fg, 0.9)
-        font.family: Theme.fontFamilyDisplay
+        font.family: Theme.fontFamilyRounded
         font.bold: true
         font.pixelSize: Math.round(root.height * 0.28)
         
