@@ -15,9 +15,9 @@ QtObject {
     // how long a panel takes to grow out of the pill, and to go back: the same for all of them
     readonly property int morphMs: Math.round(UserSettings.morphMs)
 
-    // The grow overshoots and settles like a spring; the close eases in and out. Elastic is only
-    // on the grow: on the close it would dip below zero and invert the card. The period is the
-    // bounce (Qt ignores an amplitude below 1, so the period is the only knob).
+    // The morph overshoots and settles like a spring, both ways. On the close the overshoot dips
+    // below the pill, so the panels clamp their size at 0 (the card holds at pill size and springs
+    // back). The period is the bounce (Qt ignores an amplitude below 1, so it is the only knob).
     readonly property int openEase: Easing.OutElastic
     readonly property real easePeriod: UserSettings.morphPeriod
 
