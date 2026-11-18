@@ -372,8 +372,7 @@ PanelWindow {
         target: root
         property: "expand"
         duration: PillState.morphMs
-        easing.type: to === 1 ? PillState.openEase : Easing.InOutCubic
-        easing.amplitude: PillState.easeAmplitude
+        easing.type: PillState.openEase
         easing.period: PillState.easePeriod
     }
 
@@ -461,8 +460,8 @@ PanelWindow {
         readonly property real startW: root.takeW > 0 ? root.takeW : stripW
         readonly property real startH: root.takeH > 0 ? root.takeH : stripH
 
-        width: startW + (root.shownW - startW) * root.expand
-        height: startH + (root.shownH - startH) * root.expand
+        width: startW + (root.shownW - startW) * Math.max(0, root.expand)
+        height: startH + (root.shownH - startH) * Math.max(0, root.expand)
         x: (root.width - width) / 2
         y: PillState.pillTop
         color: "transparent"
