@@ -91,15 +91,25 @@ Item {
         fillMode: Image.PreserveAspectCrop
     }
 
-    // Dims toward the edges and leaves the clock and pill clear, instead of a flat veil
-    RadialGradient {
+    // Dims toward the edges and leaves the clock and pill clear, instead of a flat veil.
+    // A Canvas, as the notch is, because RadialGradient needs an extra import.
+    Canvas {
         anchors.fill: parent
-        horizontalRadius: root.width * 0.75
-        verticalRadius: root.height * 0.75
         opacity: root.t
-        gradient: Gradient {
-            GradientStop { position: 0.25; color: Qt.alpha(Theme.bg, 0) }
-            GradientStop { position: 1.0; color: Qt.alpha(Theme.bg, 0.75) }
+        onWidthChanged: requestPaint()
+        onHeightChanged: requestPaint()
+        onPaint: {
+            const ctx = getContext("2d")
+            const c = Theme.bg
+            const rgba = a => "rgba(" + Math.round(c.r * 255) + "," + Math.round(c.g * 255) + ","
+                              + Math.round(c.b * 255) + "," + a + ")"
+            const r = Math.hypot(width, height) / 2 * 0.75
+            const g = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, r)
+            g.addColorStop(0.25, rgba(0))
+            g.addColorStop(1, rgba(0.75))
+            ctx.reset()
+            ctx.fillStyle = g
+            ctx.fillRect(0, 0, width, height)
         }
     }
 
