@@ -6,19 +6,14 @@ import "menu"
 
 // App focus time, from `umbriel subscribe windows`. The window with
 // active: true holds keyboard focus, and its elapsed time goes to its app_id.
-// Focus time is time a listed app (focus-apps.json) has focus, or any time a
-// pomodoro runs; it is kept in 5-minute slots for the focus widget and the
-// Pomodoro page. Totals per day live in
-// app-usage.json; categories in app-categories, one "app_id category" line each;
-// limits in app-limits, one "app_id minutes" line each; schedules in
-// app-schedules, one "target HH:MM-HH:MM[,HH:MM-HH:MM] [days]" line each
-// (target can be an app_id, prefix*, or @Category); task-gate lists targets
-// that stay closed while todo.md owes work (see taskGated). A limit notifies
-// at 80% and at 100%, once each.
+// Focus time is time an app listed in [focus] apps (config.toml) has focus, or any
+// time a pomodoro runs; it is kept in 5-minute slots for the focus widget and the
+// Pomodoro page. Totals per day live in app-usage.json in the state folder. Limits,
+// categories, schedules and the task gate are tables in config.toml, read by Config.
+// A limit notifies at 80% and at 100%, once each.
 Singleton {
     id: root
 
-    readonly property string dir: Quickshell.env("HOME") + "/.local/xdg/config"
     readonly property int keepDays: 31
     // longer gaps (suspend, a stalled shell) are not counted as use
     readonly property int maxGapMs: 90000
@@ -37,7 +32,7 @@ Singleton {
     // targets closed while tasks are owed, and the minutes that clear one
     property var taskGateTargets: []
     property int taskGateMinutes: 10
-    // { "helium": "Internet" } from app-categories; unlisted apps are "Other"
+    // { "helium": "Internet" } from [categories]; unlisted apps are "Other"
     property var categories: ({})
     // app ids whose focus time counts toward the focus widget; a pomodoro always counts
     property var focusApps: []
@@ -79,7 +74,7 @@ Singleton {
         return false
     }
 
-    // focus mode: during a work session, any app not in focus-apps.json is
+    // focus mode: during a work session, any app not in [focus] apps is
     // blocked. An empty list blocks nothing, so a missing file cannot close everything.
     function outOfFocus(app) {
         return Pomodoro.running && Pomodoro.phase === "work"
@@ -94,7 +89,7 @@ Singleton {
         return target === app
     }
 
-    // scheduled blocks: matches active time windows from app-schedules
+    // scheduled blocks: matches active time windows from [schedules]
     // (supports exact app_id, prefix*, and @Category targets)
     function scheduledBlock(app) {
         if (!app)
@@ -375,14 +370,12 @@ Singleton {
         store.setText(JSON.stringify(days, null, 2) + "\n")
     }
 
-    // "app_id category" per line; the category may hold spaces
-    function parseCategories(t) {
+    // [categories]: app_id or prefix* = "Category"
+    function parseCategories(table) {
         const m = {}
-        for (const line of t.split("\n")) {
-            const p = line.trim().split(/\s+/)
-            if (p.length >= 2)
-                m[p[0]] = p.slice(1).join(" ")
-        }
+        for (const k of Object.keys(table))
+            if (typeof table[k] === "string" && table[k].trim() !== "")
+                m[k] = table[k].trim()
         categories = m
     }
 
@@ -397,7 +390,7 @@ Singleton {
     }
 
     // seconds per category for a day, most used first. Looked up at read time,
-    // so editing app-categories also re-sorts past days.
+    // so editing the categories in config.toml also re-sorts past days.
     function categoryTotals(key, rev) {
         const r = days[key]
         if (!r)
@@ -412,12 +405,13 @@ Singleton {
             .sort((a, b) => b.sec - a.sec)
     }
 
-    function parseLimits(t) {
+    // [limits]: app_id = minutes
+    function parseLimits(table) {
         const m = {}
-        for (const line of t.split("\n")) {
-            const p = line.trim().split(/\s+/)
-            if (p.length >= 2 && parseInt(p[1]) > 0)
-                m[p[0]] = parseInt(p[1])
+        for (const k of Object.keys(table)) {
+            const n = parseInt(table[k])
+            if (n > 0)
+                m[k] = n
         }
         limits = m
     }
@@ -451,10 +445,14 @@ Singleton {
         return out
     }
 
-    // "target HH:MM-HH:MM[,HH:MM-HH:MM] [days]" per line
-    function parseSchedules(t) {
+    // [schedules]: target = ["HH:MM-HH:MM[,HH:MM-HH:MM] [days]", ...], one rule per string
+    function parseSchedules(table) {
+        const lines = []
+        for (const target of Object.keys(table))
+            for (const rule of [].concat(table[target]))
+                lines.push(target + " " + rule)
         const m = {}
-        for (const raw of t.split("\n")) {
+        for (const raw of lines) {
             const line = raw.replace(/#.*$/, "").trim()
             if (!line) continue
             const p = line.split(/\s+/)
@@ -481,21 +479,16 @@ Singleton {
     }
 
     // "minutes N" sets how long a task needs (default 10); every other line is a
-    // target, as in app-schedules. No file, or no targets, gates nothing.
-    function parseTaskGate(t) {
+    // target, as in [schedules]. No table, or no targets, gates nothing.
+    // [gate]: targets that stay closed while tasks are owed, and the minutes of grace
+    function parseTaskGate(gate) {
         const targets = []
+        for (const t of [].concat(gate.targets ?? []))
+            if (typeof t === "string" && t.trim() !== "")
+                targets.push(t.trim())
         let minutes = 10
-        for (const raw of t.split("\n")) {
-            const line = raw.replace(/#.*$/, "").trim()
-            if (!line) continue
-            const p = line.split(/\s+/)
-            if (p[0] === "minutes" && p.length >= 2) {
-                const n = parseInt(p[1])
-                if (n > 0 && n <= 240) minutes = n
-            } else {
-                targets.push(p[0])
-            }
-        }
+        const n = parseInt(gate.minutes)
+        if (n > 0 && n <= 240) minutes = n
         taskGateTargets = targets
         taskGateMinutes = minutes
         enforce(lastWindows)
@@ -552,7 +545,7 @@ Singleton {
 
     FileView {
         id: store
-        path: root.dir + "/app-usage.json"
+        path: Quickshell.env("HOME") + "/.local/state/lumin/app-usage.json"
         atomicWrites: true
         onLoaded: {
             let d = null
@@ -571,54 +564,17 @@ Singleton {
         }
     }
 
-    FileView {
-        path: root.dir + "/app-limits"
-        watchChanges: true
-        onFileChanged: reload()
-        onLoaded: root.parseLimits(text())
-        onLoadFailed: root.limits = {}
-    }
-
-    FileView {
-        path: root.dir + "/app-schedules"
-        watchChanges: true
-        onFileChanged: reload()
-        onLoaded: root.parseSchedules(text())
-        onLoadFailed: root.schedules = {}
-    }
-
-    // one target per line, see parseTaskGate; a missing file gates nothing
-    FileView {
-        path: root.dir + "/task-gate"
-        watchChanges: true
-        onFileChanged: reload()
-        onLoaded: root.parseTaskGate(text())
-        onLoadFailed: root.parseTaskGate("")
-    }
-
-    // one "app_id category" per line; a missing file means everything is "Other"
-    FileView {
-        path: root.dir + "/app-categories"
-        watchChanges: true
-        onFileChanged: reload()
-        onLoaded: root.parseCategories(text())
-        onLoadFailed: root.categories = {}
-    }
-
-    // a JSON array of app ids, e.g. ["helium", "code"]; a bad file counts as empty
-    FileView {
-        path: root.dir + "/focus-apps.json"
-        watchChanges: true
-        onFileChanged: reload()
-        onLoaded: {
-            let a = []
-            try {
-                a = JSON.parse(text())
-            } catch (e) {
-                a = []
-            }
-            root.focusApps = Array.isArray(a) ? a : []
+    // every table is read from config.toml whenever the file is read; a missing table is empty
+    Connections {
+        target: Config
+        function onDataChanged() {
+            const c = Config.data
+            root.parseLimits(c.limits ?? {})
+            root.parseSchedules(c.schedules ?? {})
+            root.parseTaskGate(c.gate ?? {})
+            root.parseCategories(c.categories ?? {})
+            const apps = c.focus?.apps
+            root.focusApps = Array.isArray(apps) ? apps : []
         }
-        onLoadFailed: root.focusApps = []
     }
 }

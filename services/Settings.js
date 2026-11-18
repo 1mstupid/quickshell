@@ -1,7 +1,7 @@
 .pragma library
 
-// Every setting in settings.json: its key, type and default, for a number its range, and a
-// label and group for the settings panel. UserSettings reads, checks and writes the file
+// Every setting in the [settings] table of config.toml: its key, type and default, for a number its range, and a
+// label and group for the settings panel. UserSettings reads, checks and writes the table
 // through this list, so a new setting is one entry here and one property there.
 // A setting is a "bool", a "number" or a "text" (a non-empty string).
 // For the panel a number also has a `step` and a `unit`, and a widget a `layout` id: its
@@ -87,34 +87,4 @@ function normalize(s, v) {
         return t !== "" && t.length <= 100 ? t : undefined
     }
     return undefined
-}
-
-// The file's text as { values, extra }: a value for every setting (the default for one that is
-// missing or of the wrong type, and for a bad file), and the keys of the file that are not
-// settings, so that writing the file back does not lose them.
-function parse(text) {
-    let d = null
-    try {
-        d = JSON.parse(text)
-    } catch (e) {
-        d = null
-    }
-    if (typeof d !== "object" || d === null || Array.isArray(d))
-        d = {}
-
-    const values = {}
-    for (const s of SETTINGS) {
-        const v = normalize(s, d[s.key])
-        values[s.key] = v === undefined ? s.def : v
-    }
-    const extra = {}
-    for (const k of Object.keys(d))
-        if (!find(k))
-            extra[k] = d[k]
-    return { values: values, extra: extra }
-}
-
-// the text of the file: every setting, in the order of the list, then the extra keys
-function serialize(values, extra) {
-    return JSON.stringify(Object.assign({}, values, extra), null, 2) + "\n"
 }

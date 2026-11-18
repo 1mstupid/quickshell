@@ -5,14 +5,14 @@ import Quickshell.Io
 
 // Outgoing file shares through localsend-cli. Files queue here and go in one send to
 // the phone's IP. The CLI can't find devices on this network, so the IP is fixed in
-// settings.json, e.g. {"shareDevice": "100.117.26.7"} (a Tailscale address). A file
+// config.toml's [settings] table, e.g. shareDevice = "100.117.26.7" (a Tailscale address). A file
 // dragged onto the bar pill or the share panel queues it and opens the panel.
 Singleton {
     id: root
 
-    // the destination; empty until settings.json names one
+    // the destination; empty until config.toml names one
     readonly property string selectedDevice: {
-        const d = UserSettings.extra.shareDevice
+        const d = Config.data.settings?.shareDevice
         return typeof d === "string" ? d.trim() : ""
     }
 

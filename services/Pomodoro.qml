@@ -6,8 +6,8 @@ import Quickshell.Io
 // Pomodoro timer with study cycles. A cycle is four work sessions: after each
 // of the first three comes a short break, after the fourth a long break. Work
 // sessions are counted per day in AppUsage, which also drives the dots.
-// Durations come from ~/.local/xdg/config/pomodoro-config ("work", "short" and
-// "long" lines, in minutes).
+// Durations come from the [pomodoro] table of config.toml: work, short and long, in
+// minutes.
 //
 // The state file holds "endMs minutes remaining phase override", so a running or paused
 // timer survives bar restarts; the file is watched so `echo` edits take effect.
@@ -16,8 +16,7 @@ import Quickshell.Io
 Singleton {
     id: root
 
-    readonly property string stateFile: Quickshell.env("HOME") + "/.local/xdg/config/pomodoro"
-    readonly property string configFile: Quickshell.env("HOME") + "/.local/xdg/config/pomodoro-config"
+    readonly property string stateFile: Quickshell.env("HOME") + "/.local/state/lumin/pomodoro"
     readonly property string alarmSound: Quickshell.env("HOME")
         + "/.local/state/home-manager/gcroots/current-home/home-path/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga"
 
@@ -145,28 +144,22 @@ Singleton {
         onTriggered: root.done = false
     }
 
-    // reads the durations; any line that is missing or not a sane number keeps its default
-    function parseConfig(t) {
+    // reads the durations; a value that is missing or not a sane number keeps its default
+    function parseConfig(table) {
         const v = { work: 30, short: 5, long: 15 }
-        for (const line of t.split("\n")) {
-            const p = line.trim().split(/\s+/)
-            if (p.length < 2 || !(p[0] in v))
-                continue
-            const n = parseInt(p[1])
+        for (const k of Object.keys(v)) {
+            const n = parseInt(table[k])
             if (n >= 1 && n <= 180)
-                v[p[0]] = n
+                v[k] = n
         }
         workMin = v.work
         shortMin = v.short
         longMin = v.long
     }
 
-    FileView {
-        path: root.configFile
-        watchChanges: true
-        onFileChanged: reload()
-        onLoaded: root.parseConfig(text())
-        onLoadFailed: root.parseConfig("")
+    Connections {
+        target: Config
+        function onDataChanged() { root.parseConfig(Config.data.pomodoro ?? {}) }
     }
 
     FileView {
