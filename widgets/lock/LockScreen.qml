@@ -16,10 +16,13 @@ Item {
     property real t: 0
     // the pill stays at the top and drops a little in the lock state
     readonly property real lockTop: PillState.pillTop + 20
+    // t clamped to 0..1: the elastic overshoot moves position, but not widths, blur or scale
+    readonly property real tClamped: Math.max(0, Math.min(1, t))
     Behavior on t {
         NumberAnimation {
-            duration: PillState.morphMs
-            easing.type: Easing.InOutCubic
+            duration: PillState.lockMs
+            easing.type: PillState.openEase
+            easing.period: PillState.easePeriod
         }
     }
 
@@ -95,7 +98,7 @@ Item {
         layer.effect: MultiEffect {
             blurEnabled: true
             blurMax: 64
-            blur: root.t
+            blur: root.tClamped
         }
     }
 
@@ -117,8 +120,8 @@ Item {
         font.pixelSize: Math.round(root.height * 0.28)
         
         transformOrigin: Item.Center
-        scale: 0.08 + 0.92 * root.t
-        opacity: Math.min(1, root.t * 1.5)
+        scale: 0.08 + 0.92 * root.tClamped
+        opacity: Math.min(1, root.tClamped * 1.5)
 
         // Screen center vs Exact Notch body center (accounting for shoulders via bodyX)
         readonly property real screenCenterX: root.width / 2
@@ -154,7 +157,7 @@ Item {
         }
 
         visible: root.primary
-        bodyWidth: PillState.pillWidth + (fitWidth - PillState.pillWidth) * root.t
+        bodyWidth: PillState.pillWidth + (fitWidth - PillState.pillWidth) * root.tClamped
         bodyHeight: PillState.pillHeight
         x: (root.width - bodyWidth) / 2 - bodyX + root.shake
         // unlocking returns it to the bar's place, through the same progress t

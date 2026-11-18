@@ -14,6 +14,8 @@ QtObject {
 
     // how long a panel takes to grow out of the pill, and to go back: the same for all of them
     readonly property int morphMs: Math.round(UserSettings.morphMs)
+    // the lock screen's fade-in and reversed unlock: longer, so the elastic bounce reads
+    readonly property int lockMs: 420
 
     // The morph overshoots and settles like a spring, both ways. On the close the overshoot dips
     // below the pill, so the panels clamp their size at 0 (the card holds at pill size and springs
