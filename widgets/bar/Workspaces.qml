@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Hyprland
 import QtQuick.Layouts
 import QtQuick.Effects
 import "../../services"
@@ -96,11 +97,7 @@ RowLayout {
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
 
-                onClicked: Quickshell.execDetached([
-                    "umbriel",
-                    "msg",
-                    "workspace-switch:" + modelData.name + "/" + root.outputName
-                ])
+                onClicked: Hyprland.dispatch("workspace " + modelData.id)
             }
         }
     }

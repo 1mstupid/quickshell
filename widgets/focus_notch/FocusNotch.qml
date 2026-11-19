@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Effects
 import Quickshell
 import Quickshell.Wayland
+import Quickshell.Hyprland
 import Quickshell.Services.Notifications
 import "../../services"
 import "../../services/menu"
@@ -778,10 +779,7 @@ PanelWindow {
                             anchors.fill: parent
                             anchors.margins: -4
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: Quickshell.execDetached([
-                                "umbriel", "msg",
-                                "workspace-switch:" + dot.modelData.name + "/" + PillState.originName
-                            ])
+                            onClicked: Hyprland.dispatch("workspace " + dot.modelData.id)
                         }
                     }
                 }
