@@ -633,7 +633,7 @@ PanelWindow {
                 anchors.leftMargin: 22
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 2
-                opacity: PillState.clockFlying ? 0 : 1
+                opacity: flyAnim.running ? 0 : 1
 
                 Text {
                     text: Qt.formatDateTime(idleClock.date, UserSettings.clockFormat)
@@ -2201,7 +2201,7 @@ PanelWindow {
     SystemClock { id: flyTick; precision: SystemClock.Minutes }
     Text {
         id: flyClock
-        visible: PillState.clockFlying
+        visible: flyAnim.running
         property real flyT: 0
         text: Qt.formatDateTime(flyTick.date, UserSettings.clockFormat)
         color: Theme.fg

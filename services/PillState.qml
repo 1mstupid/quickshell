@@ -71,4 +71,7 @@ QtObject {
     property real pillTop: 8
     property real pillWidth: 120
     property real pillHeight: 30
+    // the bar clock's centre in screen coordinates, written by widgets/bar/Clock.qml
+    property real clockX: 0
+    property real clockY: 0
 }
