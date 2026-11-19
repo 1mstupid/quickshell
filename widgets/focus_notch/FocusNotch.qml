@@ -355,8 +355,9 @@ PanelWindow {
         id: growAnim
         target: root
         property: "grow"
-        duration: 160
-        easing.type: Easing.InOutCubic
+        duration: 140
+        // out, not in-out: the strip moves at once on hover instead of starting slowly
+        easing.type: Easing.OutCubic
         onFinished: {
             if (root.stage === "" && root.grow < 0.01) {
                 root.visible = false
