@@ -57,18 +57,7 @@ PanelWindow {
 
     // the strip only takes input on the card, so the screen below stays usable;
     // the open panel also takes the band around it, to catch a click outside
-    // on the hover strip the pill's band stays with the bar, so the pointer still rests on the
-    // pill and the strip stays open; the card takes the input below the band. Never zero-sized,
-    // so the region is not read as empty.
-    mask: Region { item: root.stage === "open" ? catcher : (root.stage === "hover" ? cardBody : card) }
-
-    Item {
-        id: cardBody
-        x: card.x
-        y: card.y + PillState.pillHeight
-        width: card.width
-        height: Math.max(1, card.height - PillState.pillHeight)
-    }
+    mask: Region { item: root.stage === "open" ? catcher : card }
 
     // ── Geometry ───────────────────────────────────────────────────────────
     readonly property int hoverW: 560
@@ -323,7 +312,6 @@ PanelWindow {
     }
 
     function show(next) {
-        console.log("notch show " + next + " claim=" + PillState.owner)
         if (!PillState.claim("focus"))
             return
         // a card the previous panel gave up: grow from it, with the strip kept hidden
@@ -389,32 +377,16 @@ PanelWindow {
         easing.period: PillState.easePeriod
     }
 
-    // the pointer is off both the pill and the card: a hover strip closes at once. The card
-    // covers the pill's place, so moving from the pill into the card is not leaving.
-    function leaveHover() {
-        console.log("notch leaveHover stage=" + stage + " pill=" + FocusNotchState.pillHovered + " card=" + cardHover.hovered)
-        if (stage === "hover" && !FocusNotchState.pillHovered && !cardHover.hovered)
-            close()
-    }
-
-    // The pointer passes from the bar pill to the card, and the card only registers it a
-    // moment later. The check waits that moment, so the hand-off does not close the strip.
-    Timer {
-        id: handoff
-        interval: 100
-        onTriggered: root.leaveHover()
-    }
 
     Connections {
         target: FocusNotchState
         function onPillHoveredChanged() {
-            console.log("notch pillHovered=" + FocusNotchState.pillHovered + " armed=" + root.armed + " canTake=" + root.canTake)
             if (FocusNotchState.pillHovered) {
                 if (root.armed && root.canTake)
                     root.show("hover")
             } else {
+                // a hovered strip is pinned: leaving does not close it, a click does
                 root.armed = true
-                handoff.restart()
             }
         }
         function onOpenRequestedChanged() {
@@ -479,7 +451,6 @@ PanelWindow {
 
         HoverHandler {
             id: cardHover
-            onHoveredChanged: if (!hovered) handoff.restart()
         }
 
         // a click on the hovered strip opens the panel; one on the open panel stays on it
