@@ -125,7 +125,7 @@ Item {
         id: timeText
         visible: root.primary
         text: Qt.formatDateTime(clock.date, UserSettings.clockFormat)
-        color: Qt.alpha(Theme.fg, 0.9)
+        color: Theme.fg
         font.family: Theme.fontFamilyRounded
         font.bold: true
         font.pixelSize: Math.round(root.height * 0.28)
