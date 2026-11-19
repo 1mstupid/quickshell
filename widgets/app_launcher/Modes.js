@@ -29,7 +29,7 @@ function parse(text) {
 
 // the modes a half-typed bang could still become ("!ca" -> calc, "!" -> all)
 function hints(text) {
-    if (text.charAt(0) !== "!" || /\s/.test(text))
+    if (text.charAt(0) !== ">" || /\s/.test(text))
         return []
     const frag = text.slice(1).toLowerCase()
     return MODES.filter(m => m.name.indexOf(frag) === 0)
