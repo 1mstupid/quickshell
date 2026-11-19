@@ -320,6 +320,9 @@ PanelWindow {
         const from = PillState.takeOver()
         takeW = from.taken ? from.w : 0
         takeH = from.taken ? from.h : 0
+        // the strip's clock fades in on open
+        if (!focusOn)
+            fadeIn.restart()
         visible = true
         stage = next
         goTo(from.taken ? 0 : 1, next === "open" ? 1 : 0)
@@ -345,6 +348,10 @@ PanelWindow {
             return
         stage = ""
         FocusNotchState.openRequested = false
+        // the strip's clock fades out on close, the reverse of the fade in
+        fadeIn.stop()
+        if (!focusOn)
+            fadeOut.restart()
         // closing shrinks back into the strip, as it does when it was not a takeover
         takeW = 0
         takeH = 0
@@ -355,9 +362,10 @@ PanelWindow {
         id: growAnim
         target: root
         property: "grow"
-        duration: 140
-        // out, not in-out: the strip moves at once on hover instead of starting slowly
-        easing.type: Easing.OutCubic
+        duration: 180
+        // back out: the strip overshoots its size and settles, so the open reads as a spring
+        easing.type: Easing.OutBack
+        easing.overshoot: 2.5
         onFinished: {
             if (root.stage === "" && root.grow < 0.01) {
                 root.visible = false
@@ -434,8 +442,9 @@ PanelWindow {
     Rectangle {
         id: card
 
-        readonly property real stripW: PillState.pillWidth + (root.hoverW - PillState.pillWidth) * root.grow
-        readonly property real stripH: PillState.pillHeight + (root.hoverH - PillState.pillHeight) * root.grow
+        // grow overshoots past 1 and dips below 0 on the way; the strip never draws below the pill
+        readonly property real stripW: PillState.pillWidth + (root.hoverW - PillState.pillWidth) * Math.max(0, root.grow)
+        readonly property real stripH: PillState.pillHeight + (root.hoverH - PillState.pillHeight) * Math.max(0, root.grow)
 
         readonly property real startW: root.takeW > 0 ? root.takeW : stripW
         readonly property real startH: root.takeH > 0 ? root.takeH : stripH
@@ -622,13 +631,15 @@ PanelWindow {
                 anchors.leftMargin: 22
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 2
+                opacity: root.clockShown
 
                 Text {
                     text: Qt.formatDateTime(idleClock.date, UserSettings.clockFormat)
                     color: Theme.fg
-                    font.family: Theme.fontFamilyDisplay
+                    // SF Rounded bold, as the bar's and the lock's clock, so the two read as one clock
+                    font.family: Theme.fontFamilyRounded
                     font.pixelSize: 34
-                    font.weight: Font.DemiBold
+                    font.bold: true
                 }
                 Text {
                     text: Qt.formatDate(idleClock.date, "dddd, MMMM d")
@@ -638,15 +649,6 @@ PanelWindow {
                 }
             }
 
-            // the divider sits between the clock and the media, at the strip's centre
-            Rectangle {
-                x: (parent.width - width) / 2
-                y: 14
-                width: 1
-                height: parent.height - 28
-                color: Qt.alpha(Theme.fg, 0.12)
-            }
-
             Row {
                 id: idleMediaRow
                 anchors.right: parent.right
@@ -654,6 +656,33 @@ PanelWindow {
                 anchors.top: parent.top
                 anchors.topMargin: 14
                 spacing: 10
+
+                Column {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 130
+                    spacing: 2
+
+                    Text {
+                        width: parent.width
+                        text: idleMedia.present ? (idleMedia.player?.trackTitle ?? "") : "Nothing playing"
+                        horizontalAlignment: Text.AlignRight
+                        color: idleMedia.present ? Theme.fg : Qt.alpha(Theme.fg, 0.5)
+                        font.family: Theme.fontFamilySans
+                        font.pixelSize: 13
+                        font.weight: idleMedia.present ? Font.DemiBold : Font.Normal
+                        elide: Text.ElideRight
+                    }
+                    Text {
+                        width: parent.width
+                        visible: idleMedia.present
+                        text: idleMedia.artistText
+                        horizontalAlignment: Text.AlignRight
+                        color: Qt.alpha(Theme.fg, 0.6)
+                        font.family: Theme.fontFamilySans
+                        font.pixelSize: 11
+                        elide: Text.ElideRight
+                    }
+                }
 
                 Rectangle {
                     id: idleArt
@@ -683,40 +712,66 @@ PanelWindow {
                         }
                     }
                 }
-
-                Column {
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 130
-                    spacing: 2
-
-                    Text {
-                        width: parent.width
-                        text: idleMedia.present ? (idleMedia.player?.trackTitle ?? "") : "Nothing playing"
-                        color: idleMedia.present ? Theme.fg : Qt.alpha(Theme.fg, 0.5)
-                        font.family: Theme.fontFamilySans
-                        font.pixelSize: 13
-                        font.weight: idleMedia.present ? Font.DemiBold : Font.Normal
-                        elide: Text.ElideRight
-                    }
-                    Text {
-                        width: parent.width
-                        visible: idleMedia.present
-                        text: idleMedia.artistText
-                        color: Qt.alpha(Theme.fg, 0.6)
-                        font.family: Theme.fontFamilySans
-                        font.pixelSize: 11
-                        elide: Text.ElideRight
-                    }
-                }
             }
 
-            // the bar's workspace capsules for this screen, under the track
-            Workspaces {
+            // a thin rule under the media, the horizontal counterpart of the old vertical divider
+            Rectangle {
+                anchors.right: parent.right
+                anchors.rightMargin: 22
+                anchors.top: idleMediaRow.bottom
+                anchors.topMargin: 8
+                width: idleMediaRow.width
+                height: 1
+                color: Qt.alpha(Theme.fg, 0.12)
+            }
+
+            // the workspaces as dots for this screen; the focused one stretches into a bar
+            Wm {
+                id: dotWm
+                outputName: PillState.originName
+            }
+            Row {
                 anchors.right: parent.right
                 anchors.rightMargin: 22
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: 14
-                outputName: PillState.originName
+                spacing: 6
+
+                Repeater {
+                    model: dotWm.workspaces
+                        .slice()
+                        .sort((a, b) => a.index - b.index)
+                        .slice(0, 5)
+
+                    Rectangle {
+                        id: dot
+
+                        required property var modelData
+                        readonly property bool focused: modelData.focused
+
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: focused ? 16 : 6
+                        height: 6
+                        radius: 3
+                        color: focused ? Theme.accent
+                            : modelData.occupied ? Qt.alpha(Theme.accent, 0.6)
+                            : Qt.alpha(Theme.fg, 0.22)
+
+                        Behavior on width { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                        Behavior on color { ColorAnimation { duration: 150 } }
+
+                        // the dot is small, so the hit area runs a few pixels past it
+                        MouseArea {
+                            anchors.fill: parent
+                            anchors.margins: -4
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: Quickshell.execDetached([
+                                "umbriel", "msg",
+                                "workspace-switch:" + dot.modelData.name + "/" + PillState.originName
+                            ])
+                        }
+                    }
+                }
             }
         }
 
@@ -2137,5 +2192,24 @@ PanelWindow {
                 y: 50
             }
         }
+    }
+
+    // the strip's clock fades in on open and out on close
+    property real clockShown: 0
+    NumberAnimation {
+        id: fadeIn
+        target: root
+        property: "clockShown"
+        to: 1
+        duration: 150
+        easing.type: Easing.OutCubic
+    }
+    NumberAnimation {
+        id: fadeOut
+        target: root
+        property: "clockShown"
+        to: 0
+        duration: 150
+        easing.type: Easing.OutCubic
     }
 }
