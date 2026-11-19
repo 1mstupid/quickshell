@@ -60,8 +60,8 @@ PanelWindow {
     mask: Region { item: root.stage === "open" ? catcher : card }
 
     // ── Geometry ───────────────────────────────────────────────────────────
-    readonly property int hoverW: 520
-    readonly property int hoverH: 78
+    readonly property int hoverW: 560
+    readonly property int hoverH: 88
     readonly property int openW: 580
     readonly property int openH: 260
     // The card's size on the open panel. The pages share openW x openH; the control page is
@@ -376,35 +376,22 @@ PanelWindow {
         easing.period: PillState.easePeriod
     }
 
-    // the pointer has to rest on the pill a moment, so passing over it on the
-    // way to the screen edge does not open it
-    Timer {
-        id: enterTimer
-        interval: 180
-        onTriggered: {
-            if (FocusNotchState.pillHovered && root.armed && root.canTake)
-                root.show("hover")
-        }
-    }
-
-    // the strip closes shortly after the pointer leaves it
-    Timer {
-        id: leaveTimer
-        interval: 300
-        onTriggered: {
-            if (root.stage === "hover" && !cardHover.hovered)
-                root.close()
-        }
+    // the pointer is off both the pill and the card: a hover strip closes at once. The card
+    // covers the pill's place, so moving from the pill into the card is not leaving.
+    function leaveHover() {
+        if (stage === "hover" && !FocusNotchState.pillHovered && !cardHover.hovered)
+            close()
     }
 
     Connections {
         target: FocusNotchState
         function onPillHoveredChanged() {
             if (FocusNotchState.pillHovered) {
-                enterTimer.restart()
+                if (root.armed && root.canTake)
+                    root.show("hover")
             } else {
                 root.armed = true
-                enterTimer.stop()
+                root.leaveHover()
             }
         }
         function onOpenRequestedChanged() {
@@ -469,18 +456,7 @@ PanelWindow {
 
         HoverHandler {
             id: cardHover
-            onHoveredChanged: {
-                if (hovered)
-                    leaveTimer.stop()
-                else if (root.stage === "hover")
-                    leaveTimer.restart()
-            }
-        }
-
-        // a click on the strip opens the panel; one on the open panel stays on it
-        MouseArea {
-            anchors.fill: parent
-            onClicked: if (root.stage === "hover") root.show("open")
+            onHoveredChanged: if (!hovered) root.leaveHover()
         }
 
         // wheel over the strip steps the page; summed so a touchpad does not skip pages
