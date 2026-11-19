@@ -10,10 +10,9 @@ import "ScheduleMd.js" as ScheduleMd
 //   | 05:00-07:30 | Bloco 1 | Emergência |      |   (Clock)
 //   | Seg         | Mat 1   | Fis 1      |      |   (Week)
 // Until there is a file the built-in template is used; Schedule.init() (or
-// `qs ipc call schedule init`) writes it out to be edited. Today's blocks are
-// not written to todo.md up front: they show in the task list as slots, and a
-// slot becomes a task (Todo.materialize) when it is started or ticked, so a
-// block that is skipped leaves nothing overdue behind.
+// `qs ipc call schedule init`) writes it out to be edited. Today's blocks show in
+// the task list as slots until they start; the block on now is then written to
+// todo.md (writeStarted), so the day is not written up front.
 Singleton {
     id: root
 
@@ -54,6 +53,19 @@ Singleton {
         return ScheduleMd.fmtTime(min)
     }
 
+    // the block that is on now becomes a task in todo.md once it starts, so the day's
+    // blocks are in the file without the whole day being written up front. A block
+    // already in the file (open or ticked) is left alone. Waits for todo.md to load,
+    // because adding to an empty buffer would overwrite the file.
+    function writeStarted() {
+        if (!Todo.loaded)
+            return
+        const s = slots.find(x => x.start <= nowMin && nowMin < x.end)
+        if (s === undefined || Todo.find(Todo.today, s.title) !== null)
+            return
+        Todo.materialize({ due: Todo.today, title: s.title, time: s.time }, false)
+    }
+
     // minutes planned for the block with this title today, or 0
     function minutesFor(title) {
         const s = slots.find(x => x.title === title)
@@ -69,6 +81,13 @@ Singleton {
         Quickshell.execDetached(["sh", "-c", "set -C; printf '%s\\n' \"$1\" > \"$2\"",
                                  "sh", ScheduleMd.defaultText(), root.path])
         reloadTimer.restart()
+    }
+
+    onCurrentTitleChanged: writeStarted()
+
+    Connections {
+        target: Todo
+        function onLoadedChanged() { root.writeStarted() }
     }
 
     Timer {
