@@ -713,9 +713,9 @@ PanelWindow {
                 anchors.top: idleMediaRow.bottom
                 anchors.topMargin: 8
                 width: idleMediaRow.width
-                height: 2
-                radius: 1
-                color: Qt.alpha(Theme.fg, 0.15)
+                height: 4
+                radius: 2
+                color: Qt.alpha(Theme.fg, 0.2)
 
                 Rectangle {
                     anchors.left: parent.left
@@ -727,13 +727,53 @@ PanelWindow {
                 }
             }
 
-            // the bar's workspace capsules for this screen, under the track
-            Workspaces {
+            // the workspaces as dots for this screen; the focused one stretches into a bar
+            Wm {
+                id: dotWm
+                outputName: PillState.originName
+            }
+            Row {
                 anchors.right: parent.right
                 anchors.rightMargin: 22
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: 14
-                outputName: PillState.originName
+                spacing: 6
+
+                Repeater {
+                    model: dotWm.workspaces
+                        .slice()
+                        .sort((a, b) => a.index - b.index)
+                        .slice(0, 5)
+
+                    Rectangle {
+                        id: dot
+
+                        required property var modelData
+                        readonly property bool focused: modelData.focused
+
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: focused ? 16 : 6
+                        height: 6
+                        radius: 3
+                        color: focused ? Theme.accent
+                            : modelData.occupied ? Qt.alpha(Theme.accent, 0.6)
+                            : Qt.alpha(Theme.fg, 0.22)
+
+                        Behavior on width { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                        Behavior on color { ColorAnimation { duration: 150 } }
+
+                        // the dot is small, so the hit area runs a few pixels past it
+                        MouseArea {
+                            anchors.fill: parent
+                            anchors.margins: -4
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: Quickshell.execDetached([
+                                "umbriel", "msg",
+                                "workspace-switch:" + dot.modelData.name + "/" + PillState.originName
+                            ])
+                        }
+                    }
+                }
             }
         }
 
