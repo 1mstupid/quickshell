@@ -16,6 +16,10 @@ QtObject {
     readonly property int morphMs: Math.round(UserSettings.morphMs)
     // the lock screen's fade-in and reversed unlock: longer, so the elastic bounce reads
     readonly property int lockMs: 420
+    // how far the pill drops in the lock state; the bar's pill drops by the same amount while locked
+    readonly property int lockDrop: 20
+    // true from the lock until the centre clock lands back on the bar: the bar's pill sits dropped
+    property bool pillDropped: false
 
     // The morph overshoots and settles like a spring, both ways. On the close the overshoot dips
     // below the pill, so the panels clamp their size at 0 (the card holds at pill size and springs

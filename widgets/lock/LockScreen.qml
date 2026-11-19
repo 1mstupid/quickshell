@@ -15,7 +15,7 @@ Item {
     // 0 = desktop/bar state, 1 = settled lockscreen
     property real t: 0
     // the pill stays at the top and drops a little in the lock state
-    readonly property real lockTop: PillState.pillTop + 20
+    readonly property real lockTop: PillState.pillTop + PillState.lockDrop
     // the bar clock's size (widgets/bar/Clock.qml): the centre clock lands on it
     readonly property real barClockPx: 15
     // t clamped to 0..1: the elastic overshoot moves position, but not widths, blur or scale
@@ -29,9 +29,17 @@ Item {
     }
 
     Component.onCompleted: {
-        if (root.primary)
+        if (root.primary) {
             PillState.owner = "lock"
+            PillState.pillDropped = true
+        }
         t = 1
+    }
+
+    // the centre clock lands on the bar: the bar's pill jumps back and settles
+    onTChanged: {
+        if (root.primary && root.lock.unlocking && t === 0)
+            PillState.pillDropped = false
     }
 
     Connections {
@@ -53,6 +61,8 @@ Item {
             PillState.progress = 0
             PillState.owner = ""
         }
+        if (root.primary)
+            PillState.pillDropped = false
     }
 
     Binding {
