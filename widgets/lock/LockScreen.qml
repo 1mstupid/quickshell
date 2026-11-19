@@ -16,6 +16,8 @@ Item {
     property real t: 0
     // the pill stays at the top and drops a little in the lock state
     readonly property real lockTop: PillState.pillTop + 20
+    // the bar clock's size (widgets/bar/Clock.qml): the centre clock lands on it
+    readonly property real barClockPx: 15
     // t clamped to 0..1: the elastic overshoot moves position, but not widths, blur or scale
     readonly property real tClamped: Math.max(0, Math.min(1, t))
     Behavior on t {
@@ -35,15 +37,14 @@ Item {
     Connections {
         target: root.lock
         function onUnlockingChanged() {
-            if (root.lock.unlocking)
-                root.t = 0
-        }
-    }
-
-    onTChanged: {
-        if (root.primary && root.lock.unlocking && t === 0 && PillState.owner === "lock") {
-            PillState.progress = 0
-            PillState.owner = ""
+            if (!root.lock.unlocking)
+                return
+            root.t = 0
+            // the bar's pill comes back now, so its fade finishes while the lock is still up
+            if (root.primary && PillState.owner === "lock") {
+                PillState.progress = 0
+                PillState.owner = ""
+            }
         }
     }
 
@@ -120,7 +121,8 @@ Item {
         font.pixelSize: Math.round(root.height * 0.28)
         
         transformOrigin: Item.Center
-        scale: 0.08 + 0.92 * root.tClamped
+        readonly property real endScale: root.barClockPx / font.pixelSize
+        scale: endScale + (1 - endScale) * root.tClamped
         opacity: Math.min(1, root.tClamped * 1.5)
 
         // Screen center vs Exact Notch body center (accounting for shoulders via bodyX)
