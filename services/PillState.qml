@@ -20,6 +20,8 @@ QtObject {
     readonly property int lockDrop: 20
     // true from the lock until the centre clock lands back on the bar: the bar's pill sits dropped
     property bool pillDropped: false
+    // true while the lock waits for the open panels to close back into the pill
+    property bool locking: false
     // the bar pill's landing bounce: an amplitude of 2 overshoots about 17 px on the 20 px drop
     readonly property real pillAmplitude: 2.0
 

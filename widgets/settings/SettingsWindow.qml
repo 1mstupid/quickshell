@@ -67,15 +67,12 @@ PanelWindow {
             keys.forceActiveFocus()
     }
 
-    // the lock takes the screen: the settings close at once, as the pill panels do
+    // the lock is about to take the screen: the settings close back first
     Connections {
         target: PillState
-        function onOwnerChanged() {
-            if (PillState.owner === "lock" && root.visible) {
-                fade.stop()
-                root.t = 0
-                root.visible = false
-            }
+        function onLockingChanged() {
+            if (PillState.locking && root.visible)
+                root.close()
         }
     }
 

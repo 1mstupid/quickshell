@@ -2,9 +2,7 @@ import QtQuick
 import QtQuick.Effects
 import Quickshell
 import "../../services"
-import "../app_launcher"
 import "../notch"
-import "../power_menu"
 
 Item {
     id: root
@@ -34,11 +32,6 @@ Item {
         if (root.primary) {
             PillState.owner = "lock"
             PillState.pillDropped = true
-            // the panels that are toggled by a flag close with the lock, so none reopens on unlock
-            AppLauncherState.hide()
-            PowerMenuState.hide()
-            FocusNotchState.hide()
-            ShareService.close()
         }
         t = 1
     }

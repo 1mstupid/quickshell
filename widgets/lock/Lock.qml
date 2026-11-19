@@ -4,6 +4,8 @@ import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Services.Pam
 import "../../services"
+import "../app_launcher"
+import "../power_menu"
 
 Scope {
     id: root
@@ -56,8 +58,28 @@ Scope {
     }
 
     function lockNow() {
-        if (!session.locked && !guard.running)
+        if (session.locked || guard.running || PillState.locking)
+            return
+        // the open panels close back into the pill first, so the lock waits for their morph
+        AppLauncherState.hide()
+        PowerMenuState.hide()
+        FocusNotchState.hide()
+        ShareService.close()
+        if (PillState.active) {
+            PillState.locking = true
+            lockAfterClose.restart()
+        } else {
             guard.running = true
+        }
+    }
+
+    Timer {
+        id: lockAfterClose
+        interval: PillState.morphMs
+        onTriggered: {
+            PillState.locking = false
+            guard.running = true
+        }
     }
 
     function type(text) {
