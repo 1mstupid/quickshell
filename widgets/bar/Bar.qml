@@ -75,9 +75,15 @@ PanelWindow {
         // Symmetrical side width keeps the clock dead-center; collapses to 0 when only the clock is shown
         readonly property int side: Math.max(leftW, rightW)
 
-        y: Overview.open ? -(height + root.topGap) : root.topGap
+        y: Overview.open ? -(height + root.topGap)
+           : root.topGap + (PillState.pillDropped ? PillState.lockDrop : 0)
         Behavior on y {
-            NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+            NumberAnimation {
+                duration: Overview.open ? 150 : PillState.lockMs
+                easing.type: Overview.open ? Easing.OutCubic : PillState.openEase
+                easing.period: PillState.easePeriod
+                easing.amplitude: PillState.pillAmplitude
+            }
         }
         anchors.horizontalCenter: parent.horizontalCenter
         width: volumeOn ? volumeRow.implicitWidth + 4 * pad

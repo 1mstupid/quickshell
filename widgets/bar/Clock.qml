@@ -41,7 +41,8 @@ Item {
             id: timeText
             anchors.verticalCenter: parent.verticalCenter
             text: Qt.formatDateTime(clock.date, UserSettings.clockFormat)
-            font.family: Theme.fontFamilyAlt
+            // SF Rounded, as the lock screen's clock, so the handoff between them is the same glyphs
+            font.family: Theme.fontFamilyRounded
             font.pixelSize: 15
             font.bold: true
             color: Theme.fg

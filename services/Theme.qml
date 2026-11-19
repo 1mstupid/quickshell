@@ -51,6 +51,8 @@ Singleton {
     readonly property string fontFamilyNum: UserSettings.bodyFont
     // text at 20 px and up: the timer readouts and the big totals
     readonly property string fontFamilyDisplay: UserSettings.displayFont
+    // the lock screen's clock: SF Rounded, bold
+    readonly property string fontFamilyRounded: "SFRounded Nerd Font"
     readonly property real autoScale: {
         const s = Quickshell.screens.length > 0 ? Quickshell.screens[0] : null
         const h = s ? s.height : 1080

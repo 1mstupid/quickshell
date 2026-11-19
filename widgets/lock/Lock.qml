@@ -97,7 +97,7 @@ Scope {
 
     Timer {
         id: unlockTimer
-        interval: PillState.morphMs
+        interval: PillState.lockMs
         onTriggered: {
             session.locked = false
             root.unlocking = false

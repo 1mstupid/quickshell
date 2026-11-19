@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import Quickshell
 import "../../services"
 import "../notch"
@@ -13,31 +14,45 @@ Item {
 
     // 0 = desktop/bar state, 1 = settled lockscreen
     property real t: 0
+    // the pill stays at the top and drops a little in the lock state
+    readonly property real lockTop: PillState.pillTop + PillState.lockDrop
+    // the bar clock's size (widgets/bar/Clock.qml): the centre clock lands on it
+    readonly property real barClockPx: 15
+    // t clamped to 0..1: the elastic overshoot moves position, but not widths, blur or scale
+    readonly property real tClamped: Math.max(0, Math.min(1, t))
     Behavior on t {
         NumberAnimation {
-            duration: PillState.morphMs
-            easing.type: Easing.InOutCubic
+            duration: PillState.lockMs
+            easing.type: PillState.openEase
+            easing.period: PillState.easePeriod
         }
     }
 
     Component.onCompleted: {
-        if (root.primary)
+        if (root.primary) {
             PillState.owner = "lock"
+            PillState.pillDropped = true
+        }
         t = 1
+    }
+
+    // the centre clock lands on the bar: the bar's pill jumps back and settles
+    onTChanged: {
+        if (root.primary && root.lock.unlocking && t === 0)
+            PillState.pillDropped = false
     }
 
     Connections {
         target: root.lock
         function onUnlockingChanged() {
-            if (root.lock.unlocking)
-                root.t = 0
-        }
-    }
-
-    onTChanged: {
-        if (root.primary && root.lock.unlocking && t === 0 && PillState.owner === "lock") {
-            PillState.progress = 0
-            PillState.owner = ""
+            if (!root.lock.unlocking)
+                return
+            root.t = 0
+            // the bar's pill comes back now, so its fade finishes while the lock is still up
+            if (root.primary && PillState.owner === "lock") {
+                PillState.progress = 0
+                PillState.owner = ""
+            }
         }
     }
 
@@ -46,6 +61,8 @@ Item {
             PillState.progress = 0
             PillState.owner = ""
         }
+        if (root.primary)
+            PillState.pillDropped = false
     }
 
     Binding {
@@ -81,32 +98,45 @@ Item {
         opacity: root.t
     }
 
+    // The desktop behind the lock: blurred as the lock comes in
     Image {
         anchors.fill: parent
         source: root.lock.wallpaperPath !== "" ? "file://" + root.lock.wallpaperPath : ""
         sourceSize.width: root.width
         sourceSize.height: root.height
         fillMode: Image.PreserveAspectCrop
+        layer.enabled: true
+        layer.effect: MultiEffect {
+            blurEnabled: true
+            blurMax: 64
+            blur: root.tClamped
+        }
     }
 
+    // A transparent veil over the blurred desktop
     Rectangle {
         anchors.fill: parent
-        color: Qt.alpha(Theme.bg, 0.65)
+        color: Qt.alpha(Theme.bg, 0.35)
         opacity: root.t
     }
 
     // Center clock emerges from the notch and returns to it on unlock
     Text {
+        id: timeText
         visible: root.primary
         text: Qt.formatDateTime(clock.date, UserSettings.clockFormat)
-        color: Qt.alpha(Theme.fg, 0.9)
-        font.family: Theme.fontFamilyDisplay
+        color: Theme.fg
+        font.family: Theme.fontFamilyRounded
         font.bold: true
         font.pixelSize: Math.round(root.height * 0.28)
+        // over the notch: it lands on the pill's clock, not under it
+        z: 2
         
         transformOrigin: Item.Center
-        scale: 0.08 + 0.92 * root.t
-        opacity: Math.min(1, root.t * 1.5)
+        readonly property real endScale: root.barClockPx / font.pixelSize
+        scale: endScale + (1 - endScale) * root.tClamped
+        // fades in on lock, and stays solid on unlock so it lands over the pill, not into it
+        opacity: root.lock.unlocking ? 1 : Math.min(1, root.tClamped * 1.5)
 
         // Screen center vs Exact Notch body center (accounting for shoulders via bodyX)
         readonly property real screenCenterX: root.width / 2
@@ -127,21 +157,26 @@ Item {
         readonly property int dotsCount: Math.min(root.lock.buffer.length, 24)
         readonly property real dotsWidth: dotsCount > 0 ? (dotsCount * 6 + (dotsCount - 1) * 5) : 0
         readonly property real capsWidth: capsLabel.visible ? (capsLabel.implicitWidth + 12) : 0
-        // icon (12 + 14) + leftMargin (10) + dots + rightMargin (12) + caps
-        readonly property real neededWidth: 46 + dotsWidth + capsWidth + 12
+        // the glyph alone until something is typed, then the dots take its place
+        readonly property real contentWidth: dotsCount > 0 ? dotsWidth : 14
+        // leftMargin (12) + content + rightMargin (12) + caps
+        readonly property real neededWidth: 24 + contentWidth + capsWidth
 
-        visible: root.primary
-        bodyWidth: Math.max(PillState.pillWidth, neededWidth)
-        bodyHeight: PillState.pillHeight
-        x: (root.width - bodyWidth) / 2 - bodyX + root.shake
-        y: PillState.pillTop
-
-        Behavior on bodyWidth {
+        // eases when typing starts or stops; bodyWidth moves between the bar's pill and this
+        property real fitWidth: neededWidth
+        Behavior on fitWidth {
             NumberAnimation {
                 duration: 140
                 easing.type: Easing.OutCubic
             }
         }
+
+        visible: root.primary
+        bodyWidth: PillState.pillWidth + (fitWidth - PillState.pillWidth) * root.tClamped
+        bodyHeight: PillState.pillHeight
+        x: (root.width - bodyWidth) / 2 - bodyX + root.shake
+        // unlocking returns it to the bar's place, through the same progress t
+        y: PillState.pillTop + (root.lockTop - PillState.pillTop) * root.t
     }
 
     // Password content inside the pill silhouette
@@ -158,6 +193,7 @@ Item {
             id: icon
             x: 12
             anchors.verticalCenter: parent.verticalCenter
+            visible: root.lock.buffer.length === 0
             text: "󰌾"
             color: root.lock.failed ? Theme.alert : Qt.alpha(Theme.fg, 0.6)
             font.family: Theme.fontFamily
@@ -173,23 +209,9 @@ Item {
             }
         }
 
-        Text {
-            visible: root.lock.buffer.length === 0
-            anchors.left: icon.right
-            anchors.leftMargin: 8
-            anchors.right: capsLabel.visible ? capsLabel.left : parent.right
-            anchors.rightMargin: 10
-            anchors.verticalCenter: parent.verticalCenter
-            elide: Text.ElideRight
-            text: root.lock.failed ? "" : ""
-            color: root.lock.failed ? Theme.alert : Qt.alpha(Theme.fg, 0.4)
-            font.family: Theme.fontFamilySans
-            font.pixelSize: 12
-        }
-
         Row {
-            anchors.left: icon.right
-            anchors.leftMargin: 10
+            anchors.left: parent.left
+            anchors.leftMargin: 12
             anchors.verticalCenter: parent.verticalCenter
             spacing: 5
 
