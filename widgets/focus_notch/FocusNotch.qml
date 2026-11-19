@@ -161,7 +161,13 @@ PanelWindow {
     readonly property string totalText: fmtMin(totalMin)
     // The minutes the schedule planned for the task in focus: 0 when it is not
     // a block of the schedule, and then the strip counts up instead of down.
-    readonly property int plannedMin: focusOn ? Schedule.minutesFor(TaskFocus.title) : 0
+    readonly property int plannedMin: {
+    if (!focusOn) return 0;
+    // Check if the focused task has an explicit estimate (e.g. from =45m), otherwise check schedule
+    if (TaskFocus.item && TaskFocus.item.estimate > 0)
+        return TaskFocus.item.estimate;
+    return Schedule.minutesFor(TaskFocus.title);
+    }
     readonly property double leftMs: plannedMin * 60000 - totalMs
     readonly property real planFraction: plannedMin > 0 ? Math.min(1, totalMs / (plannedMin * 60000)) : 0
     // the strip's time line; the end time only means something while the clock runs
@@ -257,8 +263,15 @@ PanelWindow {
     }
 
     // the right-hand label of a row: the hour for today's, the date for overdue
+// the right-hand label of a row: the hour for today's, the date for overdue, or the estimate if no time is set
     function whenText(r) {
-        return r.late ? Qt.formatDate(Todo.toDate(r.due), "d MMM") : r.time
+        if (r.late) 
+            return Qt.formatDate(Todo.toDate(r.due), "d MMM")
+        if (r.time !== "") 
+            return r.time
+        // Fall back to showing the task's estimate/duration if it exists
+        const est = r.task && r.task.estimate > 0 ? r.task.estimate : Schedule.minutesFor(r.title)
+        return est > 0 ? fmtMin(est) : ""
     }
 
     // starts timing a row; a block of the schedule becomes a task first
@@ -1623,12 +1636,23 @@ PanelWindow {
                                 anchors.verticalCenter: parent.verticalCenter
                                 anchors.right: tick.left
                                 anchors.rightMargin: 6
-                                text: root.whenText(dayRowItem.modelData)
+                                text: {
+                                    const spent = rowSpentMin(dayRowItem.modelData)
+                                    const planned = dayRowItem.modelData.task && dayRowItem.modelData.task.estimate > 0 
+                                        ? dayRowItem.modelData.task.estimate 
+                                        : Schedule.minutesFor(dayRowItem.modelData.title)
+
+                                    // If time spent > 0 or there's an active run, show spent / planned
+                                    if (spent > 0 || planned > 0) {
+                                        return (spent > 0 ? fmtMin(Math.floor(spent)) : "0m") + (planned > 0 ? " / " + fmtMin(planned) : "")
+                                    }
+                                    return root.whenText(dayRowItem.modelData)
+                                }
                                 color: dayRowItem.modelData.late ? Theme.red : Qt.alpha(Theme.fg, 0.5)
                                 font.family: Theme.fontFamilyNum
                                 font.pixelSize: 11
-                            }
-                            // nf-md-check: ticks it, shown on a hovered row
+                              }
+                              // nf-md-check: ticks it, shown on a hovered row
                             Text {
                                 id: tick
                                 anchors.verticalCenter: parent.verticalCenter
@@ -1947,8 +1971,16 @@ PanelWindow {
                                     id: amount
                                     anchors.right: parent.right
                                     anchors.verticalCenter: parent.verticalCenter
-                                    text: root.fmtMin(trackedRow.modelData.spent)
-                                        + (trackedRow.modelData.planned > 0 ? " / " + root.fmtMin(trackedRow.modelData.planned) : "")
+                                    text: {
+                                        let p = trackedRow.modelData.planned
+                                        if (p <= 0) {
+                                            // Look up the task in root.rows to grab its =estimate
+                                            const match = root.rows.find(r => r.title === trackedRow.modelData.title)
+                                            if (match && match.task && match.task.estimate > 0)
+                                                p = match.task.estimate
+                                        }
+                                        return root.fmtMin(trackedRow.modelData.spent) + (p > 0 ? " / " + root.fmtMin(p) : "")
+                                    }
                                     color: Qt.alpha(Theme.fg, 0.6)
                                     font.family: Theme.fontFamilyNum
                                     font.pixelSize: 11
