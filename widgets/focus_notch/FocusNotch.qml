@@ -52,7 +52,9 @@ PanelWindow {
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: root.stage === "open" ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    // the pinned strip takes keys on demand, so Escape closes it; the open panel holds them
+    WlrLayershell.keyboardFocus: root.stage === "open" ? WlrKeyboardFocus.Exclusive
+        : root.stage === "hover" ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
     WlrLayershell.namespace: "quickshell-focusnotch"
 
     // the strip only takes input on the card, so the screen below stays usable;
@@ -636,8 +638,9 @@ PanelWindow {
                 }
             }
 
+            // the divider sits between the clock and the media, at the strip's centre
             Rectangle {
-                x: 250
+                x: (parent.width - width) / 2
                 y: 14
                 width: 1
                 height: parent.height - 28
