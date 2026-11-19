@@ -2240,10 +2240,9 @@ PanelWindow {
         property: "flyT"
         from: 1
         to: 0
-        // quicker than the morph, with a small overshoot that settles onto the bar's clock
+        // quicker than the morph, and no overshoot: it eases onto the bar's clock
         duration: 120
-        easing.type: Easing.OutBack
-        easing.overshoot: 1.3
+        easing.type: Easing.OutCubic
         onFinished: PillState.clockFlying = false
     }
 }
