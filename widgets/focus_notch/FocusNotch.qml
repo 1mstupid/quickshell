@@ -640,35 +640,6 @@ PanelWindow {
                 }
             }
 
-            // the close button sits in the middle of the strip while the pointer is on it; the
-            // pinned strip needs a pointer way out, since Escape only works while it has focus
-            Rectangle {
-                id: idleClose
-                x: (parent.width - width) / 2
-                y: (parent.height - height) / 2
-                width: 36
-                height: 36
-                radius: 18
-                color: closeArea.containsMouse ? Qt.alpha(Theme.fg, 0.18) : Qt.alpha(Theme.fg, 0.1)
-                opacity: root.stage === "hover" && cardHover.hovered ? 1 : 0
-                Behavior on opacity { NumberAnimation { duration: 120 } }
-
-                Text {
-                    anchors.centerIn: parent
-                    text: "󰅖"
-                    color: Theme.fg
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 14
-                }
-                MouseArea {
-                    id: closeArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.close()
-                }
-            }
-
             Row {
                 id: idleMediaRow
                 anchors.right: parent.right
@@ -676,6 +647,33 @@ PanelWindow {
                 anchors.top: parent.top
                 anchors.topMargin: 14
                 spacing: 10
+
+                Column {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 130
+                    spacing: 2
+
+                    Text {
+                        width: parent.width
+                        text: idleMedia.present ? (idleMedia.player?.trackTitle ?? "") : "Nothing playing"
+                        horizontalAlignment: Text.AlignRight
+                        color: idleMedia.present ? Theme.fg : Qt.alpha(Theme.fg, 0.5)
+                        font.family: Theme.fontFamilySans
+                        font.pixelSize: 13
+                        font.weight: idleMedia.present ? Font.DemiBold : Font.Normal
+                        elide: Text.ElideRight
+                    }
+                    Text {
+                        width: parent.width
+                        visible: idleMedia.present
+                        text: idleMedia.artistText
+                        horizontalAlignment: Text.AlignRight
+                        color: Qt.alpha(Theme.fg, 0.6)
+                        font.family: Theme.fontFamilySans
+                        font.pixelSize: 11
+                        elide: Text.ElideRight
+                    }
+                }
 
                 Rectangle {
                     id: idleArt
@@ -703,31 +701,6 @@ PanelWindow {
                             maskEnabled: true
                             maskSource: idleArtMask
                         }
-                    }
-                }
-
-                Column {
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 130
-                    spacing: 2
-
-                    Text {
-                        width: parent.width
-                        text: idleMedia.present ? (idleMedia.player?.trackTitle ?? "") : "Nothing playing"
-                        color: idleMedia.present ? Theme.fg : Qt.alpha(Theme.fg, 0.5)
-                        font.family: Theme.fontFamilySans
-                        font.pixelSize: 13
-                        font.weight: idleMedia.present ? Font.DemiBold : Font.Normal
-                        elide: Text.ElideRight
-                    }
-                    Text {
-                        width: parent.width
-                        visible: idleMedia.present
-                        text: idleMedia.artistText
-                        color: Qt.alpha(Theme.fg, 0.6)
-                        font.family: Theme.fontFamilySans
-                        font.pixelSize: 11
-                        elide: Text.ElideRight
                     }
                 }
             }
