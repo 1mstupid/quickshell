@@ -383,6 +383,14 @@ PanelWindow {
             close()
     }
 
+    // The pointer passes from the bar pill to the card, and the card only registers it a
+    // moment later. The check waits that moment, so the hand-off does not close the strip.
+    Timer {
+        id: handoff
+        interval: 60
+        onTriggered: root.leaveHover()
+    }
+
     Connections {
         target: FocusNotchState
         function onPillHoveredChanged() {
@@ -391,7 +399,7 @@ PanelWindow {
                     root.show("hover")
             } else {
                 root.armed = true
-                root.leaveHover()
+                handoff.restart()
             }
         }
         function onOpenRequestedChanged() {
@@ -456,7 +464,7 @@ PanelWindow {
 
         HoverHandler {
             id: cardHover
-            onHoveredChanged: if (!hovered) root.leaveHover()
+            onHoveredChanged: if (!hovered) handoff.restart()
         }
 
         // wheel over the strip steps the page; summed so a touchpad does not skip pages
