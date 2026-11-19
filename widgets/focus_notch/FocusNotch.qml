@@ -387,7 +387,7 @@ PanelWindow {
     // moment later. The check waits that moment, so the hand-off does not close the strip.
     Timer {
         id: handoff
-        interval: 60
+        interval: 100
         onTriggered: root.leaveHover()
     }
 
@@ -465,6 +465,12 @@ PanelWindow {
         HoverHandler {
             id: cardHover
             onHoveredChanged: if (!hovered) handoff.restart()
+        }
+
+        // a click on the hovered strip opens the panel; one on the open panel stays on it
+        MouseArea {
+            anchors.fill: parent
+            onClicked: if (root.stage === "hover") root.show("open")
         }
 
         // wheel over the strip steps the page; summed so a touchpad does not skip pages
