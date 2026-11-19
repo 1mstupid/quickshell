@@ -1061,11 +1061,17 @@ PanelWindow {
                         anchors.topMargin: 18
                         height: 14
 
+                        // while dragging the track shows the scrubbed spot; it seeks on release
+                        property bool scrubbing: false
+                        property real scrubFrac: 0
+                        readonly property real shownPos: scrubbing ? scrubFrac * media.len : media.pos
+                        readonly property real shownFrac: media.timed ? Math.min(1, shownPos / media.len) : 0
+
                         Text {
                             id: elapsed
                             anchors.left: parent.left
                             anchors.verticalCenter: parent.verticalCenter
-                            text: media.present ? media.fmt(media.pos) : ""
+                            text: media.present ? media.fmt(progress.shownPos) : ""
                             color: Qt.alpha(Theme.fg, 0.6)
                             font.family: Theme.fontFamilyNum
                             font.pixelSize: 11
@@ -1075,7 +1081,7 @@ PanelWindow {
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
                             visible: media.timed
-                            text: media.timed ? "-" + media.fmt(media.len - media.pos) : ""
+                            text: media.timed ? "-" + media.fmt(media.len - progress.shownPos) : ""
                             color: Qt.alpha(Theme.fg, 0.6)
                             font.family: Theme.fontFamilyNum
                             font.pixelSize: 11
@@ -1096,7 +1102,34 @@ PanelWindow {
                                 anchors.bottom: parent.bottom
                                 radius: parent.radius
                                 color: Theme.fg
-                                width: parent.width * (media.timed ? Math.min(1, media.pos / media.len) : 0)
+                                width: parent.width * progress.shownFrac
+                            }
+
+                            // the hit area runs a few pixels past the 4 px track, so it is easy to grab
+                            MouseArea {
+                                id: seekArea
+                                anchors.fill: parent
+                                anchors.margins: -8
+                                enabled: media.timed && (media.player?.canSeek ?? false)
+                                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+
+                                function fracAt(mx) {
+                                    const x = mapToItem(parent, mx, 0).x
+                                    return Math.max(0, Math.min(1, x / parent.width))
+                                }
+                                onPressed: mouse => {
+                                    progress.scrubFrac = fracAt(mouse.x)
+                                    progress.scrubbing = true
+                                }
+                                onPositionChanged: mouse => {
+                                    if (progress.scrubbing)
+                                        progress.scrubFrac = fracAt(mouse.x)
+                                }
+                                onReleased: {
+                                    media.seek(progress.scrubFrac)
+                                    progress.scrubbing = false
+                                }
+                                onCanceled: progress.scrubbing = false
                             }
                         }
                     }

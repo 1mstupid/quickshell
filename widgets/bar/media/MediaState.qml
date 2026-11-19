@@ -99,6 +99,16 @@ Item {
             player.stop()
     }
 
+    // seek to a fraction of the track; the position is set at once so the bar does not
+    // snap back until the player reports it
+    function seek(frac) {
+        if (!player || !timed || !player.canSeek)
+            return
+        const t = Math.max(0, Math.min(1, frac)) * len
+        player.position = t
+        pos = t
+    }
+
     function fmt(s) {
         s = Math.max(0, Math.round(s))
         const m = Math.floor(s / 60), r = s % 60
