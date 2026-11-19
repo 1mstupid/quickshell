@@ -466,7 +466,7 @@ PanelWindow {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
 
-            opacity: pill.contentHidden || PillState.clockFlying ? 0 : 1
+            opacity: pill.contentHidden ? 0 : 1
             Behavior on opacity { NumberAnimation { duration: 120 } }
         }
     }

@@ -320,9 +320,7 @@ PanelWindow {
         const from = PillState.takeOver()
         takeW = from.taken ? from.w : 0
         takeH = from.taken ? from.h : 0
-        // the strip's clock fades in on open; the bar's clock stays put
-        flyAnim.stop()
-        PillState.clockFlying = false
+        // the strip's clock fades in on open
         if (!focusOn)
             fadeIn.restart()
         visible = true
@@ -342,8 +340,6 @@ PanelWindow {
         expand = 0
         stage = ""
         FocusNotchState.openRequested = false
-        flyAnim.stop()
-        PillState.clockFlying = false
         visible = false
     }
 
@@ -352,13 +348,10 @@ PanelWindow {
             return
         stage = ""
         FocusNotchState.openRequested = false
-        // the clock flies back to the bar: the strip's clock hands over to the flying one at once
+        // the strip's clock fades out on close, the reverse of the fade in
         fadeIn.stop()
-        if (!focusOn) {
-            clockShown = 0
-            PillState.clockFlying = true
-            flyAnim.restart()
-        }
+        if (!focusOn)
+            fadeOut.restart()
         // closing shrinks back into the strip, as it does when it was not a takeover
         takeW = 0
         takeH = 0
@@ -638,12 +631,12 @@ PanelWindow {
                 anchors.leftMargin: 22
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 2
-                opacity: root.clockShown * (flyAnim.running ? 0 : 1)
+                opacity: root.clockShown
 
                 Text {
                     text: Qt.formatDateTime(idleClock.date, UserSettings.clockFormat)
                     color: Theme.fg
-                    // SF Rounded bold, as the bar's and the lock's clock, so the flight lands on the same glyphs
+                    // SF Rounded bold, as the bar's and the lock's clock, so the two read as one clock
                     font.family: Theme.fontFamilyRounded
                     font.pixelSize: 34
                     font.bold: true
@@ -2201,29 +2194,7 @@ PanelWindow {
         }
     }
 
-    // the bar's clock flies from its place in the pill to the strip's clock, and the strip's own
-    // clock takes over once it lands; the bar's size is 15 px, the strip's 34 px
-    SystemClock { id: flyTick; precision: SystemClock.Minutes }
-    Text {
-        id: flyClock
-        visible: flyAnim.running
-        property real flyT: 0
-        text: Qt.formatDateTime(flyTick.date, UserSettings.clockFormat)
-        color: Theme.fg
-        font.family: Theme.fontFamilyRounded
-        font.pixelSize: 34
-        font.bold: true
-        transformOrigin: Item.Center
-        readonly property real startScale: 15 / font.pixelSize
-        scale: startScale + (1 - startScale) * flyT
-        // the strip's clock: the open panel's centre less half the strip, plus its margin
-        readonly property real endX: root.width / 2 - root.hoverW / 2 + 22 + width / 2
-        readonly property real endY: PillState.pillTop + 42
-        x: PillState.clockX + (endX - PillState.clockX) * flyT - width / 2
-        y: PillState.clockY + (endY - PillState.clockY) * flyT - height / 2
-    }
-
-    // the strip's clock fades in on open; on close it is handed to the flying clock
+    // the strip's clock fades in on open and out on close
     property real clockShown: 0
     NumberAnimation {
         id: fadeIn
@@ -2233,16 +2204,12 @@ PanelWindow {
         duration: 150
         easing.type: Easing.OutCubic
     }
-
     NumberAnimation {
-        id: flyAnim
-        target: flyClock
-        property: "flyT"
-        from: 1
+        id: fadeOut
+        target: root
+        property: "clockShown"
         to: 0
-        // quicker than the morph, and no overshoot: it eases onto the bar's clock
-        duration: 120
+        duration: 150
         easing.type: Easing.OutCubic
-        onFinished: PillState.clockFlying = false
     }
 }
