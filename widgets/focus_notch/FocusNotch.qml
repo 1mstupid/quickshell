@@ -320,11 +320,11 @@ PanelWindow {
         const from = PillState.takeOver()
         takeW = from.taken ? from.w : 0
         takeH = from.taken ? from.h : 0
-        // from the pill, the bar's clock flies to the strip's clock; the strip shows its own once it lands
-        if (!from.taken && !focusOn) {
-            PillState.clockFlying = true
-            flyAnim.restart()
-        }
+        // the strip's clock fades in on open; the bar's clock stays put
+        flyAnim.stop()
+        PillState.clockFlying = false
+        if (!focusOn)
+            fadeIn.restart()
         visible = true
         stage = next
         goTo(from.taken ? 0 : 1, next === "open" ? 1 : 0)
@@ -352,8 +352,13 @@ PanelWindow {
             return
         stage = ""
         FocusNotchState.openRequested = false
-        flyAnim.stop()
-        PillState.clockFlying = false
+        // the clock flies back to the bar: the strip's clock hands over to the flying one at once
+        fadeIn.stop()
+        if (!focusOn) {
+            clockShown = 0
+            PillState.clockFlying = true
+            flyAnim.restart()
+        }
         // closing shrinks back into the strip, as it does when it was not a takeover
         takeW = 0
         takeH = 0
@@ -633,7 +638,7 @@ PanelWindow {
                 anchors.leftMargin: 22
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 2
-                opacity: flyAnim.running ? 0 : 1
+                opacity: root.clockShown * (flyAnim.running ? 0 : 1)
 
                 Text {
                     text: Qt.formatDateTime(idleClock.date, UserSettings.clockFormat)
@@ -2218,13 +2223,24 @@ PanelWindow {
         y: PillState.clockY + (endY - PillState.clockY) * flyT - height / 2
     }
 
+    // the strip's clock fades in on open; on close it is handed to the flying clock
+    property real clockShown: 0
+    NumberAnimation {
+        id: fadeIn
+        target: root
+        property: "clockShown"
+        to: 1
+        duration: 150
+        easing.type: Easing.OutCubic
+    }
+
     NumberAnimation {
         id: flyAnim
         target: flyClock
         property: "flyT"
-        from: 0
-        to: 1
-        // quicker than the morph, and a small overshoot so it settles onto the strip's clock
+        from: 1
+        to: 0
+        // quicker than the morph, with a small overshoot that settles onto the bar's clock
         duration: 120
         easing.type: Easing.OutBack
         easing.overshoot: 1.3
