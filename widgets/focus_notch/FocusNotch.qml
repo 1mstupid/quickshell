@@ -114,8 +114,6 @@ PanelWindow {
         property: "watching"
         value: root.stage === "open" && root.tab === "ports"
     }
-    // after a close the pointer has to leave the pill before it can open the strip again
-    property bool armed: true
     onStageChanged: if (stage === "open") keyHost.forceActiveFocus()
     // 0 = the bar pill, 1 = the strip; 0 = the strip, 1 = the full panel
     property real grow: 0
@@ -300,7 +298,9 @@ PanelWindow {
     }
 
     // ── Open / close ───────────────────────────────────────────────────────
-    readonly property bool canTake: PillState.owner === "" && !Overview.open && FocusNotchState.available
+    // the pill is free, or still ours while the strip closes, so a reopen is not held back
+    readonly property bool canTake: (PillState.owner === "" || PillState.owner === "focus")
+        && !Overview.open && FocusNotchState.available
 
     function goTo(g, e) {
         growAnim.stop()
@@ -334,7 +334,6 @@ PanelWindow {
         grow = 0
         expand = 0
         stage = ""
-        armed = false
         FocusNotchState.openRequested = false
         visible = false
     }
@@ -343,7 +342,6 @@ PanelWindow {
         if (stage === "")
             return
         stage = ""
-        armed = false
         FocusNotchState.openRequested = false
         // closing shrinks back into the strip, as it does when it was not a takeover
         takeW = 0
@@ -382,12 +380,10 @@ PanelWindow {
         target: FocusNotchState
         function onPillHoveredChanged() {
             if (FocusNotchState.pillHovered) {
-                if (root.armed && root.canTake)
+                if (root.canTake)
                     root.show("hover")
-            } else {
-                // a hovered strip is pinned: leaving does not close it, a click does
-                root.armed = true
             }
+            // leaving does not close a hovered strip: it is pinned until clicked
         }
         function onOpenRequestedChanged() {
             // the notch is off or has no page on: a request to open it is dropped
