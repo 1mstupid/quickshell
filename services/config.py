@@ -153,7 +153,11 @@ def set_value(path, table, key, raw):
     expected = copy.deepcopy(doc)
     expected.setdefault(table, {})[key] = value
     new = edit(text, table, key, value)
-    if tomllib.loads(new) != expected:
+    try:
+        checked = tomllib.loads(new) == expected
+    except tomllib.TOMLDecodeError:  # an edit that left invalid TOML is not written
+        checked = False
+    if not checked:
         print("config: the edit could not be checked, so the file was rewritten and its "
               "comments are gone", file=sys.stderr)
         new = dumps(expected)
