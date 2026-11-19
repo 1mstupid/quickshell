@@ -20,6 +20,8 @@ QtObject {
     readonly property int lockDrop: 20
     // true from the lock until the centre clock lands back on the bar: the bar's pill sits dropped
     property bool pillDropped: false
+    // the bar pill's landing bounce: an amplitude of 1.5 overshoots about 12 px on the 20 px drop
+    readonly property real pillAmplitude: 1.5
 
     // The morph overshoots and settles like a spring, both ways. On the close the overshoot dips
     // below the pill, so the panels clamp their size at 0 (the card holds at pill size and springs

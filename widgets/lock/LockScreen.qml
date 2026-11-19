@@ -129,6 +129,8 @@ Item {
         font.family: Theme.fontFamilyRounded
         font.bold: true
         font.pixelSize: Math.round(root.height * 0.28)
+        // over the notch: it lands on the pill's clock, not under it
+        z: 2
         
         transformOrigin: Item.Center
         readonly property real endScale: root.barClockPx / font.pixelSize

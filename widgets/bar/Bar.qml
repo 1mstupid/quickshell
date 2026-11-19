@@ -82,6 +82,7 @@ PanelWindow {
                 duration: Overview.open ? 150 : PillState.lockMs
                 easing.type: Overview.open ? Easing.OutCubic : PillState.openEase
                 easing.period: PillState.easePeriod
+                easing.amplitude: PillState.pillAmplitude
             }
         }
         anchors.horizontalCenter: parent.horizontalCenter
