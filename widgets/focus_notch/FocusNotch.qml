@@ -57,7 +57,17 @@ PanelWindow {
 
     // the strip only takes input on the card, so the screen below stays usable;
     // the open panel also takes the band around it, to catch a click outside
-    mask: Region { item: root.stage === "open" ? catcher : card }
+    // on the hover strip the pill's band stays with the bar, so the pointer still rests on the
+    // pill and the strip stays open; the card takes the input below the band
+    mask: Region { item: root.stage === "open" ? catcher : (root.stage === "hover" ? cardBody : card) }
+
+    Item {
+        id: cardBody
+        x: card.x
+        y: card.y + PillState.pillHeight
+        width: card.width
+        height: Math.max(0, card.height - PillState.pillHeight)
+    }
 
     // ── Geometry ───────────────────────────────────────────────────────────
     readonly property int hoverW: 560
