@@ -355,9 +355,10 @@ PanelWindow {
         id: growAnim
         target: root
         property: "grow"
-        duration: 140
-        // out, not in-out: the strip moves at once on hover instead of starting slowly
-        easing.type: Easing.OutCubic
+        duration: 180
+        // back out: the strip overshoots its size and settles, so the open reads as a spring
+        easing.type: Easing.OutBack
+        easing.overshoot: 2.5
         onFinished: {
             if (root.stage === "" && root.grow < 0.01) {
                 root.visible = false
@@ -434,8 +435,9 @@ PanelWindow {
     Rectangle {
         id: card
 
-        readonly property real stripW: PillState.pillWidth + (root.hoverW - PillState.pillWidth) * root.grow
-        readonly property real stripH: PillState.pillHeight + (root.hoverH - PillState.pillHeight) * root.grow
+        // grow overshoots past 1 and dips below 0 on the way; the strip never draws below the pill
+        readonly property real stripW: PillState.pillWidth + (root.hoverW - PillState.pillWidth) * Math.max(0, root.grow)
+        readonly property real stripH: PillState.pillHeight + (root.hoverH - PillState.pillHeight) * Math.max(0, root.grow)
 
         readonly property real startW: root.takeW > 0 ? root.takeW : stripW
         readonly property real startH: root.takeH > 0 ? root.takeH : stripH
@@ -638,13 +640,33 @@ PanelWindow {
                 }
             }
 
-            // the divider sits between the clock and the media, at the strip's centre
+            // the close button sits in the middle of the strip while the pointer is on it; the
+            // pinned strip needs a pointer way out, since Escape only works while it has focus
             Rectangle {
+                id: idleClose
                 x: (parent.width - width) / 2
-                y: 14
-                width: 1
-                height: parent.height - 28
-                color: Qt.alpha(Theme.fg, 0.12)
+                y: (parent.height - height) / 2
+                width: 36
+                height: 36
+                radius: 18
+                color: closeArea.containsMouse ? Qt.alpha(Theme.fg, 0.18) : Qt.alpha(Theme.fg, 0.1)
+                opacity: root.stage === "hover" && cardHover.hovered ? 1 : 0
+                Behavior on opacity { NumberAnimation { duration: 120 } }
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "󰅖"
+                    color: Theme.fg
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 14
+                }
+                MouseArea {
+                    id: closeArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.close()
+                }
             }
 
             Row {
@@ -707,6 +729,28 @@ PanelWindow {
                         font.pixelSize: 11
                         elide: Text.ElideRight
                     }
+                }
+            }
+
+            // the media's progress, a hairline under the title and art
+            Rectangle {
+                id: idleTrack
+                anchors.right: parent.right
+                anchors.rightMargin: 22
+                anchors.top: idleMediaRow.bottom
+                anchors.topMargin: 8
+                width: idleMediaRow.width
+                height: 2
+                radius: 1
+                color: Qt.alpha(Theme.fg, 0.15)
+
+                Rectangle {
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    radius: parent.radius
+                    color: Theme.fg
+                    width: parent.width * (idleMedia.timed ? Math.min(1, idleMedia.pos / idleMedia.len) : 0)
                 }
             }
 
