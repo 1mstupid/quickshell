@@ -312,6 +312,7 @@ PanelWindow {
     }
 
     function show(next) {
+        console.log("notch show " + next + " claim=" + PillState.owner)
         if (!PillState.claim("focus"))
             return
         // a card the previous panel gave up: grow from it, with the strip kept hidden
@@ -380,6 +381,7 @@ PanelWindow {
     // the pointer is off both the pill and the card: a hover strip closes at once. The card
     // covers the pill's place, so moving from the pill into the card is not leaving.
     function leaveHover() {
+        console.log("notch leaveHover stage=" + stage + " pill=" + FocusNotchState.pillHovered + " card=" + cardHover.hovered)
         if (stage === "hover" && !FocusNotchState.pillHovered && !cardHover.hovered)
             close()
     }
@@ -395,6 +397,7 @@ PanelWindow {
     Connections {
         target: FocusNotchState
         function onPillHoveredChanged() {
+            console.log("notch pillHovered=" + FocusNotchState.pillHovered + " armed=" + root.armed + " canTake=" + root.canTake)
             if (FocusNotchState.pillHovered) {
                 if (root.armed && root.canTake)
                     root.show("hover")
