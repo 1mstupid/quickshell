@@ -52,9 +52,9 @@ PanelWindow {
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Overlay
-    // the pinned strip takes keys on demand, so Escape closes it; the open panel holds them
-    WlrLayershell.keyboardFocus: root.stage === "open" ? WlrKeyboardFocus.Exclusive
-        : root.stage === "hover" ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+    // the pinned strip and the open panel hold the keys, so Escape reaches them; on demand focus
+    // was dropped as soon as the pointer left the strip
+    WlrLayershell.keyboardFocus: root.stage !== "" ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     WlrLayershell.namespace: "quickshell-focusnotch"
 
     // the strip only takes input on the card, so the screen below stays usable;
