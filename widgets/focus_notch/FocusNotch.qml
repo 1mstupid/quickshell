@@ -2224,8 +2224,10 @@ PanelWindow {
         property: "flyT"
         from: 0
         to: 1
-        duration: PillState.morphMs
-        easing.type: Easing.OutCubic
+        // quicker than the morph, and a small overshoot so it settles onto the strip's clock
+        duration: 120
+        easing.type: Easing.OutBack
+        easing.overshoot: 1.3
         onFinished: PillState.clockFlying = false
     }
 }
