@@ -160,6 +160,15 @@ PanelWindow {
         }
     }
 
+    // the lock is about to take the screen: the picker closes back into the pill first
+    Connections {
+        target: PillState
+        function onLockingChanged() {
+            if (PillState.locking && root.visible)
+                root.close()
+        }
+    }
+
     function openPicker() {
         focusCurrent()
         if (!PillState.claim("colorschemes"))

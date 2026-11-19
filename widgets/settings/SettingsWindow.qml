@@ -67,6 +67,15 @@ PanelWindow {
             keys.forceActiveFocus()
     }
 
+    // the lock is about to take the screen: the settings close back first
+    Connections {
+        target: PillState
+        function onLockingChanged() {
+            if (PillState.locking && root.visible)
+                root.close()
+        }
+    }
+
     NumberAnimation {
         id: fade
         target: root
