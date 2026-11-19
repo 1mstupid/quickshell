@@ -133,7 +133,8 @@ Item {
         transformOrigin: Item.Center
         readonly property real endScale: root.barClockPx / font.pixelSize
         scale: endScale + (1 - endScale) * root.tClamped
-        opacity: Math.min(1, root.tClamped * 1.5)
+        // fades in on lock, and stays solid on unlock so it lands over the pill, not into it
+        opacity: root.lock.unlocking ? 1 : Math.min(1, root.tClamped * 1.5)
 
         // Screen center vs Exact Notch body center (accounting for shoulders via bodyX)
         readonly property real screenCenterX: root.width / 2
