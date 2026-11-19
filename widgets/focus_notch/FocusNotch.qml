@@ -52,7 +52,9 @@ PanelWindow {
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: root.stage === "open" ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    // the pinned strip and the open panel hold the keys, so Escape reaches them; on demand focus
+    // was dropped as soon as the pointer left the strip
+    WlrLayershell.keyboardFocus: root.stage !== "" ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     WlrLayershell.namespace: "quickshell-focusnotch"
 
     // the strip only takes input on the card, so the screen below stays usable;
@@ -60,8 +62,8 @@ PanelWindow {
     mask: Region { item: root.stage === "open" ? catcher : card }
 
     // ── Geometry ───────────────────────────────────────────────────────────
-    readonly property int hoverW: 520
-    readonly property int hoverH: 78
+    readonly property int hoverW: 560
+    readonly property int hoverH: 88
     readonly property int openW: 580
     readonly property int openH: 260
     // The card's size on the open panel. The pages share openW x openH; the control page is
@@ -114,8 +116,6 @@ PanelWindow {
         property: "watching"
         value: root.stage === "open" && root.tab === "ports"
     }
-    // after a close the pointer has to leave the pill before it can open the strip again
-    property bool armed: true
     onStageChanged: if (stage === "open") keyHost.forceActiveFocus()
     // 0 = the bar pill, 1 = the strip; 0 = the strip, 1 = the full panel
     property real grow: 0
@@ -300,7 +300,9 @@ PanelWindow {
     }
 
     // ── Open / close ───────────────────────────────────────────────────────
-    readonly property bool canTake: PillState.owner === "" && !Overview.open && FocusNotchState.available
+    // the pill is free, or still ours while the strip closes, so a reopen is not held back
+    readonly property bool canTake: (PillState.owner === "" || PillState.owner === "focus")
+        && !Overview.open && FocusNotchState.available
 
     function goTo(g, e) {
         growAnim.stop()
@@ -334,7 +336,6 @@ PanelWindow {
         grow = 0
         expand = 0
         stage = ""
-        armed = false
         FocusNotchState.openRequested = false
         visible = false
     }
@@ -343,7 +344,6 @@ PanelWindow {
         if (stage === "")
             return
         stage = ""
-        armed = false
         FocusNotchState.openRequested = false
         // closing shrinks back into the strip, as it does when it was not a takeover
         takeW = 0
@@ -355,8 +355,9 @@ PanelWindow {
         id: growAnim
         target: root
         property: "grow"
-        duration: 160
-        easing.type: Easing.InOutCubic
+        duration: 140
+        // out, not in-out: the strip moves at once on hover instead of starting slowly
+        easing.type: Easing.OutCubic
         onFinished: {
             if (root.stage === "" && root.grow < 0.01) {
                 root.visible = false
@@ -376,36 +377,15 @@ PanelWindow {
         easing.period: PillState.easePeriod
     }
 
-    // the pointer has to rest on the pill a moment, so passing over it on the
-    // way to the screen edge does not open it
-    Timer {
-        id: enterTimer
-        interval: 180
-        onTriggered: {
-            if (FocusNotchState.pillHovered && root.armed && root.canTake)
-                root.show("hover")
-        }
-    }
-
-    // the strip closes shortly after the pointer leaves it
-    Timer {
-        id: leaveTimer
-        interval: 300
-        onTriggered: {
-            if (root.stage === "hover" && !cardHover.hovered)
-                root.close()
-        }
-    }
 
     Connections {
         target: FocusNotchState
         function onPillHoveredChanged() {
             if (FocusNotchState.pillHovered) {
-                enterTimer.restart()
-            } else {
-                root.armed = true
-                enterTimer.stop()
+                if (root.canTake)
+                    root.show("hover")
             }
+            // leaving does not close a hovered strip: it is pinned until clicked
         }
         function onOpenRequestedChanged() {
             // the notch is off or has no page on: a request to open it is dropped
@@ -469,15 +449,9 @@ PanelWindow {
 
         HoverHandler {
             id: cardHover
-            onHoveredChanged: {
-                if (hovered)
-                    leaveTimer.stop()
-                else if (root.stage === "hover")
-                    leaveTimer.restart()
-            }
         }
 
-        // a click on the strip opens the panel; one on the open panel stays on it
+        // a click on the hovered strip opens the panel; one on the open panel stays on it
         MouseArea {
             anchors.fill: parent
             onClicked: if (root.stage === "hover") root.show("open")
@@ -664,8 +638,9 @@ PanelWindow {
                 }
             }
 
+            // the divider sits between the clock and the media, at the strip's centre
             Rectangle {
-                x: 250
+                x: (parent.width - width) / 2
                 y: 14
                 width: 1
                 height: parent.height - 28

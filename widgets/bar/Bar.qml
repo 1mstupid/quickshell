@@ -29,7 +29,9 @@ PanelWindow {
     // panel grows from here, through PillState.pillTop.
     readonly property real topGap: UserSettings.pill ? 8 : 0
 
-    implicitHeight: topGap + pill.height
+    // the pointer area of the pill also takes a margin below and around it (hoverZone)
+    readonly property int hoverPad: 10
+    implicitHeight: topGap + pill.height + hoverPad
 
     // hidden bar gives its space back to windows
     readonly property bool showBar: shown && !Overview.open
@@ -39,7 +41,18 @@ PanelWindow {
     visible: Theme.barStateReady && shown
 
     // while the picker is open the pill is non-interactive, so clicks pass through
-    mask: Region { item: PillState.active ? null : pill }
+    mask: Region { item: PillState.active ? null : hoverZone }
+
+    // the focus notch's pointer area: the pill with a margin, so a near miss still opens it
+    Item {
+        id: hoverZone
+        anchors.fill: pill
+        anchors.margins: -root.hoverPad
+        HoverHandler {
+            id: pillHover
+            enabled: root.isOrigin
+        }
+    }
 
     // the picker card grows out of the origin bar's pill, so publish its geometry
     readonly property bool isOrigin: root.modelData?.name === PillState.originName
@@ -104,11 +117,7 @@ PanelWindow {
             NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
         }
 
-        // the focus notch opens when the pointer rests on the pill (origin screen only)
-        HoverHandler {
-            id: pillHover
-            enabled: root.isOrigin
-        }
+        // the focus notch opens when the pointer is on the pill (origin screen only)
         Binding {
             target: FocusNotchState
             property: "pillHovered"
