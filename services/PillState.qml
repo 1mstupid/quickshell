@@ -18,6 +18,9 @@ QtObject {
     readonly property int lockMs: 420
     // how far the pill drops in the lock state; the bar's pill drops by the same amount while locked
     readonly property int lockDrop: 20
+    // true while the focus strip's flying clock carries the bar's clock across, so the bar's own
+    // clock steps aside
+    property bool clockFlying: false
     // true from the lock until the centre clock lands back on the bar: the bar's pill sits dropped
     property bool pillDropped: false
     // true while the lock waits for the open panels to close back into the pill

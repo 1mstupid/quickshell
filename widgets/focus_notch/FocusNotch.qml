@@ -320,6 +320,11 @@ PanelWindow {
         const from = PillState.takeOver()
         takeW = from.taken ? from.w : 0
         takeH = from.taken ? from.h : 0
+        // from the pill, the bar's clock flies to the strip's clock; the strip shows its own once it lands
+        if (!from.taken && !focusOn) {
+            PillState.clockFlying = true
+            flyAnim.restart()
+        }
         visible = true
         stage = next
         goTo(from.taken ? 0 : 1, next === "open" ? 1 : 0)
@@ -337,6 +342,8 @@ PanelWindow {
         expand = 0
         stage = ""
         FocusNotchState.openRequested = false
+        flyAnim.stop()
+        PillState.clockFlying = false
         visible = false
     }
 
@@ -345,6 +352,8 @@ PanelWindow {
             return
         stage = ""
         FocusNotchState.openRequested = false
+        flyAnim.stop()
+        PillState.clockFlying = false
         // closing shrinks back into the strip, as it does when it was not a takeover
         takeW = 0
         takeH = 0
@@ -624,13 +633,15 @@ PanelWindow {
                 anchors.leftMargin: 22
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 2
+                opacity: PillState.clockFlying ? 0 : 1
 
                 Text {
                     text: Qt.formatDateTime(idleClock.date, UserSettings.clockFormat)
                     color: Theme.fg
-                    font.family: Theme.fontFamilyDisplay
+                    // SF Rounded bold, as the bar's and the lock's clock, so the flight lands on the same glyphs
+                    font.family: Theme.fontFamilyRounded
                     font.pixelSize: 34
-                    font.weight: Font.DemiBold
+                    font.bold: true
                 }
                 Text {
                     text: Qt.formatDate(idleClock.date, "dddd, MMMM d")
@@ -705,26 +716,15 @@ PanelWindow {
                 }
             }
 
-            // the media's progress, a hairline under the title and art
+            // a thin rule under the media, the horizontal counterpart of the old vertical divider
             Rectangle {
-                id: idleTrack
                 anchors.right: parent.right
                 anchors.rightMargin: 22
                 anchors.top: idleMediaRow.bottom
                 anchors.topMargin: 8
                 width: idleMediaRow.width
-                height: 4
-                radius: 2
-                color: Qt.alpha(Theme.fg, 0.2)
-
-                Rectangle {
-                    anchors.left: parent.left
-                    anchors.top: parent.top
-                    anchors.bottom: parent.bottom
-                    radius: parent.radius
-                    color: Theme.fg
-                    width: parent.width * (idleMedia.timed ? Math.min(1, idleMedia.pos / idleMedia.len) : 0)
-                }
+                height: 1
+                color: Qt.alpha(Theme.fg, 0.12)
             }
 
             // the workspaces as dots for this screen; the focused one stretches into a bar
@@ -2194,5 +2194,38 @@ PanelWindow {
                 y: 50
             }
         }
+    }
+
+    // the bar's clock flies from its place in the pill to the strip's clock, and the strip's own
+    // clock takes over once it lands; the bar's size is 15 px, the strip's 34 px
+    SystemClock { id: flyTick; precision: SystemClock.Minutes }
+    Text {
+        id: flyClock
+        visible: PillState.clockFlying
+        property real flyT: 0
+        text: Qt.formatDateTime(flyTick.date, UserSettings.clockFormat)
+        color: Theme.fg
+        font.family: Theme.fontFamilyRounded
+        font.pixelSize: 34
+        font.bold: true
+        transformOrigin: Item.Center
+        readonly property real startScale: 15 / font.pixelSize
+        scale: startScale + (1 - startScale) * flyT
+        // the strip's clock: the open panel's centre less half the strip, plus its margin
+        readonly property real endX: root.width / 2 - root.hoverW / 2 + 22 + width / 2
+        readonly property real endY: PillState.pillTop + 42
+        x: PillState.clockX + (endX - PillState.clockX) * flyT - width / 2
+        y: PillState.clockY + (endY - PillState.clockY) * flyT - height / 2
+    }
+
+    NumberAnimation {
+        id: flyAnim
+        target: flyClock
+        property: "flyT"
+        from: 0
+        to: 1
+        duration: PillState.morphMs
+        easing.type: Easing.OutCubic
+        onFinished: PillState.clockFlying = false
     }
 }
