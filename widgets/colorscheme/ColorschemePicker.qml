@@ -196,6 +196,8 @@ PanelWindow {
     }
 
     function close() {
+        if (PillState.owner === "colorschemes")
+            PillState.returning = true
         startW = PillState.pillWidth
         startH = PillState.pillHeight
         morph.stop()

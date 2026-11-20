@@ -74,10 +74,12 @@ PanelWindow {
 
         // volume readout replaces the contents while it is shown; panels
         // also hide the contents, but they keep the pill's own background
-        readonly property bool volumeOn: Volume.shown && !PillState.active
+        // a panel that is shrinking back into the pill no longer holds the content
+        readonly property bool panelOwns: PillState.active && !PillState.returning
+        readonly property bool volumeOn: Volume.shown && !panelOwns
         // lock readout, shown while Caps or Num Lock is on and the volume readout is not
-        readonly property bool lockOn: Locks.shown && !PillState.active && !Volume.shown
-        readonly property bool contentHidden: PillState.active || Volume.shown || Locks.shown
+        readonly property bool lockOn: Locks.shown && !panelOwns && !Volume.shown
+        readonly property bool contentHidden: panelOwns || Volume.shown || Locks.shown
 
         // Only count width + innerGap if that side actually has visible content
         readonly property int leftW: (workspaces.visible && workspaces.implicitWidth > 0)
@@ -109,7 +111,7 @@ PanelWindow {
 
         // non-origin bars fade the whole pill; the origin keeps its background
         // so the picker card can take over from the same spot
-        opacity: PillState.active ? 0 : 1
+        opacity: pill.panelOwns ? 0 : 1
         Behavior on opacity {
             NumberAnimation { duration: 120; easing.type: Easing.OutQuad }
         }

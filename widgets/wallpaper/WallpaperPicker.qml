@@ -244,6 +244,8 @@ PanelWindow {
     }
 
     function close() {
+        if (PillState.owner === "wallpapers")
+            PillState.returning = true
         startW = PillState.pillWidth
         startH = PillState.pillHeight
         morph.stop()

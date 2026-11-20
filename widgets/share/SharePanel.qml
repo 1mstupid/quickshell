@@ -44,6 +44,8 @@ PanelWindow {
     }
 
     function closePanel() {
+        if (PillState.owner === "share")
+            PillState.returning = true
         morph.stop()
         morph.from = root.t
         morph.to = 0

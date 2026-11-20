@@ -291,6 +291,8 @@ PanelWindow {
 
     function close() {
         if (!visible) return;
+        if (PillState.owner === "applauncher")
+            PillState.returning = true;
         startW = PillState.pillWidth;
         startH = PillState.pillHeight;
         morph.stop();

@@ -131,6 +131,8 @@ PanelWindow {
     }
 
     function closeMenu() {
+        if (PillState.owner === "powermenu")
+            PillState.returning = true
         startW = PillState.pillWidth
         startH = PillState.pillHeight
         taken = false
