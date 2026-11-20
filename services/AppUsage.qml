@@ -148,7 +148,7 @@ Singleton {
             const last = closeSent[w.id] ?? 0
             if ((blocked(w.app_id) || outOfFocus(w.app_id) || scheduledBlock(w.app_id)
                     || taskGated(w.app_id)) && now - last >= 10000) {
-                Hyprland.dispatch("closewindow address:" + w.id)
+                Hyprland.dispatch('hl.dsp.window.close({ window = "' + w.id + '" })')
                 next[w.id] = now
             } else if (last) {
                 next[w.id] = last
