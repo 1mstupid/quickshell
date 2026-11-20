@@ -362,6 +362,8 @@ PanelWindow {
             return
         stage = ""
         FocusNotchState.openRequested = false
+        if (PillState.owner === "focus")
+            PillState.returning = true
         // the strip's clock fades out on close, the reverse of the fade in
         fadeIn.stop()
         if (!focusOn)
