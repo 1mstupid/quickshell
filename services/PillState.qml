@@ -11,6 +11,9 @@ QtObject {
     // which panel owns the pill: "", "wallpapers", "colorschemes", "applauncher", "clipboard", "focus", "share", or "lock"
     property string owner: ""
     readonly property bool active: owner !== ""
+    // true from the start of a panel's close until the pill is released: the panel is shrinking
+    // back into the pill, so the bar's content returns with it instead of after the morph
+    property bool returning: false
 
     // how long a panel takes to grow out of the pill, and to go back: the same for all of them
     readonly property int morphMs: Math.round(UserSettings.morphMs)
@@ -37,13 +40,14 @@ QtObject {
     // once nothing owns the pill, so a stale card never starts a later panel.
     property real takeoverW: 0
     property real takeoverH: 0
-    onOwnerChanged: if (owner === "") { takeoverW = 0; takeoverH = 0 }
+    onOwnerChanged: if (owner === "") { takeoverW = 0; takeoverH = 0; returning = false }
 
     // A panel asks for the pill with its name. A switch always goes through at once: the
     // panel giving way hands its card over (giveWay), so a quick switch does not cut a morph
     // short and nothing waits. Refusing it would drop the keypress instead.
     function claim(name) {
         owner = name
+        returning = false
         return true
     }
 

@@ -53,6 +53,9 @@ Item {
 
     // 0 = the bar pill, 1 = the full band
     property real t: 0
+    // a card closed back to the pill is hidden there: the elastic close reaches the pill early, and
+    // a card left over it hid the bar's content until the morph finished
+    onTChanged: if (morph.running && morph.to === 0 && t <= 0) visible = false
 
     property var wallpapers: []
     // the search: typed straight away, there is no field to focus
@@ -231,6 +234,8 @@ Item {
     }
 
     function close() {
+        if (PillState.owner === "wallpapers")
+            PillState.returning = true
         startW = PillState.pillWidth
         startH = PillState.pillHeight
         morph.stop()
