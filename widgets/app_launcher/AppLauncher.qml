@@ -6,27 +6,13 @@ import "../../services"
 import "../notch"
 import "Modes.js" as Modes
 
-// Top-anchored launcher. Grows out of the bar pill, the same way the
-// wallpaper picker and clipboard do.
-PanelWindow {
+// The launcher grows out of the bar pill, the same way the wallpaper picker does. It is an
+// item of the origin bar's window (Bar.qml), so it drops from the pill with no seam.
+Item {
     id: root
 
-    screen: PillState.originScreen
     visible: false
-
-    anchors {
-        top: true
-        left: true
-        right: true
-    }
-    implicitHeight: PillState.pillTop + maxPanelH + 12
-
-    color: "transparent"
-    exclusionMode: ExclusionMode.Ignore
-
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: root.visible && PillState.owner === "applauncher" ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
-    WlrLayershell.namespace: "quickshell-launcher"
+    anchors.fill: parent
 
     IpcHandler {
         target: "applauncher"
@@ -484,7 +470,8 @@ PanelWindow {
         value: root.mode === "file" ? root.searchQuery.trim() : ""
     }
 
-    mask: Region { item: outline }
+    // only the card takes clicks: the bar's window masks its input to this while the launcher is open
+    readonly property Item maskItem: outline
 
     Notch {
         id: outline
