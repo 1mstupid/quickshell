@@ -327,9 +327,29 @@ PanelWindow {
         expandAnim.start()
     }
 
+    // A hovered strip closes when the pointer leaves it after having been in it, or after a
+    // moment when the pointer never reaches it (an accidental hover over the pill). A new
+    // surface gets no pointer until it moves, so a leave before any entry is not a leave.
+    property bool stripEntered: false
+    Timer {
+        id: hoverLeave
+        interval: 120
+        onTriggered: if (root.stage === "hover" && !cardHover.hovered) root.close()
+    }
+    Timer {
+        id: hoverIdle
+        interval: 1200
+        onTriggered: if (root.stage === "hover" && !root.stripEntered) root.close()
+    }
+
     function show(next) {
         if (!PillState.claim("focus"))
             return
+        stripEntered = cardHover.hovered
+        hoverIdle.stop()
+        hoverLeave.stop()
+        if (next === "hover")
+            hoverIdle.restart()
         // a card the previous panel gave up: grow from it, with the strip kept hidden
         const from = PillState.takeOver()
         takeW = from.taken ? from.w : 0
@@ -354,6 +374,8 @@ PanelWindow {
         expand = 0
         stage = ""
         FocusNotchState.openRequested = false
+        hoverIdle.stop()
+        hoverLeave.stop()
         visible = false
     }
 
@@ -362,6 +384,8 @@ PanelWindow {
             return
         stage = ""
         FocusNotchState.openRequested = false
+        hoverIdle.stop()
+        hoverLeave.stop()
         if (PillState.owner === "focus")
             PillState.returning = true
         // the strip's clock fades out on close, the reverse of the fade in
@@ -405,11 +429,9 @@ PanelWindow {
     Connections {
         target: FocusNotchState
         function onPillHoveredChanged() {
-            if (FocusNotchState.pillHovered) {
-                if (root.canTake)
-                    root.show("hover")
-            }
-            // leaving does not close a hovered strip: it is pinned until clicked
+            // a strip already showing stays as it is; the strip's own leave or the idle timer closes it
+            if (FocusNotchState.pillHovered && root.stage === "" && root.canTake)
+                root.show("hover")
         }
         function onOpenRequestedChanged() {
             // the notch is off or has no page on: a request to open it is dropped
@@ -474,6 +496,15 @@ PanelWindow {
 
         HoverHandler {
             id: cardHover
+            onHoveredChanged: {
+                if (hovered) {
+                    root.stripEntered = true
+                    hoverIdle.stop()
+                    hoverLeave.stop()
+                } else if (root.stage === "hover") {
+                    hoverLeave.restart()
+                }
+            }
         }
 
         // a click on the hovered strip opens the panel; one on the open panel stays on it
