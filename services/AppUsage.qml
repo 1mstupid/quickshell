@@ -147,6 +147,20 @@ Singleton {
             + "hl.dispatch(hl.dsp.window.close({ window = w })) break end end"])
     }
 
+    // true while an app is blocked right now. Unlike blocked(), this changes nothing,
+    // so the launcher can ask about every entry.
+    function blockedNow(app) {
+        if (!app)
+            return false
+        const rec = days[dayKey()]
+        if (rec && (rec.blocked ?? []).indexOf(app) >= 0)
+            return true
+        const lim = limits[app]
+        if (lim && rec && (rec.seconds[app] ?? 0) / 60 >= lim)
+            return true
+        return outOfFocus(app) || scheduledBlock(app) || taskGated(app)
+    }
+
     // ask each open window of a blocked app to close, retrying every 10 s
     // while it stays open (an app may show a save prompt first). Blocked means
     // over its limit, outside focus mode during a work session, in a scheduled
