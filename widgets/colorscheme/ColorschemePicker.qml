@@ -18,31 +18,18 @@ import "Colorschemes.js" as Schemes
 // shown behind its row, drawn from its folder in ~/.local/share/wallpapers, if it has one.
 // The scheme in use is remembered in ~/.local/state/lumin/colorscheme-current, and the
 // picker opens on it.
-PanelWindow {
+Item {
     id: root
 
-    // sits on the origin screen, at the top edge, under the bar pill
-    screen: PillState.originScreen
+    // a child of the origin bar's window (Bar.qml), so the band drops from the pill with no seam;
+    // the bar's window takes keys and clicks for it
     visible: false
-
-    anchors {
-        top: true
-        left: true
-        right: true
-    }
-    implicitHeight: PillState.pillTop + bandHeight + 12
-
-    exclusionMode: ExclusionMode.Ignore
-    color: "transparent"
-
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: root.visible && PillState.owner === "colorschemes" ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
-    WlrLayershell.namespace: "quickshell-colorschemes"
+    anchors.fill: parent
 
     // the band: the search row, a rule, and a list of rows that scrolls when it is longer
     // than the band. The chosen row is taller than the others; the list shows four plain
     // rows and the chosen one.
-    property int bandWidth: Math.min(460, (root.screen ? root.screen.width : 1920) - 48)
+    property int bandWidth: Math.min(460, root.width - 48)
     property int pad: 14
     property int headerH: 22
     property int rowH: 40
@@ -413,8 +400,8 @@ PanelWindow {
         radius: 26
     }
 
-    // only the band takes clicks; everything around it passes through
-    mask: Region { item: outline }
+    // only the band takes clicks: the bar's window masks its input to this while the picker is open
+    readonly property Item maskItem: outline
 
     // search row: the magnifier, what is typed (or what to type), and which row of how
     // many. Fades in during the second half of the morph, like the row.

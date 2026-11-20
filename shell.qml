@@ -24,7 +24,6 @@ import "./widgets/share"
 
 ShellRoot {
 
-    ColorschemePicker {}
 
     AppLauncher {}
 

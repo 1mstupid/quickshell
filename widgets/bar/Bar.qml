@@ -8,6 +8,7 @@ import "./media"
 import "../notch"
 import "../../services/menu"
 import "../wallpaper"
+import "../colorscheme"
 
 PanelWindow {
     id: root
@@ -25,7 +26,7 @@ PanelWindow {
     anchors { top: true; left: true; right: true }
 
     WlrLayershell.layer: WlrLayer.Top
-    WlrLayershell.keyboardFocus: pickerOpen && PillState.owner === "wallpapers" ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: openBand !== null ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     // notch: the bar sits flush with the top edge; pill: it floats a little below it. Every
     // panel grows from here, through PillState.pillTop.
@@ -45,8 +46,10 @@ PanelWindow {
     visible: Theme.barStateReady && shown
 
     // while the picker is open the pill is non-interactive, so clicks pass through
-    readonly property bool pickerOpen: isOrigin && pickerLoader.item !== null && pickerLoader.item.visible
-    mask: Region { item: root.pickerOpen ? pickerLoader.item.maskItem : (PillState.active && !root.isOrigin ? null : hoverZone) }
+    // the band of whichever picker is open on the origin screen, or null
+    readonly property Item openBand: pickerLoader.item?.visible ? pickerLoader.item.maskItem
+        : colorLoader.item?.visible ? colorLoader.item.maskItem : null
+    mask: Region { item: root.openBand ? root.openBand : (PillState.active && !root.isOrigin ? null : hoverZone) }
 
     // the focus notch's pointer area: the pill with a margin, so a near miss still opens it
     Item {
@@ -479,11 +482,17 @@ PanelWindow {
         }
     }
 
-    // the wallpaper picker lives in the origin bar's window, so it drops from the pill with no seam
+    // the pickers live in the origin bar's window, so they drop from the pill with no seam
     Loader {
         id: pickerLoader
         active: root.isOrigin
         anchors.fill: parent
         sourceComponent: WallpaperPicker {}
+    }
+    Loader {
+        id: colorLoader
+        active: root.isOrigin
+        anchors.fill: parent
+        sourceComponent: ColorschemePicker {}
     }
 }
