@@ -33,7 +33,8 @@ Singleton {
     // targets closed while tasks are owed, and the minutes that clear one
     property var taskGateTargets: []
     property int taskGateMinutes: 10
-    // { "helium": "Internet" } from [categories]; unlisted apps are "Other"
+    // { "helium": "Internet" } from [categories]: an override for apps whose
+    // desktop entry category is not what you want
     property var categories: ({})
     // app ids whose focus time counts toward the focus widget; a pomodoro always counts
     property var focusApps: []
@@ -412,6 +413,7 @@ Singleton {
         categories = m
     }
 
+    // config.toml wins over the desktop entry, so an override can still be set
     function categoryOf(app) {
         if (categories[app])
             return categories[app]
@@ -419,6 +421,26 @@ Singleton {
             if (k.endsWith("*") && app.startsWith(k.slice(0, -1)))
                 return categories[k]
         }
+        return desktopCategoryOf(app)
+    }
+
+    // freedesktop main categories, in order of preference: an entry listed as
+    // "Network;WebBrowser" is filed under Network
+    readonly property var mainCategories: [
+        "Network", "Development", "Graphics", "AudioVideo", "Audio", "Video",
+        "Office", "Game", "Education", "Science", "Utility", "System", "Settings"
+    ]
+
+    // the main category from the desktop entry whose class or id is this app
+    function desktopCategoryOf(app) {
+        if (!app)
+            return "Other"
+        const entry = DesktopEntries.applications.values.find(e => e.startupClass === app || e.id === app)
+        if (!entry || !entry.categories)
+            return "Other"
+        for (const m of mainCategories)
+            if (entry.categories.indexOf(m) >= 0)
+                return m
         return "Other"
     }
 
