@@ -507,10 +507,15 @@ PanelWindow {
         clip: true
         opacity: Math.min(root.imagesOut, Math.max(0, (root.t - 0.5) * 2))
 
-        // animated centre position, so moving between cards glides
+        // animated centre position, so moving between cards glides; the panels' elastic ease and
+        // bounce, so the carousel springs onto the card it lands on
         property real pos: root.currentIndex
         Behavior on pos {
-            NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+            NumberAnimation {
+                duration: PillState.morphMs
+                easing.type: PillState.openEase
+                easing.period: PillState.easePeriod
+            }
         }
 
         Repeater {
