@@ -97,7 +97,7 @@ RowLayout {
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
 
-                onClicked: Hyprland.dispatch("workspace " + modelData.id)
+                onClicked: Hyprland.dispatch('hl.dsp.focus({ workspace = "' + modelData.id + '" })')
             }
         }
     }
