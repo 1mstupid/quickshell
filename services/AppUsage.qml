@@ -354,13 +354,19 @@ Singleton {
         revision++
     }
 
-    // the open toplevels in the shape the rules below read: id, app_id, active
+    // the open toplevels in the shape the rules below read: id, app_id, active.
+    // Hyprland's own class and address are what windowrules and closewindow use.
+    // The Wayland app id is only a fallback: schedules and the task gate skip
+    // any window whose app_id is empty.
     function refreshWindows() {
-        lastWindows = Hyprland.toplevels.values.map(t => ({
-            id: t.address,
-            app_id: t.wayland?.appId ?? "",
-            active: t.activated === true
-        }))
+        lastWindows = Hyprland.toplevels.values.map(t => {
+            const ipc = t.lastIpcObject ?? {}
+            return {
+                id: ipc.address ?? t.address,
+                app_id: ipc.class || t.wayland?.appId || "",
+                active: t.activated === true
+            }
+        })
     }
 
     function flush() {
