@@ -219,7 +219,11 @@ PanelWindow {
     }
 
     function appResults(q) {
-        var vals = DesktopEntries.applications.values;
+        // an entry is hidden if either its StartupWMClass or its id is blocked, since
+        // a window's class may match either one
+        var vals = DesktopEntries.applications.values.filter(function (e) {
+            return !AppUsage.blockedNow(e.startupClass) && !AppUsage.blockedNow(e.id);
+        });
         var list;
 
         if (q !== "") {
