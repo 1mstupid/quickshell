@@ -137,6 +137,16 @@ Singleton {
         return taskGateTargets.some(t => matchesTarget(t, app)) && tasksOwed()
     }
 
+    // hyprctl eval finds the window object, which the close dispatcher takes. Hyprland
+    // compares addresses without the 0x prefix, so the prefix is stripped here.
+    function closeWindow(address) {
+        const hex = String(address).replace(/^0x/, "").replace(/[^0-9a-fA-F]/g, "")
+        Quickshell.execDetached(["hyprctl", "eval",
+            "for _, w in pairs(hl.get_windows()) do "
+            + "if tostring(w.address):gsub(\"^0x\", \"\") == \"" + hex + "\" then "
+            + "hl.dispatch(hl.dsp.window.close({ window = w })) break end end"])
+    }
+
     // ask each open window of a blocked app to close, retrying every 10 s
     // while it stays open (an app may show a save prompt first). Blocked means
     // over its limit, outside focus mode during a work session, in a scheduled
@@ -148,7 +158,7 @@ Singleton {
             const last = closeSent[w.id] ?? 0
             if ((blocked(w.app_id) || outOfFocus(w.app_id) || scheduledBlock(w.app_id)
                     || taskGated(w.app_id)) && now - last >= 10000) {
-                Hyprland.dispatch('hl.dsp.window.close({ window = "' + w.id + '" })')
+                closeWindow(w.id)
                 next[w.id] = now
             } else if (last) {
                 next[w.id] = last
