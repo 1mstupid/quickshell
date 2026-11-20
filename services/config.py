@@ -49,7 +49,7 @@ def dumps(doc):
 
 def read_text(path):
     try:
-        with open(path, encoding="utf-8") as f:
+        with open(path, encoding="utf-8", newline="") as f:
             return f.read()
     except FileNotFoundError:
         return ""
@@ -139,7 +139,7 @@ def write_text(path, text):
     folder = os.path.dirname(path) or "."
     os.makedirs(folder, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=folder, prefix=".config-", suffix=".toml")
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
+    with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
         f.write(text)
     os.replace(tmp, path)
 
