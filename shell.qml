@@ -25,7 +25,6 @@ import "./widgets/share"
 ShellRoot {
 
 
-    AppLauncher {}
 
     PowerMenu {}
 

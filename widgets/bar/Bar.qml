@@ -9,6 +9,7 @@ import "../notch"
 import "../../services/menu"
 import "../wallpaper"
 import "../colorscheme"
+import "../app_launcher"
 
 PanelWindow {
     id: root
@@ -48,7 +49,8 @@ PanelWindow {
     // while the picker is open the pill is non-interactive, so clicks pass through
     // the band of whichever picker is open on the origin screen, or null
     readonly property Item openBand: pickerLoader.item?.visible ? pickerLoader.item.maskItem
-        : colorLoader.item?.visible ? colorLoader.item.maskItem : null
+        : colorLoader.item?.visible ? colorLoader.item.maskItem
+        : launcherLoader.item?.visible ? launcherLoader.item.maskItem : null
     mask: Region { item: root.openBand ? root.openBand : (PillState.active && !root.isOrigin ? null : hoverZone) }
 
     // the focus notch's pointer area: the pill with a margin, so a near miss still opens it
@@ -494,5 +496,11 @@ PanelWindow {
         active: root.isOrigin
         anchors.fill: parent
         sourceComponent: ColorschemePicker {}
+    }
+    Loader {
+        id: launcherLoader
+        active: root.isOrigin
+        anchors.fill: parent
+        sourceComponent: AppLauncher {}
     }
 }
