@@ -43,6 +43,9 @@ PanelWindow {
     property real startW: PillState.pillWidth
     property real startH: PillState.pillHeight
     property real t: 0
+    // a card closed back to the pill is hidden there: the elastic close reaches the pill early, and
+    // a card left over it hid the bar's content until the morph finished
+    onTChanged: if (morph.running && morph.to === 0 && t <= 0) visible = false
 
     property real panelH: chromeH + Math.max(1, Math.min(results.length, maxVisible)) * itemH
     Behavior on panelH {
