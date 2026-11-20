@@ -7,6 +7,7 @@ import "../../services"
 import "./media"
 import "../notch"
 import "../../services/menu"
+import "../wallpaper"
 
 PanelWindow {
     id: root
@@ -24,6 +25,7 @@ PanelWindow {
     anchors { top: true; left: true; right: true }
 
     WlrLayershell.layer: WlrLayer.Top
+    WlrLayershell.keyboardFocus: pickerOpen && PillState.owner === "wallpapers" ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     // notch: the bar sits flush with the top edge; pill: it floats a little below it. Every
     // panel grows from here, through PillState.pillTop.
@@ -31,7 +33,9 @@ PanelWindow {
 
     // the pointer area of the pill also takes a margin below and around it (hoverZone)
     readonly property int hoverPad: 10
-    implicitHeight: topGap + pill.height + hoverPad
+    // the origin bar spans the screen, so the wallpaper picker can drop from the pill inside it;
+    // its input is masked to the pill, or to the picker's band, so the rest passes through
+    implicitHeight: root.isOrigin ? (modelData ? modelData.height : 0) : topGap + pill.height + hoverPad
 
     // hidden bar gives its space back to windows
     readonly property bool showBar: shown && !Overview.open
@@ -41,7 +45,8 @@ PanelWindow {
     visible: Theme.barStateReady && shown
 
     // while the picker is open the pill is non-interactive, so clicks pass through
-    mask: Region { item: PillState.active ? null : hoverZone }
+    readonly property bool pickerOpen: isOrigin && pickerLoader.item !== null && pickerLoader.item.visible
+    mask: Region { item: root.pickerOpen ? pickerLoader.item.maskItem : (PillState.active && !root.isOrigin ? null : hoverZone) }
 
     // the focus notch's pointer area: the pill with a margin, so a near miss still opens it
     Item {
@@ -469,5 +474,13 @@ PanelWindow {
             opacity: pill.contentHidden ? 0 : 1
             Behavior on opacity { NumberAnimation { duration: 120 } }
         }
+    }
+
+    // the wallpaper picker lives in the origin bar's window, so it drops from the pill with no seam
+    Loader {
+        id: pickerLoader
+        active: root.isOrigin
+        anchors.fill: parent
+        sourceComponent: WallpaperPicker {}
     }
 }

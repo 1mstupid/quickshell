@@ -15,32 +15,19 @@ import "Fuzzy.js" as Fuzzy
 // opens on the wallpaper in use, which is remembered in ~/.local/state/lumin/wallpaper-current,
 // and shows the folder that wallpaper is in: a colorscheme's folder (wallpapers/<scheme>/) after
 // the scheme was chosen, since choosing one picks a wallpaper from it.
-PanelWindow {
+Item {
     id: root
 
-    // sits on the origin screen, at the top edge, under the bar pill
-    screen: PillState.originScreen
+    // a child of the origin bar's window (Bar.qml), so the card drops from the pill with no seam;
+    // the bar's window takes keys and clicks for it
     visible: false
-
-    anchors {
-        top: true
-        left: true
-        right: true
-    }
-    implicitHeight: PillState.pillTop + bandHeight + 12
-
-    exclusionMode: ExclusionMode.Ignore
-    color: "transparent"
-
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: root.visible && PillState.owner === "wallpapers" ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
-    WlrLayershell.namespace: "quickshell-wallpapers"
+    anchors.fill: parent
 
     // the panel, and the layout inside it: pad, header, gap, carousel, gap, name, pad
     // wide enough for seven cards in full: the centre one and three each side, with the
     // next one each side cut by the carousel's clip. On a narrower screen more of the
     // outer ones are cut off.
-    property int bandWidth: Math.min(1050, (root.screen ? root.screen.width : 1920) - 48)
+    property int bandWidth: Math.min(1050, root.width - 48)
     property int bandHeight: 230
     property int pad: 14
     property int headerH: 22
@@ -410,8 +397,8 @@ PanelWindow {
         color: "transparent"
     }
 
-    // only the band takes clicks; everything around it passes through
-    mask: Region { item: outline }
+    // only the band takes clicks: the bar's window masks its input to this while the picker is open
+    readonly property Item maskItem: outline
 
     // header: the magnifier, what is typed (or what to type), then the folder in view and
     // shuffle. Fades in during the second half of the morph, like the carousel.
