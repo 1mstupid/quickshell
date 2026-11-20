@@ -1,43 +1,24 @@
 import QtQuick
 import Quickshell
-import Quickshell.Io
+import Quickshell.Hyprland
 import "../../services"
 
-// Workspaces for one output, pushed by `umbriel subscribe workspaces`.
-// No polling: one long-lived process, restarted if it exits.
+// Workspaces for one output, read from Hyprland. The workspace list updates
+// itself, so there is no subprocess to restart. Special workspaces (id <= 0)
+// are left out.
 Item {
     id: root
 
     property string outputName: ""
-    property var workspaces: []
 
-    function apply(line) {
-        let msg
-        try {
-            msg = JSON.parse(line)
-        } catch (e) {
-            return
-        }
-        if (msg.event !== "workspaces")
-            return
-        workspaces = msg.data
-            .filter(w => w.output === outputName)
-            .sort((a, b) => a.index - b.index)
-    }
-
-    Process {
-        id: sub
-        command: ["umbriel", "subscribe", "workspaces"]
-        running: true
-        stdout: SplitParser {
-            onRead: line => root.apply(line)
-        }
-        onExited: restart.restart()
-    }
-
-    Timer {
-        id: restart
-        interval: 1000
-        onTriggered: sub.running = true
-    }
+    readonly property var workspaces: Hyprland.workspaces.values
+        .filter(w => w.id > 0 && w.monitor?.name === outputName)
+        .map(w => ({
+            index: w.id,
+            id: w.id,
+            name: w.name,
+            focused: w.active,
+            occupied: (w.lastIpcObject?.windows ?? 0) > 0
+        }))
+        .sort((a, b) => a.index - b.index)
 }

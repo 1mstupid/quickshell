@@ -2,10 +2,11 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Quickshell.Hyprland
 import "menu"
 
-// App focus time, from `umbriel subscribe windows`. The window with
-// active: true holds keyboard focus, and its elapsed time goes to its app_id.
+// App focus time, from Hyprland's toplevels. The focused toplevel holds
+// keyboard focus, and its elapsed time goes to its app_id.
 // Focus time is time an app listed in [focus] apps (config.toml) has focus, or any
 // time a pomodoro runs; it is kept in 5-minute slots for the focus widget and the
 // Pomodoro page. Totals per day live in app-usage.json in the state folder. Limits,
@@ -50,7 +51,7 @@ Singleton {
     function toggleWidget() { WidgetLayout.toggle("usage") }
     function toggleFocusWidget() { WidgetLayout.toggle("focus") }
 
-    // the window list from the last event, re-checked on each tick
+    // the window list, refreshed when focus moves and on each tick
     property var lastWindows: []
     // window id -> ms of its last close request, kept only for open windows
     property var closeSent: ({})
@@ -147,7 +148,7 @@ Singleton {
             const last = closeSent[w.id] ?? 0
             if ((blocked(w.app_id) || outOfFocus(w.app_id) || scheduledBlock(w.app_id)
                     || taskGated(w.app_id)) && now - last >= 10000) {
-                Quickshell.execDetached(["umbriel", "msg", "window-close:" + w.id])
+                Hyprland.dispatch("closewindow address:" + w.id)
                 next[w.id] = now
             } else if (last) {
                 next[w.id] = last
@@ -337,17 +338,11 @@ Singleton {
         dirty = true
     }
 
-    function onWindows(line) {
-        let msg
-        try {
-            msg = JSON.parse(line)
-        } catch (e) {
-            return
-        }
-        if (msg.event !== "windows")
-            return
+    // focus moved: bank the time of the last app, then start the new one
+    function onFocusChanged() {
         credit()
-        const w = msg.data.find(x => x.active === true)
+        refreshWindows()
+        const w = lastWindows.find(x => x.active === true)
         const app = w ? w.app_id : ""
         if (app !== currentApp) {
             const now = Date.now()
@@ -355,9 +350,17 @@ Singleton {
             currentApp = app
             sessionStart = now
         }
-        lastWindows = msg.data
         enforce(lastWindows)
         revision++
+    }
+
+    // the open toplevels in the shape the rules below read: id, app_id, active
+    function refreshWindows() {
+        lastWindows = Hyprland.toplevels.values.map(t => ({
+            id: t.address,
+            app_id: t.wayland?.appId ?? "",
+            active: t.activated === true
+        }))
     }
 
     function flush() {
@@ -502,30 +505,22 @@ Singleton {
         function toggleFocus(): void { root.toggleFocusWidget() }
     }
 
-    Process {
-        id: sub
-        command: ["umbriel", "subscribe", "windows"]
-        running: true
-        stdout: SplitParser {
-            onRead: line => root.onWindows(line)
-        }
-        onExited: restart.restart()
-    }
-
-    Timer {
-        id: restart
-        interval: 1000
-        onTriggered: sub.running = true
+    Connections {
+        target: Hyprland
+        function onActiveToplevelChanged() { root.onFocusChanged() }
     }
 
     // once a second, so the focus counter ticks live; credit() only adds time
-    // that has really passed, so a slow tick never over-counts
+    // that has really passed, so a slow tick never over-counts. The window list
+    // is re-read here too, so a window opened by a blocked app is closed promptly.
     Timer {
         interval: 1000
         repeat: true
         running: true
         onTriggered: {
             root.credit()
+            root.refreshWindows()
+            root.enforce(root.lastWindows)
             root.revision++
         }
     }
