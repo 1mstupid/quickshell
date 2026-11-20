@@ -7,6 +7,7 @@ import "../../services"
 import "./media"
 import "../notch"
 import "../../services/menu"
+import "../wallpaper"
 
 PanelWindow {
     id: root
@@ -24,6 +25,7 @@ PanelWindow {
     anchors { top: true; left: true; right: true }
 
     WlrLayershell.layer: WlrLayer.Top
+    WlrLayershell.keyboardFocus: pickerOpen && PillState.owner === "wallpapers" ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     // notch: the bar sits flush with the top edge; pill: it floats a little below it. Every
     // panel grows from here, through PillState.pillTop.
@@ -31,7 +33,9 @@ PanelWindow {
 
     // the pointer area of the pill also takes a margin below and around it (hoverZone)
     readonly property int hoverPad: 10
-    implicitHeight: topGap + pill.height + hoverPad
+    // the origin bar spans the screen, so the wallpaper picker can drop from the pill inside it;
+    // its input is masked to the pill, or to the picker's band, so the rest passes through
+    implicitHeight: root.isOrigin ? (modelData ? modelData.height : 0) : topGap + pill.height + hoverPad
 
     // hidden bar gives its space back to windows
     readonly property bool showBar: shown && !Overview.open
@@ -41,7 +45,8 @@ PanelWindow {
     visible: Theme.barStateReady && shown
 
     // while the picker is open the pill is non-interactive, so clicks pass through
-    mask: Region { item: PillState.active ? null : hoverZone }
+    readonly property bool pickerOpen: isOrigin && pickerLoader.item !== null && pickerLoader.item.visible
+    mask: Region { item: root.pickerOpen ? pickerLoader.item.maskItem : (PillState.active && !root.isOrigin ? null : hoverZone) }
 
     // the focus notch's pointer area: the pill with a margin, so a near miss still opens it
     Item {
@@ -74,10 +79,12 @@ PanelWindow {
 
         // volume readout replaces the contents while it is shown; panels
         // also hide the contents, but they keep the pill's own background
-        readonly property bool volumeOn: Volume.shown && !PillState.active
+        // a panel that is shrinking back into the pill no longer holds the content
+        readonly property bool panelOwns: PillState.active && !PillState.returning
+        readonly property bool volumeOn: Volume.shown && !panelOwns
         // lock readout, shown while Caps or Num Lock is on and the volume readout is not
-        readonly property bool lockOn: Locks.shown && !PillState.active && !Volume.shown
-        readonly property bool contentHidden: PillState.active || Volume.shown || Locks.shown
+        readonly property bool lockOn: Locks.shown && !panelOwns && !Volume.shown
+        readonly property bool contentHidden: panelOwns || Volume.shown || Locks.shown
 
         // Only count width + innerGap if that side actually has visible content
         readonly property int leftW: (workspaces.visible && workspaces.implicitWidth > 0)
@@ -109,8 +116,9 @@ PanelWindow {
 
         // non-origin bars fade the whole pill; the origin keeps its background
         // so the picker card can take over from the same spot
-        opacity: PillState.active ? 0 : 1
+        opacity: pill.panelOwns ? 0 : 1
         Behavior on opacity {
+            enabled: !PillState.returning
             NumberAnimation { duration: 120; easing.type: Easing.OutQuad }
         }
         Behavior on width {
@@ -154,7 +162,7 @@ PanelWindow {
             outputName: root.modelData.name
 
             opacity: pill.contentHidden ? 0 : 1
-            Behavior on opacity { NumberAnimation { duration: 120 } }
+            Behavior on opacity { enabled: !PillState.returning; NumberAnimation { duration: 120 } }
             visible: UserSettings.workspaces
         }
 
@@ -167,7 +175,7 @@ PanelWindow {
             spacing: Math.round(4 * Theme.barScale)
 
             opacity: pill.contentHidden ? 0 : 1
-            Behavior on opacity { NumberAnimation { duration: 120 } }
+            Behavior on opacity { enabled: !PillState.returning; NumberAnimation { duration: 120 } }
 
             // media wave
             Network {
@@ -467,7 +475,15 @@ PanelWindow {
             anchors.verticalCenter: parent.verticalCenter
 
             opacity: pill.contentHidden ? 0 : 1
-            Behavior on opacity { NumberAnimation { duration: 120 } }
+            Behavior on opacity { enabled: !PillState.returning; NumberAnimation { duration: 120 } }
         }
+    }
+
+    // the wallpaper picker lives in the origin bar's window, so it drops from the pill with no seam
+    Loader {
+        id: pickerLoader
+        active: root.isOrigin
+        anchors.fill: parent
+        sourceComponent: WallpaperPicker {}
     }
 }
