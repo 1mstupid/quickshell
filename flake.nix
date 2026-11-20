@@ -38,11 +38,7 @@
       };
     in {
       quickshell-files = files;
-      default = wrappers.wrappers.quickshell.wrap {
-        inherit pkgs;
-        configDir = files;
-        configFile = "${files}/shell.qml";
-      };
+      default = pkgs.quickshell;
     });
   };
 }
