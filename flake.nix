@@ -3,7 +3,8 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    wrappers.url = "github:lassulus/wrappers";
+    wrappers.url = "github:BirdeeHub/nix-wrapper-modules/ec3ec32509e1bd97cd9886658b04702a2a7b7007";
+    wrappers.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = {
