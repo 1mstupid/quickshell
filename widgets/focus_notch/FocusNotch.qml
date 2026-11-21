@@ -30,6 +30,7 @@ import "../bar"
 //   Focus  the task in hand: its timer, pause, stop and done, and the time tracked today.
 //   Ports  what is listening on this machine, and which of it the network can reach.
 //   Usage  time per app for today, this week or this month, charted by hour or by day.
+//   Buds   the battery of the Galaxy Buds, left, right and case, and how they are worn.
 // The gear at the right of the header, on every page, opens the control panel (ControlPage):
 // a page with no tab, narrower than the others and as tall as its rows, and the gear leaves
 // it again. `qs ipc call drawer toggle` opens it too.
@@ -85,17 +86,18 @@ PanelWindow {
 
     // "" closed, "hover" the strip, "open" the full panel
     property string stage: ""
-    // the open panel's page: "home", "day", "week", "focus", "ports", "usage" or "control", remembered
+    // the open panel's page: "home", "day", "week", "focus", "ports", "usage", "share", "buds" or "control", remembered
     // across openings (the control page is not: it is left when the panel closes)
     // a page the settings turn off is not shown; the first one that is on takes its place
     readonly property string tab: FocusNotchState.pageOn(FocusNotchState.page) ? FocusNotchState.page : (pages[0] ?? "home")
-    readonly property var pages: ["home", "day", "week", "focus", "ports", "usage", "share"].filter(FocusNotchState.pageOn)
+    readonly property var pages: ["home", "day", "week", "focus", "ports", "usage", "share", "buds"].filter(FocusNotchState.pageOn)
     // the strip's tabs, minus the pages the settings turn off
     readonly property var tabList: [{ key: "home", glyph: "󰋜", name: "Home" },
                                     { key: "work", glyph: "󰸗", name: "Work" },
                                     { key: "ports", glyph: "󰈀", name: "Ports" },
                                     { key: "usage", glyph: "󰄧", name: "Usage" },
-                                    { key: "share", glyph: "󰈔", name: "Share" }].filter(t => FocusNotchState.pageOn(t.key))
+                                    { key: "share", glyph: "󰈔", name: "Share" },
+                                    { key: "buds", glyph: "󰋋", name: "Buds" }].filter(t => FocusNotchState.pageOn(t.key))
     readonly property int pageIndex: Math.max(0, pages.indexOf(tab))
     // Work is Day or Week; the Work tab returns to the one last shown
     property string lastWork: "day"
@@ -116,6 +118,12 @@ PanelWindow {
         target: Ports
         property: "watching"
         value: root.stage === "open" && root.tab === "ports"
+    }
+    // GalaxyBudsClient only runs while the Buds page is on screen
+    Binding {
+        target: Buds
+        property: "watching"
+        value: root.stage === "open" && root.tab === "buds"
     }
     onStageChanged: if (stage === "open") keyHost.forceActiveFocus()
     // 0 = the bar pill, 1 = the strip; 0 = the strip, 1 = the full panel
@@ -2231,6 +2239,14 @@ PanelWindow {
             // ── Share: the files queued for a LocalSend send ───────────────
             SharePage {
                 visible: root.tab === "share"
+                y: 40
+                width: panel.width
+                height: panel.height - y
+            }
+
+            // ── Buds: the battery of the Galaxy Buds ───────────────────────
+            BudsPage {
+                visible: root.tab === "buds"
                 y: 40
                 width: panel.width
                 height: panel.height - y
