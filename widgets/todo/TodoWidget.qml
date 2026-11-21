@@ -45,7 +45,13 @@ PanelWindow {
 
     // task rows shown at most; what does not fit is counted in a "+N more" line
     readonly property int maxRows: 8
-    readonly property var rows: buildRows(Todo.items, Todo.today)
+    // the minute is read on the minute, not every second: no polling
+    SystemClock {
+        id: clock
+        precision: SystemClock.Minutes
+    }
+    readonly property int nowMin: clock.date.getHours() * 60 + clock.date.getMinutes()
+    readonly property var rows: buildRows(Todo.items, Todo.today, nowMin)
     readonly property date day: Todo.toDate(Todo.today)
 
     // p1 before p2 before p3, unprioritised last
@@ -53,7 +59,11 @@ PanelWindow {
         return task.priority === 0 ? 4 : task.priority
     }
 
-    function buildRows(items, today) {
+    function minutesOf(hhmm) {
+        return parseInt(hhmm.slice(0, 2)) * 60 + parseInt(hhmm.slice(3, 5))
+    }
+
+    function buildRows(items, today, nowMin) {
         const tomorrow = Todo.addDays(today, 1)
         const order = (a, b) => (a.done - b.done) || (rank(a) - rank(b)) || (a.line - b.line)
         const overdue = items.filter(t => !t.done && t.due < today)
@@ -61,10 +71,15 @@ PanelWindow {
         const now = items.filter(t => t.due === today).sort(order)
         const next = items.filter(t => !t.done && t.due === tomorrow).sort(order)
 
+        // the next timed task still to start today, as the strip writes it
+        const timed = now.filter(t => !t.done && t.time !== "" && minutesOf(t.time) >= nowMin)
+            .sort((a, b) => minutesOf(a.time) - minutesOf(b.time))
         const open = now.filter(t => !t.done).length
-        const head = open > 0
-            ? "You have <b>" + open + "</b> " + (open === 1 ? "task" : "tasks") + " today"
-            : now.length > 0 ? "All done for today" : "Nothing due today"
+        const head = timed.length > 0
+            ? "Next: <b>" + timed[0].title + "</b> " + timed[0].time
+            : open > 0
+                ? "You have <b>" + open + "</b> " + (open === 1 ? "task" : "tasks") + " today"
+                : now.length > 0 ? "All done for today" : "Nothing due today"
 
         const out = []
         let room = root.maxRows
