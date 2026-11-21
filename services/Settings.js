@@ -53,6 +53,7 @@ const SETTINGS = [
     { key: "focusUsage", type: "bool", def: true, group: "widgets", label: "Focus: Usage page" },
     { key: "focusShare", type: "bool", def: true, group: "widgets", label: "Focus: Share page" },
     { key: "focusBuds", type: "bool", def: true, group: "widgets", label: "Focus: Buds page" },
+    { key: "focusTray", type: "bool", def: true, group: "widgets", label: "Focus: Tray page" },
     { key: "todoWidget", type: "bool", def: true, layout: "todo", group: "widgets", label: "Todo" },
     { key: "habitsWidget", type: "bool", def: true, layout: "habits", group: "widgets", label: "Habits" },
     { key: "mediaWidget", type: "bool", def: true, layout: "media", group: "widgets", label: "Media player" },
