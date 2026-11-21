@@ -33,6 +33,7 @@ Singleton {
     property bool focusPorts: Schema.defaultOf("focusPorts")
     property bool focusUsage: Schema.defaultOf("focusUsage")
     property bool focusShare: Schema.defaultOf("focusShare")
+    property bool focusBuds: Schema.defaultOf("focusBuds")
     property bool todoWidget: Schema.defaultOf("todoWidget")
     property bool habitsWidget: Schema.defaultOf("habitsWidget")
     property bool mediaWidget: Schema.defaultOf("mediaWidget")

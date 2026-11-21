@@ -28,12 +28,13 @@ Singleton {
         case "ports": return UserSettings.focusPorts
         case "usage": return UserSettings.focusUsage
         case "share": return UserSettings.focusShare
+        case "buds": return UserSettings.focusBuds
         default: return true
         }
     }
     readonly property bool available: UserSettings.focusNotch
         && (UserSettings.focusHome || UserSettings.focusWork || UserSettings.focusPorts
-            || UserSettings.focusUsage || UserSettings.focusShare)
+            || UserSettings.focusUsage || UserSettings.focusShare || UserSettings.focusBuds)
 
     // The control panel is a page with no tab: the gear on the header opens it, and
     // `before` is the page it goes back to.
