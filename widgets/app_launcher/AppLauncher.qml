@@ -5,6 +5,7 @@ import QtQuick
 import "../../services"
 import "../notch"
 import "Modes.js" as Modes
+import "FileSearch.js" as FileSearch
 
 // The launcher grows out of the bar pill, the same way the wallpaper picker does. It is an
 // item of the origin bar's window (Bar.qml), so it drops from the pill with no seam.
@@ -143,7 +144,7 @@ Item {
             if (Files.entriesFor !== q)
                 return [];
             return Files.entries.map(function (e) {
-                return { kind: "file", title: e.name, subtitle: e.sub, icon: "", glyph: e.glyph, value: e.path, next: e.next };
+                return { kind: "file", title: e.name, subtitle: FileSearch.describe(e, Files.meta[e.path], Date.now()), icon: "", glyph: e.glyph, value: e.path, next: e.next };
             });
         }
 
@@ -736,7 +737,7 @@ Item {
                                 text: appRow.modelData.kind === "file"
                                     ? (appRow.modelData.subtitle || "File")
                                     : appRow.modelData.kind === "folder"
-                                        ? "Folder"
+                                        ? (appRow.modelData.subtitle || "Folder")
                                         : appRow.modelData.subtitle
                                 elide: Text.ElideRight
                                 font.family: Theme.fontFamily

@@ -94,6 +94,46 @@ function parseLs(out, dir, frag, home) {
     })
 }
 
+// "4.2 MB": whole numbers from 10 up, one decimal below
+function fmtSize(bytes) {
+    const units = ["B", "KB", "MB", "GB", "TB"]
+    let v = bytes
+    let i = 0
+    while (v >= 1024 && i < units.length - 1) {
+        v /= 1024
+        i++
+    }
+    if (i === 0)
+        return v + " B"
+    return (v < 10 ? v.toFixed(1) : Math.round(v)) + " " + units[i]
+}
+
+// the time of today's files, the date of older ones; seconds since the epoch in, text out
+function fmtDate(epochSec, nowMs) {
+    const d = new Date(epochSec * 1000)
+    const n = new Date(nowMs)
+    if (d.toDateString() === n.toDateString())
+        return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0")
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    return d.getDate() + " " + months[d.getMonth()] + " " + d.getFullYear()
+}
+
+// the row's second line: where a found file lives, then its size and when it changed.
+// meta is the stat of the path, or undefined while it is still being read.
+function describe(e, meta, nowMs) {
+    const parts = []
+    if (e.dir)
+        parts.push("Folder")
+    else if (e.sub !== "File")
+        parts.push(e.sub)
+    if (meta) {
+        if (!e.dir)
+            parts.push(fmtSize(meta.size))
+        parts.push(fmtDate(meta.mtime, nowMs))
+    }
+    return parts.length > 0 ? parts.join("  ·  ") : e.sub
+}
+
 function parseFd(out, home) {
     const rows = []
 
