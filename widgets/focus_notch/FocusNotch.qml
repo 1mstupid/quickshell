@@ -586,14 +586,22 @@ PanelWindow {
                             font.family: Theme.fontFamilySans
                             font.pixelSize: 11
                         }
-                        // live dot: lit while the clock runs, grey while it is paused
+                        // live dot: lit while the clock runs, grey while it is paused; it breathes while running
                         Rectangle {
+                            id: liveDot
                             visible: root.focusOn
                             anchors.verticalCenter: parent.verticalCenter
                             width: 6
                             height: 6
                             radius: 3
                             color: TaskFocus.running ? Theme.green : Theme.disabled
+
+                            SequentialAnimation on opacity {
+                                running: TaskFocus.running && liveDot.visible
+                                loops: Animation.Infinite
+                                NumberAnimation { to: 0.35; duration: 900; easing.type: Easing.InOutSine }
+                                NumberAnimation { to: 1; duration: 900; easing.type: Easing.InOutSine }
+                            }
                         }
                     }
                     Text {
