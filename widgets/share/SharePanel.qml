@@ -4,9 +4,10 @@ import QtQuick
 import "../../services"
 import "../notch"
 
-// The share panel: a Files Tray and a LocalSend area that grow out of the bar pill when a
-// file is dragged onto it. Click the LocalSend area to send the queue. It closes on its own
-// when a drag leaves it without a drop.
+// The share panel: a shelf of the queued files on the left, and a LocalSend area in the
+// rest of the space. A click on a shelf file opens it; dragging one onto LocalSend sends it
+// alone; a click on LocalSend sends the whole queue. A file dropped on the card joins the
+// shelf. It closes on its own when a drag leaves it without a drop.
 PanelWindow {
     id: root
 
@@ -25,7 +26,7 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "qs-share"
 
-    readonly property int panelW: 240
+    readonly property int panelW: 360
     readonly property int panelH: 96
 
     // 0 = the bar pill, 1 = the full panel
@@ -140,13 +141,111 @@ PanelWindow {
             spacing: 10
             opacity: Math.max(0, (root.t - 0.5) * 2)
 
-            // the LocalSend area: a click sends the whole queue
+            // the shelf: the queued files, one a row. A click opens a file with xdg-open;
+            // a row dragged onto LocalSend sends that file alone.
+            Rectangle {
+                width: 130
+                height: 64
+                radius: 14
+                color: Qt.alpha(Theme.fg, 0.05)
+                clip: true
+
+                Text {
+                    visible: ShareService.queuedFiles.length === 0
+                    anchors.centerIn: parent
+                    text: "drop files here"
+                    color: Qt.alpha(Theme.fg, 0.4)
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 10
+                }
+
+                ListView {
+                    anchors.fill: parent
+                    anchors.margins: 5
+                    spacing: 2
+                    model: ShareService.queuedFiles
+
+                    delegate: Item {
+                        id: shelfRow
+                        required property string modelData
+
+                        width: ListView.view.width
+                        height: 28
+
+                        // the drag moves this proxy and not the row, so the list keeps its place
+                        Item {
+                            id: ghost
+                            width: shelfRow.width
+                            height: shelfRow.height
+                            Drag.active: shelfMa.drag.active
+                            Drag.keys: ["shelf"]
+                            Drag.mimeData: { "text/uri-list": ShareService.fileUrl(shelfRow.modelData) }
+                            Drag.supportedActions: Qt.CopyAction
+                        }
+
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: 8
+                            color: shelfMa.containsMouse ? Qt.alpha(Theme.fg, 0.1) : "transparent"
+                        }
+
+                        Column {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.leftMargin: 7
+                            anchors.rightMargin: 7
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            Text {
+                                width: parent.width
+                                text: shelfRow.modelData.split("/").pop()
+                                elide: Text.ElideRight
+                                color: Theme.fg
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                            }
+                            Text {
+                                width: parent.width
+                                text: shelfRow.modelData.split("/").slice(-2, -1)[0] ?? ""
+                                elide: Text.ElideRight
+                                color: Qt.alpha(Theme.fg, 0.4)
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 9
+                            }
+                        }
+
+                        MouseArea {
+                            id: shelfMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            drag.target: ghost
+                            onReleased: {
+                                ghost.x = 0
+                                ghost.y = 0
+                            }
+                            onClicked: ShareService.openFile(shelfRow.modelData)
+                        }
+                    }
+                }
+            }
+
+            // the LocalSend area: a click sends the whole queue; a shelf file dropped here is sent alone
             Rectangle {
                 width: 200
                 height: 64
                 radius: 14
                 color: sendMa.containsMouse && ShareService.queuedFiles.length > 0
                     ? Qt.alpha(Theme.fg, 0.12) : Qt.alpha(Theme.fg, 0.08)
+
+                DropArea {
+                    anchors.fill: parent
+                    keys: ["shelf"]
+                    onDropped: drop => {
+                        ShareService.send(ShareService.pathsOf(drop.urls))
+                        drop.accept(Qt.CopyAction)
+                    }
+                }
 
                 Column {
                     anchors.centerIn: parent
