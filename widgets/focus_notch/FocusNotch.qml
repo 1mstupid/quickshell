@@ -4,6 +4,8 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Hyprland
 import Quickshell.Services.Notifications
+import Quickshell.Services.Pipewire
+import Quickshell.Services.Mpris
 import "../../services"
 import "../../services/menu"
 import "../notch"
@@ -21,7 +23,8 @@ import "../bar"
 // Home, Work, Ports and Usage; Work holds the Day, Week and Focus pages, and a small
 // switch on a row under the tabs picks between them:
 //   Home   the now-playing card on the left, and the day on the right: the date,
-//          what is on now and what comes next.
+//          what is on now and what comes next. The card's two buttons next to the
+//          transport switch it to the playing sources, or to the audio output.
 //   Day    what is left to do: todo.md's tasks together with today's blocks from
 //          schedule.md. A click puts a row in focus (it does not tick it), the
 //          check on a hovered row ticks it, and the box at the bottom adds a task
@@ -1068,6 +1071,14 @@ PanelWindow {
                 width: panel.width
                 height: panel.height - y
 
+                // what the media card shows: the player, its playing sources, or the
+                // outputs; back to the player whenever the Home page is left
+                property string mediaView: "player"
+                onVisibleChanged: if (!visible) mediaView = "player"
+
+                // the outputs, bound only while their list is on screen
+                readonly property var sinks: Pipewire.nodes.values.filter(n => n.isSink && !n.isStream)
+
                 // now playing, laid out like the reference: art and title on top, the
                 // progress under them, the transport centred at the bottom
                 Item {
@@ -1081,6 +1092,7 @@ PanelWindow {
 
                     Row {
                         id: mediaTop
+                        visible: homeTab.mediaView === "player"
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.top: parent.top
@@ -1160,6 +1172,7 @@ PanelWindow {
                     // elapsed, a thin track, and the time left
                     Item {
                         id: progress
+                        visible: homeTab.mediaView === "player"
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.top: mediaTop.bottom
@@ -1243,6 +1256,7 @@ PanelWindow {
 
                     // previous, play or pause, next: fixed cells, so the three share one centre line
                     Row {
+                        visible: homeTab.mediaView === "player"
                         anchors.horizontalCenter: parent.horizontalCenter
                         anchors.top: progress.bottom
                         anchors.topMargin: 12
@@ -1275,6 +1289,12 @@ PanelWindow {
                             }
                         }
 
+                        // playing sources on the left, output on the right
+                        Transport {
+                            glyph: "≡"
+                            glyphSize: 18
+                            onTapped: homeTab.mediaView = "sources"
+                        }
                         Transport {
                             glyph: "󰑟"
                             allowed: media.player?.canGoPrevious ?? false
@@ -1290,6 +1310,277 @@ PanelWindow {
                             glyph: "󰈑"
                             allowed: media.player?.canGoNext ?? false
                             onTapped: media.player.next()
+                        }
+                        Transport {
+                            glyph: "󰕾"
+                            glyphSize: 18
+                            onTapped: homeTab.mediaView = "output"
+                        }
+                    }
+                }
+
+                // ── Playing sources: the MPRIS players; picking one pins it to the card ──
+                Item {
+                    id: sourcesView
+                    visible: homeTab.mediaView === "sources"
+                    x: mediaCard.x
+                    y: mediaCard.y
+                    width: mediaCard.width
+                    height: mediaCard.height
+
+                    Text {
+                        id: sourcesBack
+                        x: 14
+                        y: 12
+                        text: "‹  Playing sources"
+                        color: backSources.containsMouse ? Theme.accent : Theme.fg
+                        font.family: Theme.fontFamilySans
+                        font.pixelSize: 13
+                        font.weight: Font.DemiBold
+
+                        MouseArea {
+                            id: backSources
+                            anchors.fill: parent
+                            anchors.margins: -6
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: homeTab.mediaView = "player"
+                        }
+                    }
+
+                    ListView {
+                        x: 14
+                        y: sourcesBack.y + sourcesBack.height + 10
+                        width: parent.width - 28
+                        height: parent.height - y - 8
+                        clip: true
+                        spacing: 4
+                        boundsBehavior: Flickable.StopAtBounds
+                        model: Mpris.players.values
+
+                        // nothing to choose from until a player is running
+                        Text {
+                            anchors.centerIn: parent
+                            visible: parent.count === 0
+                            text: "No player running"
+                            color: Qt.alpha(Theme.fg, 0.5)
+                            font.family: Theme.fontFamilySans
+                            font.pixelSize: 12
+                        }
+
+                        delegate: Rectangle {
+                            id: sourceRow
+                            required property var modelData
+                            readonly property bool current: media.player === modelData
+                            readonly property bool playing: modelData.playbackState === MprisPlaybackState.Playing
+
+                            width: ListView.view.width
+                            height: 44
+                            radius: 8
+                            color: current ? Qt.alpha(Theme.fg, 0.1)
+                                 : sourceMouse.containsMouse ? Qt.alpha(Theme.fg, 0.05) : "transparent"
+
+                            Column {
+                                anchors.left: parent.left
+                                anchors.right: sourceState.left
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 8
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 2
+
+                                Text {
+                                    width: parent.width
+                                    text: sourceRow.modelData.trackTitle || sourceRow.modelData.identity
+                                    elide: Text.ElideRight
+                                    color: Theme.fg
+                                    font.family: Theme.fontFamilySans
+                                    font.pixelSize: 13
+                                    font.weight: sourceRow.current ? Font.DemiBold : Font.Normal
+                                }
+                                Text {
+                                    width: parent.width
+                                    text: sourceRow.modelData.identity
+                                    elide: Text.ElideRight
+                                    color: Qt.alpha(Theme.fg, 0.5)
+                                    font.family: Theme.fontFamilySans
+                                    font.pixelSize: 11
+                                }
+                            }
+                            Text {
+                                id: sourceState
+                                anchors.right: parent.right
+                                anchors.rightMargin: 12
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: sourceRow.playing ? "󰕾" : "󰏤"
+                                color: sourceRow.playing ? Theme.accent : Qt.alpha(Theme.fg, 0.4)
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 14
+                            }
+
+                            MouseArea {
+                                id: sourceMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    media.manual = sourceRow.modelData
+                                    homeTab.mediaView = "player"
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ── Output: the audio sinks, and the volume of the default one ──
+                Item {
+                    id: outputView
+                    visible: homeTab.mediaView === "output"
+                    x: mediaCard.x
+                    y: mediaCard.y
+                    width: mediaCard.width
+                    height: mediaCard.height
+
+                    // bound only while the list is shown, so the sinks report their names
+                    PwObjectTracker {
+                        objects: outputView.visible ? homeTab.sinks : []
+                    }
+
+                    Text {
+                        id: outputBack
+                        x: 14
+                        y: 12
+                        text: "‹  Output"
+                        color: backOutput.containsMouse ? Theme.accent : Theme.fg
+                        font.family: Theme.fontFamilySans
+                        font.pixelSize: 13
+                        font.weight: Font.DemiBold
+
+                        MouseArea {
+                            id: backOutput
+                            anchors.fill: parent
+                            anchors.margins: -6
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: homeTab.mediaView = "player"
+                        }
+                    }
+
+                    Column {
+                        id: sinkList
+                        x: 14
+                        y: outputBack.y + outputBack.height + 10
+                        width: outputView.width - 28
+                        spacing: 2
+
+                        Repeater {
+                            model: homeTab.sinks
+
+                            Rectangle {
+                                id: sinkRow
+                                required property var modelData
+                                readonly property bool current: Pipewire.defaultAudioSink === modelData
+
+                                width: sinkList.width
+                                height: 32
+                                radius: 8
+                                color: sinkMouse.containsMouse ? Qt.alpha(Theme.fg, 0.05) : "transparent"
+
+                                Text {
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: 12
+                                    anchors.right: sinkCheck.left
+                                    anchors.rightMargin: 8
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: sinkRow.modelData.description || sinkRow.modelData.name
+                                    elide: Text.ElideRight
+                                    color: sinkRow.current ? Theme.fg : Qt.alpha(Theme.fg, 0.7)
+                                    font.family: Theme.fontFamilySans
+                                    font.pixelSize: 13
+                                    font.weight: sinkRow.current ? Font.DemiBold : Font.Normal
+                                }
+                                Text {
+                                    id: sinkCheck
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: 12
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: sinkRow.current ? "✓" : ""
+                                    color: Theme.accent
+                                    font.family: Theme.fontFamilySans
+                                    font.pixelSize: 13
+                                }
+
+                                MouseArea {
+                                    id: sinkMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: Pipewire.preferredDefaultAudioSink = sinkRow.modelData
+                                }
+                            }
+                        }
+                    }
+
+                    // the default output's volume, under the list
+                    Item {
+                        id: volumeRow
+                        x: 14
+                        width: outputView.width - 28
+                        height: 20
+                        y: outputView.height - height - 14
+                        visible: Volume.audio !== null
+
+                        Text {
+                            id: volIcon
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "󰕾"
+                            color: Qt.alpha(Theme.fg, 0.6)
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 14
+                        }
+                        Rectangle {
+                            id: volTrack
+                            anchors.left: volIcon.right
+                            anchors.leftMargin: 10
+                            anchors.right: volReadout.left
+                            anchors.rightMargin: 10
+                            anchors.verticalCenter: parent.verticalCenter
+                            height: 4
+                            radius: 2
+                            color: Qt.alpha(Theme.fg, 0.12)
+
+                            Rectangle {
+                                anchors.left: parent.left
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                width: parent.width * Math.max(0, Math.min(1, Volume.audio ? Volume.audio.volume : 0))
+                                radius: parent.radius
+                                color: Theme.accent
+                            }
+                            // taller than the track, so it is easy to hit
+                            MouseArea {
+                                anchors.fill: parent
+                                anchors.topMargin: -8
+                                anchors.bottomMargin: -8
+                                cursorShape: Qt.PointingHandCursor
+                                function set(x) {
+                                    if (Volume.audio)
+                                        Volume.audio.volume = Math.max(0, Math.min(1, x / width))
+                                }
+                                onPressed: m => set(m.x)
+                                onPositionChanged: m => { if (pressed) set(m.x) }
+                            }
+                        }
+                        Text {
+                            id: volReadout
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 28
+                            horizontalAlignment: Text.AlignRight
+                            text: Volume.volume.toString()
+                            color: Qt.alpha(Theme.fg, 0.6)
+                            font.family: Theme.fontFamilyAlt
+                            font.pixelSize: 11
                         }
                     }
                 }
