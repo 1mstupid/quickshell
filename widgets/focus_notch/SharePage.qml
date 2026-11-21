@@ -1,57 +1,117 @@
 import QtQuick
 import "../../services"
 
-// The Share page of the focus notch: the files queued for a LocalSend send, each with a
-// remove x, and cancel and send under them. A file dropped on the page joins the queue.
+// The Share page of the focus notch: the shelf of the files queued for a LocalSend send, a
+// vertical list on the left, and LocalSend in the rest of the space. A click on a shelf file
+// opens it; a shelf file dragged onto LocalSend is sent alone; cancel and send sit under them.
+// A file dropped on the page joins the shelf.
 Item {
     id: page
 
     readonly property int pad: 18
     readonly property int actionsH: 28
 
-    // the queued files as tiles, wrapping; the area is clipped so a long queue scrolls away
+    // the shelf and LocalSend share the space above the actions: the queued files as a
+    // vertical list on the left, LocalSend in the rest
     Item {
+        id: sharing
         x: page.pad
         y: 12
         width: page.width - 2 * page.pad
         height: page.height - y - page.actionsH - 24
-        clip: true
 
-        Flow {
-            width: parent.width
-            spacing: 8
+        // the shelf: a click opens a file with xdg-open, the x takes it off the queue,
+        // and a row dragged onto LocalSend is sent alone
+        Rectangle {
+            id: shelf
+            width: 150
+            height: parent.height
+            radius: 12
+            color: Qt.alpha(Theme.fg, 0.05)
+            clip: true
 
-            Repeater {
+            Text {
+                visible: ShareService.queuedFiles.length === 0
+                anchors.centerIn: parent
+                text: "drop files here"
+                color: Qt.alpha(Theme.fg, 0.4)
+                font.family: Theme.fontFamilySans
+                font.pixelSize: 12
+            }
+
+            ListView {
+                anchors.fill: parent
+                anchors.margins: 6
+                spacing: 3
                 model: ShareService.queuedFiles
 
-                Rectangle {
-                    id: tile
+                delegate: Item {
+                    id: shelfRow
                     required property string modelData
 
-                    width: 150
-                    height: 40
-                    radius: 10
-                    color: Qt.alpha(Theme.fg, 0.06)
+                    width: ListView.view.width
+                    height: 36
 
-                    Text {
-                        anchors.left: parent.left
-                        anchors.leftMargin: 10
-                        anchors.right: parent.right
-                        anchors.rightMargin: 22
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: tile.modelData.split("/").pop()
-                        elide: Text.ElideRight
-                        color: Theme.fg
-                        font.family: Theme.fontFamilySans
-                        font.pixelSize: 12
+                    // the drag moves this proxy and not the row, so the list keeps its place
+                    Item {
+                        id: ghost
+                        width: shelfRow.width
+                        height: shelfRow.height
+                        Drag.active: rowMa.drag.active
+                        Drag.keys: ["shelf"]
+                        Drag.mimeData: { "text/uri-list": ShareService.fileUrl(shelfRow.modelData) }
+                        Drag.supportedActions: Qt.CopyAction
                     }
 
-                    // the remove x, in the tile's top-right corner
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 8
+                        color: rowMa.containsMouse ? Qt.alpha(Theme.fg, 0.1) : "transparent"
+                    }
+
+                    Column {
+                        anchors.left: parent.left
+                        anchors.right: removeGlyph.left
+                        anchors.leftMargin: 8
+                        anchors.rightMargin: 4
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        Text {
+                            width: parent.width
+                            text: shelfRow.modelData.split("/").pop()
+                            elide: Text.ElideRight
+                            color: Theme.fg
+                            font.family: Theme.fontFamilySans
+                            font.pixelSize: 12
+                        }
+                        Text {
+                            width: parent.width
+                            text: shelfRow.modelData.split("/").slice(-2, -1)[0] ?? ""
+                            elide: Text.ElideRight
+                            color: Qt.alpha(Theme.fg, 0.4)
+                            font.family: Theme.fontFamilySans
+                            font.pixelSize: 10
+                        }
+                    }
+
+                    MouseArea {
+                        id: rowMa
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        drag.target: ghost
+                        onReleased: {
+                            ghost.x = 0
+                            ghost.y = 0
+                        }
+                        onClicked: ShareService.openFile(shelfRow.modelData)
+                    }
+
+                    // the remove x, at the row's right; it sits above the row's own area
                     Text {
                         id: removeGlyph
-                        anchors.top: parent.top
                         anchors.right: parent.right
-                        anchors.topMargin: 3
+                        anchors.verticalCenter: parent.verticalCenter
                         anchors.rightMargin: 6
                         text: "󰅖"
                         color: Qt.alpha(Theme.fg, removeMouse.containsMouse ? 0.9 : 0.4)
@@ -61,24 +121,64 @@ Item {
                     MouseArea {
                         id: removeMouse
                         anchors.right: parent.right
-                        anchors.top: parent.top
+                        anchors.verticalCenter: parent.verticalCenter
                         width: 18
                         height: 18
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: ShareService.removeFile(tile.modelData)
+                        onClicked: ShareService.removeFile(shelfRow.modelData)
                     }
                 }
             }
         }
 
-        Text {
-            visible: ShareService.queuedFiles.length === 0
-            anchors.centerIn: parent
-            text: "drop files here"
-            color: Qt.alpha(Theme.fg, 0.4)
-            font.family: Theme.fontFamilySans
-            font.pixelSize: 12
+        // LocalSend: the rest of the space. A click sends the queue; a shelf row dropped here is sent alone.
+        Rectangle {
+            id: sendArea
+            x: shelf.width + 10
+            width: sharing.width - x
+            height: parent.height
+            radius: 12
+            color: sendMa.containsMouse && ShareService.queuedFiles.length > 0
+                ? Qt.alpha(Theme.fg, 0.12) : Qt.alpha(Theme.fg, 0.06)
+
+            Column {
+                anchors.centerIn: parent
+                spacing: 4
+
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: "LocalSend"
+                    color: Theme.fg
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 14
+                    font.weight: Font.Medium
+                }
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: ShareService.queuedFiles.length > 0 ? "click to send, or drop a file here" : "drop a file here"
+                    color: Qt.alpha(Theme.fg, 0.5)
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 10
+                }
+            }
+
+            DropArea {
+                anchors.fill: parent
+                keys: ["shelf"]
+                onDropped: drop => {
+                    ShareService.send(ShareService.pathsOf(drop.urls))
+                    drop.accept(Qt.CopyAction)
+                }
+            }
+
+            MouseArea {
+                id: sendMa
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: ShareService.send()
+            }
         }
     }
 

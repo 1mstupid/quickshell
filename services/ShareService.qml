@@ -18,6 +18,9 @@ Singleton {
 
     // paths waiting to be sent, in the order they were added
     property var queuedFiles: []
+    // the paths of the send under way, and how many files they expanded to
+    property var sentPaths: []
+    property int sentCount: 0
     property int totalFileCount: 0
     property real totalSize: 0
 
@@ -85,18 +88,40 @@ Singleton {
     }
 
     // drop URLs are file:// URIs; anything else is ignored
-    function addUrls(urls) {
-        dropped = true
+    function pathsOf(urls) {
+        const out = []
         for (let i = 0; i < urls.length; i++) {
             const s = String(urls[i])
             if (s.indexOf("file://") !== 0)
                 continue
             try {
-                addFile(decodeURIComponent(s.slice(7)))
+                out.push(decodeURIComponent(s.slice(7)))
             } catch (e) {
                 // a malformed escape: skip this one
             }
         }
+        return out
+    }
+
+    function addUrls(urls) {
+        dropped = true
+        for (const p of pathsOf(urls))
+            addFile(p)
+    }
+
+    // the URI a shelf row carries when it is dragged out, with each name escaped
+    function fileUrl(path) {
+        return "file://" + path.split("/").map(encodeURIComponent).join("/")
+    }
+
+    // a shelf file opens in whatever the desktop uses for it
+    function openFile(path) {
+        openProc.command = ["xdg-open", path]
+        openProc.running = true
+    }
+
+    Process {
+        id: openProc
     }
 
     function removeFile(path) {
@@ -156,12 +181,15 @@ print(f"{tf}|{ts}")
         }
     }
 
-    // Process queue: recursively expand any directories into all subfiles, then send
-    function send() {
-        if (expanding || sending || queuedFiles.length === 0 || selectedDevice === "")
+    // Process queue: recursively expand any directories into all subfiles, then send.
+    // With a list, only those paths go (a file dragged from the shelf); else the whole queue.
+    function send(paths) {
+        const list = Array.isArray(paths) ? paths : queuedFiles
+        if (expanding || sending || list.length === 0 || selectedDevice === "")
             return
         expanding = true
         lastError = ""
+        sentPaths = list
 
         expandProc.command = ["python3", "-c", `
 import sys, os
@@ -181,7 +209,7 @@ for p in paths:
 
 for fp in final_paths:
     print(fp)
-`].concat(queuedFiles)
+`].concat(list)
         expandProc.running = true
     }
 
@@ -202,6 +230,7 @@ for fp in final_paths:
                 root.lastError = "No valid files to send."
                 return
             }
+            root.sentCount = outputFiles.length
 
             root.sending = true
             sendProc.command = ["localsend-cli", "send", selectedDevice].concat(outputFiles)
@@ -216,11 +245,10 @@ for fp in final_paths:
         onExited: exitCode => {
             root.sending = false
             if (exitCode === 0) {
-                const count = root.totalFileCount
-                const sizeStr = root.formatSize(root.totalSize)
-                const label = count === 1 ? "1 file" : count + " files"
-                root.notify("Transfer Complete", "Sent " + label + " (" + sizeStr + ")", "normal")
-                root.clearQueue()
+                const label = root.sentCount === 1 ? "1 file" : root.sentCount + " files"
+                root.notify("Transfer Complete", "Sent " + label, "normal")
+                // only what was sent leaves the queue; a file dragged alone keeps the rest
+                root.queuedFiles = root.queuedFiles.filter(p => root.sentPaths.indexOf(p) < 0)
                 root.close()
                 return
             }
