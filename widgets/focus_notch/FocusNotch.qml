@@ -559,14 +559,6 @@ PanelWindow {
             opacity: Math.max(0, (root.grow - 0.5) * 2) * Math.max(0, 1 - root.expand * 2) * (root.focusOn ? 1 : 0)
             visible: opacity > 0
 
-            // a faint wash while the clock runs, so a running task reads at a glance
-            Rectangle {
-                anchors.fill: parent
-                radius: 14
-                color: TaskFocus.running ? Qt.alpha(Theme.accent, 0.08) : "transparent"
-                Behavior on color { ColorAnimation { duration: 200 } }
-            }
-
             Row {
                 anchors.fill: parent
                 anchors.leftMargin: 18
