@@ -559,6 +559,14 @@ PanelWindow {
             opacity: Math.max(0, (root.grow - 0.5) * 2) * Math.max(0, 1 - root.expand * 2) * (root.focusOn ? 1 : 0)
             visible: opacity > 0
 
+            // a faint wash while the clock runs, so a running task reads at a glance
+            Rectangle {
+                anchors.fill: parent
+                radius: 14
+                color: TaskFocus.running ? Qt.alpha(Theme.accent, 0.08) : "transparent"
+                Behavior on color { ColorAnimation { duration: 200 } }
+            }
+
             Row {
                 anchors.fill: parent
                 anchors.leftMargin: 18
@@ -586,14 +594,22 @@ PanelWindow {
                             font.family: Theme.fontFamilySans
                             font.pixelSize: 11
                         }
-                        // live dot: lit while the clock runs, grey while it is paused
+                        // live dot: lit while the clock runs, grey while it is paused; it breathes while running
                         Rectangle {
+                            id: liveDot
                             visible: root.focusOn
                             anchors.verticalCenter: parent.verticalCenter
                             width: 6
                             height: 6
                             radius: 3
                             color: TaskFocus.running ? Theme.green : Theme.disabled
+
+                            SequentialAnimation on opacity {
+                                running: TaskFocus.running && liveDot.visible
+                                loops: Animation.Infinite
+                                NumberAnimation { to: 0.35; duration: 900; easing.type: Easing.InOutSine }
+                                NumberAnimation { to: 1; duration: 900; easing.type: Easing.InOutSine }
+                            }
                         }
                     }
                     Text {

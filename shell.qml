@@ -56,11 +56,6 @@ ShellRoot {
 
         Bar {}
     }
-    Variants {
-        model: Quickshell.screens
-
-        ScreenBorder {}
-    }
 
     property var notifications: Notifications.notifications
     // referenced so the singleton starts with the shell

@@ -8,6 +8,7 @@ import "./media"
 import "../notch"
 import "../../services/menu"
 import "../wallpaper"
+import "../focus_notch"
 import "../colorscheme"
 import "../app_launcher"
 
@@ -91,6 +92,19 @@ PanelWindow {
         readonly property bool lockOn: Locks.shown && !panelOwns && !Volume.shown
         readonly property bool contentHidden: panelOwns || Volume.shown || Locks.shown
 
+        // a task in focus replaces the clock with its ring and elapsed time, while the
+        // pill is at rest; the clock comes back when the task ends
+        readonly property bool focusShown: TaskFocus.active && !contentHidden
+        readonly property int focusSeconds: Math.floor(TaskFocus.elapsedMs / 1000)
+        readonly property string focusText: {
+            const h = Math.floor(focusSeconds / 3600)
+            const m = Math.floor(focusSeconds % 3600 / 60)
+            const s = focusSeconds % 60
+            const mm = String(m).padStart(2, "0")
+            const ss = String(s).padStart(2, "0")
+            return h > 0 ? h + ":" + mm + ":" + ss : mm + ":" + ss
+        }
+
         // Only count width + innerGap if that side actually has visible content
         readonly property int leftW: (workspaces.visible && workspaces.implicitWidth > 0)
             ? workspaces.implicitWidth + innerGap : 0
@@ -113,7 +127,7 @@ PanelWindow {
         anchors.horizontalCenter: parent.horizontalCenter
         width: volumeOn ? volumeRow.implicitWidth + 4 * pad
              : lockOn ? lockRow.implicitWidth + 4 * pad
-             : clock.implicitWidth + 2 * (pad + side)
+             : (focusShown ? focusReadout.implicitWidth : clock.implicitWidth) + 2 * (pad + side)
         height: Theme.effectiveBarHeight
 
         // the notch is painted by the Canvas below, so the rectangle itself stays clear
@@ -479,8 +493,35 @@ PanelWindow {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
 
-            opacity: pill.contentHidden ? 0 : 1
+            opacity: pill.contentHidden || pill.focusShown ? 0 : 1
             Behavior on opacity { enabled: !PillState.returning; NumberAnimation { duration: 120 } }
+        }
+
+        // the task in focus: a ring that goes round once an hour, and the time on it;
+        // accent while the clock runs, grey while paused
+        Row {
+            id: focusReadout
+            anchors.centerIn: parent
+            spacing: 6
+
+            opacity: pill.focusShown ? 1 : 0
+            visible: opacity > 0
+            Behavior on opacity { enabled: !PillState.returning; NumberAnimation { duration: 120 } }
+
+            Ring {
+                anchors.verticalCenter: parent.verticalCenter
+                size: 16
+                fraction: TaskFocus.active ? (TaskFocus.elapsedMs % 3600000) / 3600000 : 0
+                tint: TaskFocus.paused ? Theme.disabled : Theme.accent
+            }
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: pill.focusText
+                color: TaskFocus.paused ? Qt.alpha(Theme.fg, 0.5) : Theme.fg
+                font.family: Theme.fontFamilyNum
+                font.pixelSize: Theme.fontSize
+                font.bold: true
+            }
         }
     }
 
