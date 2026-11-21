@@ -1162,11 +1162,15 @@ PanelWindow {
                         }
                     }
 
+                    // fades out while the sources or output view is on, as the card's content does not
                     EqBars {
                         anchors.right: mediaTop.right
                         anchors.verticalCenter: mediaTop.verticalCenter
-                        visible: media.present
+                        opacity: media.present && homeTab.mediaView === "player" ? 1 : 0
+                        visible: opacity > 0
                         playing: media.playing
+
+                        Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
                     }
 
                     // elapsed, a thin track, and the time left
