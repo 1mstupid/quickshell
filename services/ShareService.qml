@@ -18,6 +18,17 @@ Singleton {
 
     // paths waiting to be sent, in the order they were added
     property var queuedFiles: []
+
+    // the tray: favourite files kept to hand. They are apart from the queue and are never
+    // sent with it. Kept in ~/.local/state/lumin/tray, one path a line, so they survive a restart.
+    property var favorites: []
+    FileView {
+        id: favFile
+        path: Quickshell.env("HOME") + "/.local/state/lumin/tray"
+        atomicWrites: true
+        onLoaded: root.favorites = text().split("\n").filter(p => p !== "")
+        onLoadFailed: root.favorites = []
+    }
     property int totalFileCount: 0
     property real totalSize: 0
 
@@ -85,18 +96,55 @@ Singleton {
     }
 
     // drop URLs are file:// URIs; anything else is ignored
-    function addUrls(urls) {
-        dropped = true
+    function pathsOf(urls) {
+        const out = []
         for (let i = 0; i < urls.length; i++) {
             const s = String(urls[i])
             if (s.indexOf("file://") !== 0)
                 continue
             try {
-                addFile(decodeURIComponent(s.slice(7)))
+                out.push(decodeURIComponent(s.slice(7)))
             } catch (e) {
                 // a malformed escape: skip this one
             }
         }
+        return out
+    }
+
+    // files dropped on the tray join the favourites; the panel stays open as for a queue drop
+    function addFavorites(urls) {
+        dropped = true
+        const next = favorites.slice()
+        for (const p of pathsOf(urls)) {
+            if (next.indexOf(p) < 0)
+                next.push(p)
+        }
+        setFavorites(next)
+    }
+
+    function removeFavorite(path) {
+        setFavorites(favorites.filter(p => p !== path))
+    }
+
+    function setFavorites(next) {
+        favorites = next
+        favFile.setText(next.join("\n") + "\n")
+    }
+
+    // a tray file opens in whatever the desktop uses for it
+    function openFile(path) {
+        openProc.command = ["xdg-open", path]
+        openProc.running = true
+    }
+
+    Process {
+        id: openProc
+    }
+
+    function addUrls(urls) {
+        dropped = true
+        for (const p of pathsOf(urls))
+            addFile(p)
     }
 
     function removeFile(path) {

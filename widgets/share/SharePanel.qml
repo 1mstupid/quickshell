@@ -4,9 +4,10 @@ import QtQuick
 import "../../services"
 import "../notch"
 
-// The share panel: a Files Tray and a LocalSend area that grow out of the bar pill when a
-// file is dragged onto it. Click the LocalSend area to send the queue. It closes on its own
-// when a drag leaves it without a drop.
+// The share panel: a LocalSend area and a tray area that grow out of the bar pill when a file
+// is dragged onto it. A file dropped on LocalSend joins the queue, and a click there sends it;
+// a file dropped on the tray is kept as a favourite. It closes on its own when a drag leaves
+// it without a drop.
 PanelWindow {
     id: root
 
@@ -142,7 +143,7 @@ PanelWindow {
 
             // the LocalSend area: a click sends the whole queue
             Rectangle {
-                width: 200
+                width: 110
                 height: 64
                 radius: 14
                 color: sendMa.containsMouse && ShareService.queuedFiles.length > 0
@@ -162,7 +163,7 @@ PanelWindow {
                     }
 
                     Text {
-                        width: 180
+                        width: 100
                         horizontalAlignment: Text.AlignHCenter
                         elide: Text.ElideRight
                         text: ShareService.sending ? "Sending…"
@@ -183,6 +184,52 @@ PanelWindow {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: ShareService.send()
+                }
+            }
+
+            // the tray area: a file dropped here becomes a favourite, kept for later
+            Rectangle {
+                id: trayArea
+                width: 110
+                height: 64
+                radius: 14
+                color: trayDrop.containsDrag ? Qt.alpha(Theme.fg, 0.12) : Qt.alpha(Theme.fg, 0.08)
+
+                Column {
+                    anchors.centerIn: parent
+                    spacing: 3
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: "Tray"
+                        color: Theme.fg
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 13
+                        font.weight: Font.Medium
+                    }
+
+                    Text {
+                        width: 100
+                        horizontalAlignment: Text.AlignHCenter
+                        elide: Text.ElideRight
+                        text: ShareService.favorites.length === 0 ? "drop to keep"
+                            : ShareService.favorites.length + (ShareService.favorites.length === 1 ? " file kept" : " files kept")
+                        color: Qt.alpha(Theme.fg, 0.5)
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 10
+                    }
+                }
+
+                DropArea {
+                    id: trayDrop
+                    anchors.fill: parent
+                    keys: ["text/uri-list"]
+                    onEntered: ShareService.cancelClose()
+                    onExited: ShareService.scheduleClose()
+                    onDropped: drop => {
+                        ShareService.addFavorites(drop.urls)
+                        drop.accept(Qt.CopyAction)
+                    }
                 }
             }
         }
