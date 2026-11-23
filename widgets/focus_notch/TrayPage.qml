@@ -267,15 +267,6 @@ Item {
         }
     }
 
-    // a thin rule under the search, as the wallpaper picker has
-    Rectangle {
-        x: searchRow.x
-        y: searchRow.y + searchRow.height + 6
-        width: searchRow.width
-        height: 1
-        color: Qt.alpha(Theme.fg, 0.08)
-    }
-
     // where the view is: the tray, then each folder gone into; a crumb goes back to it.
     // On the right, the sort mode, which a click or S cycles.
     Item {
