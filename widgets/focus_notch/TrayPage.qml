@@ -1,29 +1,56 @@
 import QtQuick
 import QtQuick.Effects
+import Quickshell
+import Quickshell.Io
 import "../../services"
 import "../wallpaper/Fuzzy.js" as Fuzzy
 import "TrayGlyphs.js" as TrayGlyphs
 
 // The Tray page of the focus notch: the favourite files and folders as a carousel, like the
-// wallpaper picker. Type to search their names (fuzzy). Left and Right move (the notch passes
-// them on), a click on a side card moves to it, a click on the centre card or Enter opens it with
-// xdg-open. A card dragged onto another takes its place; dragged out, it is a file for other
-// apps. The x takes it off the tray. A file dropped on the page is kept. Favourites are not
-// sent with the LocalSend queue.
+// wallpaper picker, and a folder opens into its contents as a tree. Type to search the names
+// (fuzzy). Left and Right move, Up goes to the folder above, Down or Enter opens the centre
+// card (a folder goes in, a file opens with xdg-open). A click on a card does the same.
+// Dragging a file onto a folder card moves it there (gio move). A file from another app
+// dropped on a folder copies into it, and onto the tray itself it is kept. A card dragged
+// out of the notch is a file for other apps. The x takes a favourite off the tray.
 Item {
     id: page
+
+    // the lowest drop area, so the cards above it take the drops they match
+    DropArea {
+        anchors.fill: parent
+        keys: ["text/uri-list"]
+        onDropped: drop => {
+            if (drop.getDataAsString(page.internalMime) !== "")
+                return
+            if (page.dir === "")
+                ShareService.addFavorites(drop.urls)
+            else
+                ShareService.transfer("copy", ShareService.pathsOf(drop.urls), page.dir)
+            drop.accept(Qt.CopyAction)
+        }
+    }
 
     readonly property int pad: 18
     readonly property int bottomH: 40
     readonly property int cardW: 160
     readonly property int cardH: 100
     readonly property real step: cardW * 0.8 + 10
+    // a card dragged inside the notch carries its path under this type
+    readonly property string internalMime: "application/x-tray-path"
 
     property string query: ""
     property int current: 0
-    readonly property var shown: query.trim() === ""
-        ? ShareService.favorites
-        : Fuzzy.rank(ShareService.favorites, query, nameOf)
+    // the folders gone into, outermost first; empty is the tray itself
+    property var trail: []
+    readonly property string dir: trail.length > 0 ? trail[trail.length - 1] : ""
+    // the contents of the folder in view, folders first, and which of them are folders
+    property var children: []
+    property var childFolders: ({})
+    property string listedFor: ""
+
+    readonly property var source: dir === "" ? ShareService.favorites : children
+    readonly property var shown: query.trim() === "" ? source : Fuzzy.rank(source, query, nameOf)
 
     function nameOf(path) {
         return path.split("/").pop()
@@ -33,20 +60,113 @@ Item {
         return /\.(png|jpe?g|webp|gif|bmp)$/i.test(path)
     }
 
+    function isFolder(path) {
+        return dir === "" ? ShareService.folders[path] === true : childFolders[path] === true
+    }
+
+    function isMissing(path) {
+        return dir === "" && ShareService.missing[path] === true
+    }
+
     function stepBy(delta) {
         if (shown.length > 0)
             current = Math.max(0, Math.min(shown.length - 1, current + delta))
     }
 
     function openCurrent() {
-        if (shown.length > 0)
-            ShareService.openFile(shown[current])
+        if (shown.length === 0)
+            return
+        const p = shown[current]
+        if (isFolder(p))
+            enter(p)
+        else
+            ShareService.openFile(p)
     }
 
-    onQueryChanged: current = 0
-    onShownChanged: current = Math.max(0, Math.min(current, shown.length - 1))
+    // Down: into the centre card when it is a folder
+    function enterCurrent() {
+        if (shown.length > 0 && isFolder(shown[current]))
+            enter(shown[current])
+    }
 
-    // the search, typed straight in. Enter opens the centre file; Escape clears the search,
+    function enter(path) {
+        search.text = ""
+        trail = trail.concat([path])
+        current = 0
+        refreshListing()
+    }
+
+    // Up: to the folder above, or out to the tray
+    function up() {
+        if (trail.length === 0)
+            return
+        search.text = ""
+        trail = trail.slice(0, -1)
+        current = 0
+        refreshListing()
+    }
+
+    // the breadcrumb: depth 0 is the tray, depth n the folder n levels in
+    function jump(depth) {
+        if (depth >= trail.length)
+            return
+        search.text = ""
+        trail = trail.slice(0, depth)
+        current = 0
+        refreshListing()
+    }
+
+    function refreshListing() {
+        if (dir === "") {
+            children = []
+            childFolders = ({})
+            return
+        }
+        listedFor = dir
+        listProc.running = false
+        listProc.command = ["timeout", "3", "ls", "-1Ap", "--", dir]
+        listProc.running = true
+    }
+
+    // the contents of a folder: ls marks folders with a trailing slash; dotfiles are left out,
+    // as the launcher leaves them out
+    Process {
+        id: listProc
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (page.listedFor !== page.dir)
+                    return
+                var dirs = {}
+                var folders = []
+                var files = []
+                for (const line of text.split("\n")) {
+                    if (line === "" || line.charAt(0) === ".")
+                        continue
+                    const isDir = line.charAt(line.length - 1) === "/"
+                    const path = page.dir + "/" + (isDir ? line.slice(0, -1) : line)
+                    if (isDir) {
+                        dirs[path] = true
+                        folders.push(path)
+                    } else {
+                        files.push(path)
+                    }
+                }
+                page.childFolders = dirs
+                page.children = folders.concat(files)
+            }
+        }
+    }
+
+    Connections {
+        target: ShareService
+        // a move or copy from the tray: the folder in view may have changed
+        function onTransferred(to) {
+            if (page.trail.length > 0)
+                page.refreshListing()
+        }
+    }
+
+    // the search, typed straight in. Enter opens the centre card; Escape clears the search,
     // and with nothing typed it goes on to close the panel.
     Item {
         id: searchRow
@@ -96,12 +216,59 @@ Item {
         color: Qt.alpha(Theme.fg, 0.08)
     }
 
+    // where the view is: the tray, then each folder gone into; a crumb goes back to it
+    Row {
+        id: crumbs
+        x: page.pad
+        y: 46
+        spacing: 6
+
+        Text {
+            text: "Tray"
+            color: page.trail.length === 0 ? Theme.fg : Qt.alpha(Theme.fg, 0.5)
+            font.family: Theme.fontFamilySans
+            font.pixelSize: 11
+            MouseArea {
+                anchors.fill: parent
+                anchors.margins: -4
+                cursorShape: Qt.PointingHandCursor
+                onClicked: page.jump(0)
+            }
+        }
+        Repeater {
+            model: page.trail
+
+            Row {
+                spacing: 6
+
+                Text {
+                    text: "›"
+                    color: Qt.alpha(Theme.fg, 0.3)
+                    font.family: Theme.fontFamilySans
+                    font.pixelSize: 11
+                }
+                Text {
+                    text: page.nameOf(modelData)
+                    color: index === page.trail.length - 1 ? Theme.fg : Qt.alpha(Theme.fg, 0.5)
+                    font.family: Theme.fontFamilySans
+                    font.pixelSize: 11
+                    MouseArea {
+                        anchors.fill: parent
+                        anchors.margins: -4
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: page.jump(index + 1)
+                    }
+                }
+            }
+        }
+    }
+
     // the carousel: each card is placed from the centre by its distance, so the cards
-    // either side shrink and fade; the centre one is the file in focus
+    // either side shrink and fade; the centre one is the card in focus
     Item {
         id: carousel
         x: page.pad
-        y: 44
+        y: 68
         width: page.width - 2 * page.pad
         height: page.height - y - page.bottomH
         clip: true
@@ -122,8 +289,9 @@ Item {
 
                 readonly property real d: cell.index - carousel.pos
                 readonly property bool focused: page.current === cell.index
-                readonly property bool isDir: ShareService.folders[cell.modelData] === true
+                readonly property bool isDir: page.isFolder(cell.modelData)
                 readonly property bool picture: !cell.isDir && page.isImage(cell.modelData)
+                readonly property bool missing: page.isMissing(cell.modelData)
 
                 width: page.cardW
                 height: page.cardH
@@ -133,24 +301,48 @@ Item {
                 opacity: Math.abs(d) > 2.5 ? 0 : Math.max(0.3, 1 - 0.3 * Math.abs(d))
                 visible: opacity > 0
 
-                // a card dropped on this one takes its place in the tray
+                // a card dragged in from the tray: onto a folder it moves in there; onto a
+                // card of the tray itself it takes that card's place
                 DropArea {
                     anchors.fill: parent
-                    keys: ["tray"]
+                    keys: [page.internalMime]
                     onDropped: drop => {
-                        ShareService.moveFavorite(drop.getDataAsString("application/x-tray-path"), cell.modelData)
+                        const from = drop.getDataAsString(page.internalMime)
+                        if (from !== "" && from !== cell.modelData) {
+                            if (cell.isDir) {
+                                // a folder is not moved into itself or into its own contents
+                                if (cell.modelData.indexOf(from + "/") !== 0)
+                                    ShareService.transfer("move", [from], cell.modelData)
+                            } else if (page.dir === "") {
+                                ShareService.moveFavorite(from, cell.modelData)
+                            }
+                        }
                         drop.accept(Qt.MoveAction)
                     }
                 }
 
-                // the card: dragged to move it in the tray, or out to another app as a file
+                // a file from another app dropped on a folder card is copied into it
+                DropArea {
+                    anchors.fill: parent
+                    enabled: cell.isDir
+                    keys: ["text/uri-list"]
+                    onDropped: drop => {
+                        if (drop.getDataAsString(page.internalMime) !== "")
+                            return
+                        ShareService.transfer("copy", ShareService.pathsOf(drop.urls), cell.modelData)
+                        drop.accept(Qt.CopyAction)
+                    }
+                }
+
+                // the card: dragged to move it, or out to another app as a file
                 Item {
                     id: ghost
                     width: cell.width
                     height: cell.height
                     Drag.active: cardMa.drag.active
-                    Drag.keys: ["tray"]
-                    Drag.supportedActions: Qt.MoveAction | Qt.CopyAction
+                    Drag.keys: [page.internalMime]
+                    Drag.dragType: Drag.Automatic
+                    Drag.supportedActions: Qt.CopyAction | Qt.MoveAction
                     Drag.mimeData: ({
                         "text/uri-list": ShareService.fileUrl(cell.modelData),
                         "application/x-tray-path": cell.modelData
@@ -162,6 +354,7 @@ Item {
                         color: Qt.alpha(Theme.fg, 0.06)
                         border.width: cell.focused ? 2 : 0
                         border.color: Theme.accent
+                        opacity: cell.missing ? 0.45 : 1
 
                         // hidden rounded shape, used only to mask the picture
                         Item {
@@ -209,6 +402,14 @@ Item {
                                 font.family: Theme.fontFamilySans
                                 font.pixelSize: 11
                             }
+                            Text {
+                                visible: cell.missing
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: "missing"
+                                color: Qt.alpha(Theme.fg, 0.5)
+                                font.family: Theme.fontFamilySans
+                                font.pixelSize: 9
+                            }
                         }
 
                         MouseArea {
@@ -221,7 +422,9 @@ Item {
                                 ghost.y = 0
                             }
                             onClicked: {
-                                if (cell.focused)
+                                if (cell.isDir)
+                                    page.enter(cell.modelData)
+                                else if (cell.focused)
                                     page.openCurrent()
                                 else
                                     page.current = cell.index
@@ -256,7 +459,7 @@ Item {
             }
         }
 
-        // arrows, when there is more than one file to move between
+        // arrows, when there is more than one card to move between
         Text {
             visible: page.shown.length > 1 && page.current > 0
             anchors.left: parent.left
@@ -294,14 +497,17 @@ Item {
         Text {
             visible: page.shown.length === 0
             anchors.centerIn: parent
-            text: ShareService.favorites.length === 0 ? "drop files here to keep them" : "no matches"
+            text: page.query.trim() !== "" ? "no matches"
+                : page.dir === "" ? "drop files here to keep them"
+                : "this folder is empty"
             color: Qt.alpha(Theme.fg, 0.4)
             font.family: Theme.fontFamilySans
             font.pixelSize: 12
         }
     }
 
-    // under the carousel: the name of the file in focus, its place, and the x to take it off
+    // under the carousel: the name of the card in focus, its place, and the x to take a
+    // favourite off the tray
     Item {
         x: page.pad
         y: carousel.y + carousel.height + 6
@@ -333,6 +539,7 @@ Item {
             }
             Text {
                 id: removeGlyph
+                visible: page.dir === ""
                 anchors.verticalCenter: parent.verticalCenter
                 text: "󰅖"
                 color: Qt.alpha(Theme.fg, removeMouse.containsMouse ? 0.9 : 0.4)
@@ -347,16 +554,6 @@ Item {
                     onClicked: ShareService.removeFavorite(page.shown[page.current])
                 }
             }
-        }
-    }
-
-    // a file dropped anywhere on the page is kept on the tray
-    DropArea {
-        anchors.fill: parent
-        keys: ["text/uri-list"]
-        onDropped: drop => {
-            ShareService.addFavorites(drop.urls)
-            drop.accept(Qt.CopyAction)
         }
     }
 }

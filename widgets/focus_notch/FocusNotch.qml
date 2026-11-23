@@ -549,7 +549,7 @@ PanelWindow {
                 if (!(root.onControl && controlPage.leaveView()))
                     root.close()
             }
-            // Left and Right are the tray's, on its page; Tab and Shift+Tab move between pages
+            // Left, Right, Up, Down and Enter are the tray's, on its page; Tab and Shift+Tab move between pages
             Keys.onLeftPressed: event => {
                 if (root.tab === "tray") {
                     trayPage.stepBy(-1)
@@ -565,6 +565,18 @@ PanelWindow {
             Keys.onReturnPressed: event => {
                 if (root.tab === "tray") {
                     trayPage.openCurrent()
+                    event.accepted = true
+                }
+            }
+            Keys.onUpPressed: event => {
+                if (root.tab === "tray") {
+                    trayPage.up()
+                    event.accepted = true
+                }
+            }
+            Keys.onDownPressed: event => {
+                if (root.tab === "tray") {
+                    trayPage.enterCurrent()
                     event.accepted = true
                 }
             }

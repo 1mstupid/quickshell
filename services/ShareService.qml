@@ -33,8 +33,12 @@ Singleton {
         onLoadFailed: root.favorites = []
     }
 
-    // which favourites are folders, by path, from one stat over them; a path not yet read is a file
+    // which favourites are folders, and which are gone, by path, from one stat over them;
+    // a path not yet read is a file that is there
     property var folders: ({})
+    property var missing: ({})
+    // a gio move or copy from the tray has finished; `dir` is where the files went
+    signal transferred(string dir)
     function statFavorites() {
         statFavProc.running = false
         if (favorites.length === 0) {
@@ -48,15 +52,24 @@ Singleton {
         id: statFavProc
         stdout: StdioCollector {
             onStreamFinished: {
-                var m = {};
+                var dirs = {};
+                var here = {};
                 for (const line of text.split("\n")) {
                     const a = line.indexOf("\t");
                     if (a < 0)
                         continue;
+                    const path = line.slice(a + 1);
+                    here[path] = true;
                     if (line.slice(0, a) === "directory")
-                        m[line.slice(a + 1)] = true;
+                        dirs[path] = true;
                 }
-                root.folders = m;
+                var gone = {};
+                for (const p of root.favorites) {
+                    if (!here[p])
+                        gone[p] = true;
+                }
+                root.folders = dirs;
+                root.missing = gone;
             }
         }
     }
@@ -176,6 +189,37 @@ Singleton {
     // the URI a tray card carries when it is dragged, with each name escaped
     function fileUrl(path) {
         return "file://" + path.split("/").map(encodeURIComponent).join("/")
+    }
+
+    // move or copy paths into a folder, as the launcher's Files mode does with gio. A move
+    // of a favourite moves it in the tray too, to its new path.
+    function transfer(action, paths, dir) {
+        if (transferProc.running || paths.length === 0)
+            return
+        transferProc.pending = { action: action, paths: paths, dir: dir }
+        transferProc.command = ["gio", action].concat(paths).concat([dir])
+        transferProc.running = true
+    }
+
+    Process {
+        id: transferProc
+        property var pending: ({})
+        stderr: StdioCollector { id: transferErr }
+        onExited: exitCode => {
+            const job = transferProc.pending
+            if (exitCode !== 0) {
+                root.notify("Could not " + job.action, transferErr.text.trim() || "exit " + exitCode, "critical")
+                return
+            }
+            if (job.action === "move") {
+                const moved = root.favorites.map(p => {
+                    const i = job.paths.indexOf(p)
+                    return i < 0 ? p : job.dir + "/" + p.split("/").pop()
+                })
+                root.setFavorites(moved)
+            }
+            root.transferred(job.dir)
+        }
     }
 
     // a tray file opens in whatever the desktop uses for it
