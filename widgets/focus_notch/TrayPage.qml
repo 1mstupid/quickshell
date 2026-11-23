@@ -71,18 +71,20 @@ Item {
         return /\.(png|jpe?g|webp|gif|bmp)$/i.test(path)
     }
 
-    // Left past the first card goes up a folder, so a folder can be left with the arrows alone
+    // Home and End jump to the first and last card, so a long folder needs no run of Left or Right
+    function stepTo(index) {
+        if (shown.length > 0)
+            current = Math.max(0, Math.min(shown.length - 1, index))
+    }
+
+    // Left and Right stop at the ends; going up is a deliberate key, not an overshoot
     function stepBy(delta) {
-        if (delta < 0 && current === 0) {
-            up()
-            return
-        }
         if (shown.length > 0)
             current = Math.max(0, Math.min(shown.length - 1, current + delta))
     }
 
-    // video thumbnails: one frame of each, made by ffmpeg into the cache the first time the card
-    // is near the centre, one at a time, and shown once it is there
+    // thumbnails of clips: a frame of a video, or the cover art of a song, made by ffmpeg into the
+    // cache the first time the card is near the centre, one at a time, and shown once it is there
     readonly property string thumbDir: Quickshell.env("HOME") + "/.cache/lumin/tray-thumbs"
     property var thumbReady: ({})
     property var thumbQueue: []
@@ -106,8 +108,11 @@ Item {
         thumbProc.thumbFor = path
         // the path and the output go in as arguments, never into the script; -n keeps an
         // existing thumbnail, and a clip shorter than a second simply gets none
+        // a video gives its frame a second in; a song gives its cover art, which ffmpeg reads as a
+        // still picture stream, so there is no seek
+        const frame = TrayGlyphs.isAudio(path) ? "-an -frames:v 1" : "-ss 1 -frames:v 1"
         thumbProc.command = ["sh", "-c",
-            "mkdir -p \"$(dirname \"$2\")\" && ffmpeg -v error -n -ss 1 -i \"$1\" -frames:v 1 -vf scale=320:-2 \"$2\"",
+            "mkdir -p \"$(dirname \"$2\")\" && ffmpeg -v error -n -i \"$1\" " + frame + " -vf scale=320:-2 \"$2\"",
             "sh", path, thumbDir + "/" + TrayGlyphs.thumbName(path)]
         thumbProc.running = true
     }
@@ -262,15 +267,6 @@ Item {
         }
     }
 
-    // a thin rule under the search, as the wallpaper picker has
-    Rectangle {
-        x: searchRow.x
-        y: searchRow.y + searchRow.height + 6
-        width: searchRow.width
-        height: 1
-        color: Qt.alpha(Theme.fg, 0.08)
-    }
-
     // where the view is: the tray, then each folder gone into; a crumb goes back to it.
     // On the right, the sort mode, which a click or S cycles.
     Item {
@@ -285,6 +281,23 @@ Item {
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
             spacing: 6
+
+            // up one folder, without going to the first card
+            Text {
+                visible: page.trail.length > 0
+                text: "󰅁 up"
+                color: upMouse.containsMouse ? Theme.fg : Qt.alpha(Theme.fg, 0.5)
+                font.family: Theme.fontFamilySans
+                font.pixelSize: 11
+                MouseArea {
+                    id: upMouse
+                    anchors.fill: parent
+                    anchors.margins: -4
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: page.up()
+                }
+            }
 
             Text {
                 text: "Tray"
@@ -373,12 +386,12 @@ Item {
                 readonly property bool focused: page.current === cell.index
                 readonly property bool isDir: page.isFolder(cell.modelData)
                 readonly property bool picture: !cell.isDir && page.isImage(cell.modelData)
-                readonly property bool video: !cell.isDir && TrayGlyphs.isVideo(cell.modelData)
+                readonly property bool clip: !cell.isDir && TrayGlyphs.isMedia(cell.modelData)
                 readonly property bool near: Math.abs(cell.d) < 3
                 readonly property bool thumbed: page.thumbReady[cell.modelData] === true
 
-                onNearChanged: if (cell.near && cell.video && !cell.thumbed) page.queueThumb(cell.modelData)
-                Component.onCompleted: if (cell.near && cell.video && !cell.thumbed) page.queueThumb(cell.modelData)
+                onNearChanged: if (cell.near && cell.clip && !cell.thumbed) page.queueThumb(cell.modelData)
+                Component.onCompleted: if (cell.near && cell.clip && !cell.thumbed) page.queueThumb(cell.modelData)
                 readonly property bool missing: page.isMissing(cell.modelData)
 
                 width: page.cardW
@@ -410,8 +423,6 @@ Item {
                         anchors.fill: parent
                         radius: 10
                         color: Qt.alpha(Theme.fg, 0.06)
-                        border.width: cell.focused ? 2 : 0
-                        border.color: Theme.accent
                         opacity: cell.missing ? 0.45 : 1
 
                         // hidden rounded shape, used only to mask the picture
@@ -426,9 +437,9 @@ Item {
                         Image {
                             id: thumbImg
                             anchors.fill: parent
-                            visible: cell.picture || cell.video
+                            visible: cell.picture || cell.clip
                             source: cell.picture && cell.near ? "file://" + cell.modelData
-                                : cell.video && cell.thumbed ? page.thumbUrl(cell.modelData)
+                                : cell.clip && cell.thumbed ? page.thumbUrl(cell.modelData)
                                 : ""
                             sourceSize.width: page.cardW * 2
                             fillMode: Image.PreserveAspectCrop

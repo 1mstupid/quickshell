@@ -569,12 +569,18 @@ PanelWindow {
                 }
             }
             // X takes the centre favourite off the tray, S cycles its sort, Backspace goes up a
-            // folder; typing in the search box never reaches here
+            // folder, Home and End jump to the ends; typing in the search box never reaches here
             Keys.onPressed: event => {
                 if (root.tab !== "tray" || event.modifiers !== Qt.NoModifier)
                     return
                 if (event.key === Qt.Key_Backspace) {
                     trayPage.up()
+                    event.accepted = true
+                } else if (event.key === Qt.Key_Home) {
+                    trayPage.stepTo(0)
+                    event.accepted = true
+                } else if (event.key === Qt.Key_End) {
+                    trayPage.stepTo(trayPage.shown.length - 1)
                     event.accepted = true
                 } else if (event.key === Qt.Key_X) {
                     trayPage.removeCurrent()

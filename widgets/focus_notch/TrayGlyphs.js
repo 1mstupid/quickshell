@@ -29,6 +29,21 @@ function glyphFor(path, isDir) {
 
 const VIDEO = ["mp4", "mkv", "webm", "mov", "avi", "m4v"]
 
+const AUDIO = ["mp3", "m4a", "flac", "ogg", "opus", "wav"]
+
+function isAudio(path) {
+    const slash = path.lastIndexOf("/")
+    const dot = path.lastIndexOf(".")
+    if (dot <= slash + 1)
+        return false
+    return AUDIO.indexOf(path.slice(dot + 1).toLowerCase()) >= 0
+}
+
+// a clip has a frame to show: a video's, or an audio file's cover art
+function isMedia(path) {
+    return isVideo(path) || isAudio(path)
+}
+
 function isVideo(path) {
     const slash = path.lastIndexOf("/")
     const dot = path.lastIndexOf(".")
