@@ -7,9 +7,9 @@ import QtQuick
 import "NotificationMeta.js" as Meta
 
 // Notifications. A notification is kept until it is dismissed; its toast is a
-// shorter life: a glyph with a draining ring on the bar's pill. The toast ends when
-// it times out, and the notification stays in the list on the focus notch's Home
-// page. While `muted`, new notifications skip the toast and go straight to that list.
+// shorter life: a pill card under the notch (widgets/notify). The toast ends when it
+// times out, and the notification stays in the list on the focus notch's Home page.
+// While `muted`, new notifications skip the toast and go straight to that list.
 Singleton {
     id: root
 
@@ -22,24 +22,17 @@ Singleton {
     // do not disturb: no toasts, except for critical notifications
     property bool muted: false
 
-    // how long the glyph stays after the last notification arrived
+    // how long the toasts stay after the last notification arrived
     readonly property int toastLifetime: 5000
-    // counts the notifications that got a toast, so the glyph's ring knows when to start over
-    property int arrivals: 0
 
     // { time, quiet } by notification id, see NotificationMeta.js
     property var meta: ({})
 
     readonly property int count: server.trackedNotifications.values.length
-    readonly property int toastCount: server.trackedNotifications.values.filter(n => isToast(n)).length
 
     function isToast(n) { return Meta.isToast(meta, n.id) }
     function timeOf(n) { return Meta.timeOf(meta, n.id) }
     function expire(n) { meta = Meta.expired(meta, n.id) }
-
-    // a critical notification keeps its toast until it is dismissed or seen
-    readonly property bool critical: server.trackedNotifications.values
-        .some(n => isToast(n) && n.urgency === NotificationUrgency.Critical)
 
     // ends the toasts; critical ones only when `includeCritical`, as they never time out
     function endToasts(includeCritical) {
@@ -75,10 +68,8 @@ Singleton {
             root.meta = Meta.arrived(root.meta, live, n.id, Qt.formatTime(new Date(), "hh:mm"), quiet)
             n.tracked = true
             AppUsage.countNotification()
-            if (!quiet) {
-                root.arrivals++
+            if (!quiet)
                 toastTimer.restart()
-            }
 
             // nothing times out of the list, so cap it
             const all = server.trackedNotifications.values

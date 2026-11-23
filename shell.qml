@@ -10,6 +10,7 @@ import "./widgets/bar"
 import "./widgets/bar/media"
 import "./widgets/focus_notch"
 import "./widgets/border"
+import "./widgets/notify"
 import "./widgets/habits"
 import "./widgets/layout"
 import "./widgets/lyrics"
@@ -29,6 +30,8 @@ ShellRoot {
     PowerMenu {}
 
     SharePanel {}
+
+    NotifyStack {}
 
     SettingsWindow {}
 
