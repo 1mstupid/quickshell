@@ -43,13 +43,14 @@ PanelWindow {
         Repeater {
             model: root.shown
 
-            // the slot takes the card's height, so the cards below move as the card opens
+            // the slot is the card's full height from the start: resizing the column or the
+            // window every frame of the opening is what made it choppy
             Item {
                 id: slot
                 required property var modelData
 
                 width: 320
-                height: card.height
+                height: 52
 
                 Rectangle {
                     id: card
