@@ -56,20 +56,36 @@ PanelWindow {
                     readonly property var modelData: slot.modelData
                     readonly property bool critical: modelData.urgency === NotificationUrgency.Critical
                     readonly property var action: modelData.actions.length > 0 ? modelData.actions[0] : null
-                    // a new card starts as a droplet under the notch and opens into the pill
+                    // born at the notch: a bead swells out of its lower edge, falls, then stretches
+                    // into the pill while the content fades in
                     property bool open: false
 
                     anchors.horizontalCenter: parent.horizontalCenter
-                    width: open ? 320 : 20
-                    height: open ? 52 : 20
+                    y: -12
+                    width: 14
+                    height: 14
                     radius: height / 2
                     color: Qt.alpha(Theme.bg, 0.94)
                     clip: true
 
-                    Component.onCompleted: open = true
+                    Component.onCompleted: opening.start()
 
-                    Behavior on width { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
-                    Behavior on height { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+                    SequentialAnimation {
+                        id: opening
+
+                        NumberAnimation { target: card; property: "y"; to: -6; duration: 160; easing.type: Easing.OutQuad }
+                        ParallelAnimation {
+                            NumberAnimation { target: card; property: "y"; to: 0; duration: 200; easing.type: Easing.InQuad }
+                            NumberAnimation { target: card; property: "width"; to: 20; duration: 200 }
+                            NumberAnimation { target: card; property: "height"; to: 20; duration: 200 }
+                        }
+                        ParallelAnimation {
+                            NumberAnimation { target: card; property: "width"; to: 320; duration: 320; easing.type: Easing.OutCubic }
+                            NumberAnimation { target: card; property: "height"; to: 52; duration: 320; easing.type: Easing.OutCubic }
+                            NumberAnimation { target: face; property: "opacity"; to: 1; duration: 200 }
+                        }
+                        ScriptAction { script: card.open = true }
+                    }
 
                     // the card's own click ends its toast; the button sits above it and takes its own
                     MouseArea {
@@ -82,9 +98,7 @@ PanelWindow {
                     Item {
                         id: face
                         anchors.fill: parent
-                        opacity: card.open ? 1 : 0
-
-                        Behavior on opacity { NumberAnimation { duration: 200 } }
+                        opacity: 0
 
                         Text {
                             id: glyph
