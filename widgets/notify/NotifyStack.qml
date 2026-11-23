@@ -43,93 +43,120 @@ PanelWindow {
         Repeater {
             model: root.shown
 
-            Rectangle {
-                id: card
+            // the slot takes the card's height, so the cards below move as the card opens
+            Item {
+                id: slot
                 required property var modelData
 
-                readonly property bool critical: modelData.urgency === NotificationUrgency.Critical
-                readonly property var action: modelData.actions.length > 0 ? modelData.actions[0] : null
-
                 width: 320
-                height: 52
-                radius: height / 2
-                color: Qt.alpha(Theme.bg, 0.94)
+                height: card.height
 
-                // the card's own click ends its toast; the button sits above it and takes its own
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: Notifications.expire(card.modelData)
-                }
-
-                Text {
-                    id: glyph
-                    anchors.left: parent.left
-                    anchors.leftMargin: 18
-                    anchors.verticalCenter: parent.verticalCenter
-                    // nf-md-bell, as the bar used
-                    text: "󰂚"
-                    color: card.critical ? Theme.red : Theme.accent
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 16
-                }
-
-                Column {
-                    anchors.left: glyph.right
-                    anchors.leftMargin: 12
-                    anchors.right: action ? actionButton.left : parent.right
-                    anchors.rightMargin: 12
-                    anchors.verticalCenter: parent.verticalCenter
-
-                    Text {
-                        width: parent.width
-                        text: card.modelData.summary
-                        elide: Text.ElideRight
-                        color: Theme.fg
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 13
-                        font.weight: Font.Medium
-                    }
-                    Text {
-                        width: parent.width
-                        visible: text !== ""
-                        text: card.modelData.body
-                        elide: Text.ElideRight
-                        color: Qt.alpha(Theme.fg, 0.5)
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 11
-                    }
-                }
-
-                // the first action the app offered, as a button; it runs the action and ends the toast
                 Rectangle {
-                    id: actionButton
-                    visible: card.action !== null
-                    anchors.right: parent.right
-                    anchors.rightMargin: 10
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: visible ? actionLabel.implicitWidth + 24 : 0
-                    height: 30
-                    radius: height / 2
-                    color: actionMouse.containsMouse ? Qt.alpha(Theme.accent, 0.9) : Qt.alpha(Theme.accent, 0.75)
+                    id: card
+                    readonly property var modelData: slot.modelData
+                    readonly property bool critical: modelData.urgency === NotificationUrgency.Critical
+                    readonly property var action: modelData.actions.length > 0 ? modelData.actions[0] : null
+                    // a new card starts as a droplet under the notch and opens into the pill
+                    property bool open: false
 
-                    Text {
-                        id: actionLabel
-                        anchors.centerIn: parent
-                        text: card.action ? card.action.text : ""
-                        color: Theme.bg
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 12
-                        font.weight: Font.Medium
-                    }
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: open ? 320 : 20
+                    height: open ? 52 : 20
+                    radius: height / 2
+                    color: Qt.alpha(Theme.bg, 0.94)
+                    clip: true
+
+                    Component.onCompleted: open = true
+
+                    Behavior on width { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+                    Behavior on height { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+
+                    // the card's own click ends its toast; the button sits above it and takes its own
                     MouseArea {
-                        id: actionMouse
                         anchors.fill: parent
-                        hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            card.action.invoke()
-                            Notifications.expire(card.modelData)
+                        onClicked: Notifications.expire(card.modelData)
+                    }
+
+                    // the content fades in once the card is open, so the droplet stays empty
+                    Item {
+                        id: face
+                        anchors.fill: parent
+                        opacity: card.open ? 1 : 0
+
+                        Behavior on opacity { NumberAnimation { duration: 200 } }
+
+                        Text {
+                            id: glyph
+                            anchors.left: parent.left
+                            anchors.leftMargin: 18
+                            anchors.verticalCenter: parent.verticalCenter
+                            // nf-md-bell, as the bar used
+                            text: "󰂚"
+                            color: card.critical ? Theme.red : Theme.accent
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 16
+                        }
+
+                        Column {
+                            anchors.left: glyph.right
+                            anchors.leftMargin: 12
+                            anchors.right: card.action ? actionButton.left : parent.right
+                            anchors.rightMargin: 12
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            Text {
+                                width: parent.width
+                                text: card.modelData.summary
+                                elide: Text.ElideRight
+                                color: Theme.fg
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 13
+                                font.weight: Font.Medium
+                            }
+                            Text {
+                                width: parent.width
+                                visible: text !== ""
+                                text: card.modelData.body
+                                elide: Text.ElideRight
+                                color: Qt.alpha(Theme.fg, 0.5)
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                            }
+                        }
+
+                        // the first action the app offered, as a button; it runs the action and ends the toast
+                        Rectangle {
+                            id: actionButton
+                            visible: card.action !== null
+                            anchors.right: parent.right
+                            anchors.rightMargin: 10
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: visible ? actionLabel.implicitWidth + 24 : 0
+                            height: 30
+                            radius: height / 2
+                            color: actionMouse.containsMouse ? Qt.alpha(Theme.accent, 0.9) : Qt.alpha(Theme.accent, 0.75)
+
+                            Text {
+                                id: actionLabel
+                                anchors.centerIn: parent
+                                text: card.action ? card.action.text : ""
+                                color: Theme.bg
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 12
+                                font.weight: Font.Medium
+                            }
+                            MouseArea {
+                                id: actionMouse
+                                anchors.fill: parent
+                                enabled: card.open
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    card.action.invoke()
+                                    Notifications.expire(card.modelData)
+                                }
+                            }
                         }
                     }
                 }
