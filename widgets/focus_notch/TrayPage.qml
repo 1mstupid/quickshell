@@ -71,6 +71,12 @@ Item {
         return /\.(png|jpe?g|webp|gif|bmp)$/i.test(path)
     }
 
+    // Home and End jump to the first and last card, so a long folder needs no run of Left or Right
+    function stepTo(index) {
+        if (shown.length > 0)
+            current = Math.max(0, Math.min(shown.length - 1, index))
+    }
+
     // Left past the first card goes up a folder, so a folder can be left with the arrows alone
     function stepBy(delta) {
         if (delta < 0 && current === 0) {
@@ -289,6 +295,23 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 6
 
+            // up one folder, without going to the first card
+            Text {
+                visible: page.trail.length > 0
+                text: "󰅁 up"
+                color: upMouse.containsMouse ? Theme.fg : Qt.alpha(Theme.fg, 0.5)
+                font.family: Theme.fontFamilySans
+                font.pixelSize: 11
+                MouseArea {
+                    id: upMouse
+                    anchors.fill: parent
+                    anchors.margins: -4
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: page.up()
+                }
+            }
+
             Text {
                 text: "Tray"
                 color: page.trail.length === 0 ? Theme.fg : Qt.alpha(Theme.fg, 0.5)
@@ -413,8 +436,6 @@ Item {
                         anchors.fill: parent
                         radius: 10
                         color: Qt.alpha(Theme.fg, 0.06)
-                        border.width: cell.focused ? 2 : 0
-                        border.color: Theme.accent
                         opacity: cell.missing ? 0.45 : 1
 
                         // hidden rounded shape, used only to mask the picture
