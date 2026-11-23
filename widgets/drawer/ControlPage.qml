@@ -477,7 +477,7 @@ Item {
                 active: Theme.light
 
                 onClicked: Quickshell.execDetached([
-                    "quickshell", "ipc", "call", "colorschemes", "toggleMode"
+                    "quickshell", "-p", Quickshell.shellDir, "ipc", "call", "colorschemes", "toggleMode"
                 ])
             }
         }

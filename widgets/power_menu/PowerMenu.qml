@@ -230,7 +230,7 @@ PanelWindow {
     // the lock screen is its own shell component, reached over its IPC target
     Process {
         id: procLock
-        command: ["quickshell", "ipc", "call", "lock", "lock"]
+        command: ["quickshell", "-p", Quickshell.shellDir, "ipc", "call", "lock", "lock"]
     }
     Process {
         id: procReboot
