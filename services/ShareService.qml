@@ -33,42 +33,44 @@ Singleton {
         onLoadFailed: root.favorites = []
     }
 
-    // which favourites are folders, and which are gone, by path, from one stat over them;
-    // a path not yet read is a file that is there
-    property var folders: ({})
+    // what each favourite is, by path, from one stat over them: { dir, size, mtime }; and
+    // which are gone
+    property var info: ({})
     property var missing: ({})
-    // a gio move or copy from the tray has finished; `dir` is where the files went
-    signal transferred(string dir)
     function statFavorites() {
         statFavProc.running = false
         if (favorites.length === 0) {
-            folders = ({})
+            info = ({})
+            missing = ({})
             return
         }
-        statFavProc.command = ["timeout", "3", "stat", "-c", "%F\t%n", "--"].concat(favorites)
+        statFavProc.command = ["timeout", "3", "stat", "-c", "%F\t%s\t%Y\t%n", "--"].concat(favorites)
         statFavProc.running = true
     }
     Process {
         id: statFavProc
         stdout: StdioCollector {
             onStreamFinished: {
-                var dirs = {};
-                var here = {};
+                // type, size, mtime in seconds, then the path, which may hold tabs
+                var found = {};
                 for (const line of text.split("\n")) {
                     const a = line.indexOf("\t");
-                    if (a < 0)
+                    const b = a < 0 ? -1 : line.indexOf("\t", a + 1);
+                    const c = b < 0 ? -1 : line.indexOf("\t", b + 1);
+                    if (c < 0)
                         continue;
-                    const path = line.slice(a + 1);
-                    here[path] = true;
-                    if (line.slice(0, a) === "directory")
-                        dirs[path] = true;
+                    found[line.slice(c + 1)] = {
+                        dir: line.slice(0, a) === "directory",
+                        size: parseInt(line.slice(a + 1, b)),
+                        mtime: parseInt(line.slice(b + 1, c))
+                    };
                 }
                 var gone = {};
                 for (const p of root.favorites) {
-                    if (!here[p])
+                    if (!found[p])
                         gone[p] = true;
                 }
-                root.folders = dirs;
+                root.info = found;
                 root.missing = gone;
             }
         }
@@ -176,50 +178,9 @@ Singleton {
         statFavorites()
     }
 
-    // a tray card dropped on another one moves to its place; the paths name the cards, so a
-    // search that hides some of them does not move the wrong one
-    function moveFavorite(from, to) {
-        if (from === to || favorites.indexOf(from) < 0 || favorites.indexOf(to) < 0)
-            return
-        const next = favorites.filter(p => p !== from)
-        next.splice(next.indexOf(to), 0, from)
-        setFavorites(next)
-    }
-
     // the URI a tray card carries when it is dragged, with each name escaped
     function fileUrl(path) {
         return "file://" + path.split("/").map(encodeURIComponent).join("/")
-    }
-
-    // move or copy paths into a folder, as the launcher's Files mode does with gio. A move
-    // of a favourite moves it in the tray too, to its new path.
-    function transfer(action, paths, dir) {
-        if (transferProc.running || paths.length === 0)
-            return
-        transferProc.pending = { action: action, paths: paths, dir: dir }
-        transferProc.command = ["gio", action].concat(paths).concat([dir])
-        transferProc.running = true
-    }
-
-    Process {
-        id: transferProc
-        property var pending: ({})
-        stderr: StdioCollector { id: transferErr }
-        onExited: exitCode => {
-            const job = transferProc.pending
-            if (exitCode !== 0) {
-                root.notify("Could not " + job.action, transferErr.text.trim() || "exit " + exitCode, "critical")
-                return
-            }
-            if (job.action === "move") {
-                const moved = root.favorites.map(p => {
-                    const i = job.paths.indexOf(p)
-                    return i < 0 ? p : job.dir + "/" + p.split("/").pop()
-                })
-                root.setFavorites(moved)
-            }
-            root.transferred(job.dir)
-        }
     }
 
     // a tray file opens in whatever the desktop uses for it
