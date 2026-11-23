@@ -33,30 +33,45 @@ Singleton {
         onLoadFailed: root.favorites = []
     }
 
-    // which favourites are folders, by path, from one stat over them; a path not yet read is a file
-    property var folders: ({})
+    // what each favourite is, by path, from one stat over them: { dir, size, mtime }; and
+    // which are gone
+    property var info: ({})
+    property var missing: ({})
     function statFavorites() {
         statFavProc.running = false
         if (favorites.length === 0) {
-            folders = ({})
+            info = ({})
+            missing = ({})
             return
         }
-        statFavProc.command = ["timeout", "3", "stat", "-c", "%F\t%n", "--"].concat(favorites)
+        statFavProc.command = ["timeout", "3", "stat", "-c", "%F\t%s\t%Y\t%n", "--"].concat(favorites)
         statFavProc.running = true
     }
     Process {
         id: statFavProc
         stdout: StdioCollector {
             onStreamFinished: {
-                var m = {};
+                // type, size, mtime in seconds, then the path, which may hold tabs
+                var found = {};
                 for (const line of text.split("\n")) {
                     const a = line.indexOf("\t");
-                    if (a < 0)
+                    const b = a < 0 ? -1 : line.indexOf("\t", a + 1);
+                    const c = b < 0 ? -1 : line.indexOf("\t", b + 1);
+                    if (c < 0)
                         continue;
-                    if (line.slice(0, a) === "directory")
-                        m[line.slice(a + 1)] = true;
+                    found[line.slice(c + 1)] = {
+                        dir: line.slice(0, a) === "directory",
+                        size: parseInt(line.slice(a + 1, b)),
+                        mtime: parseInt(line.slice(b + 1, c))
+                    };
                 }
-                root.folders = m;
+                var gone = {};
+                for (const p of root.favorites) {
+                    if (!found[p])
+                        gone[p] = true;
+                }
+                root.info = found;
+                root.missing = gone;
             }
         }
     }
@@ -161,16 +176,6 @@ Singleton {
         favorites = next
         favFile.setText(next.join("\n") + "\n")
         statFavorites()
-    }
-
-    // a tray card dropped on another one moves to its place; the paths name the cards, so a
-    // search that hides some of them does not move the wrong one
-    function moveFavorite(from, to) {
-        if (from === to || favorites.indexOf(from) < 0 || favorites.indexOf(to) < 0)
-            return
-        const next = favorites.filter(p => p !== from)
-        next.splice(next.indexOf(to), 0, from)
-        setFavorites(next)
     }
 
     // the URI a tray card carries when it is dragged, with each name escaped

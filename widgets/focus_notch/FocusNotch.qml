@@ -549,7 +549,7 @@ PanelWindow {
                 if (!(root.onControl && controlPage.leaveView()))
                     root.close()
             }
-            // Left and Right are the tray's, on its page; Tab and Shift+Tab move between pages
+            // Left, Right, Up, Down, Enter, X and S are the tray's, on its page; Tab and Shift+Tab move between pages
             Keys.onLeftPressed: event => {
                 if (root.tab === "tray") {
                     trayPage.stepBy(-1)
@@ -565,6 +565,34 @@ PanelWindow {
             Keys.onReturnPressed: event => {
                 if (root.tab === "tray") {
                     trayPage.openCurrent()
+                    event.accepted = true
+                }
+            }
+            // X takes the centre favourite off the tray, S cycles its sort, Backspace goes up a
+            // folder; typing in the search box never reaches here
+            Keys.onPressed: event => {
+                if (root.tab !== "tray" || event.modifiers !== Qt.NoModifier)
+                    return
+                if (event.key === Qt.Key_Backspace) {
+                    trayPage.up()
+                    event.accepted = true
+                } else if (event.key === Qt.Key_X) {
+                    trayPage.removeCurrent()
+                    event.accepted = true
+                } else if (event.key === Qt.Key_S) {
+                    trayPage.cycleSort()
+                    event.accepted = true
+                }
+            }
+            Keys.onUpPressed: event => {
+                if (root.tab === "tray") {
+                    trayPage.up()
+                    event.accepted = true
+                }
+            }
+            Keys.onDownPressed: event => {
+                if (root.tab === "tray") {
+                    trayPage.enterCurrent()
                     event.accepted = true
                 }
             }
