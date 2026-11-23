@@ -185,12 +185,27 @@ Singleton {
 
     // a tray file opens in whatever the desktop uses for it
     function openFile(path) {
+        openProc.opening = path
         openProc.command = ["xdg-open", path]
         openProc.running = true
     }
 
+    // a file nothing can open, or one that is gone, says so instead of doing nothing
     Process {
         id: openProc
+        property string opening: ""
+        stderr: StdioCollector { id: openErr }
+        onExited: exitCode => {
+            if (exitCode === 0)
+                return
+            const name = opening.split("/").pop()
+            if (exitCode === 3)
+                root.notify("No application for " + name, "Set a default for this file type to open it from the tray.", "critical")
+            else if (exitCode === 2)
+                root.notify("Could not open " + name, "The file is no longer there.", "critical")
+            else
+                root.notify("Could not open " + name, openErr.text.trim() || "exit " + exitCode, "critical")
+        }
     }
 
     function addUrls(urls) {
