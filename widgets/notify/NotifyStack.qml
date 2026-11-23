@@ -71,6 +71,28 @@ PanelWindow {
 
                     Component.onCompleted: opening.start()
 
+                    // a click ends the toast only after the card has gone back into the notch
+                    property bool closing: false
+
+                    function dismiss(): void {
+                        if (closing) return
+                        closing = true
+                        opening.stop()
+                        closeAnim.start()
+                    }
+
+                    SequentialAnimation {
+                        id: closeAnim
+
+                        ParallelAnimation {
+                            NumberAnimation { target: face; property: "opacity"; to: 0; duration: 120 }
+                            NumberAnimation { target: card; property: "width"; to: 14; duration: 240; easing.type: Easing.InCubic }
+                            NumberAnimation { target: card; property: "height"; to: 14; duration: 240; easing.type: Easing.InCubic }
+                        }
+                        NumberAnimation { target: card; property: "y"; to: -12; duration: 160; easing.type: Easing.InQuad }
+                        ScriptAction { script: Notifications.expire(card.modelData) }
+                    }
+
                     SequentialAnimation {
                         id: opening
 
@@ -92,7 +114,7 @@ PanelWindow {
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: Notifications.expire(card.modelData)
+                        onClicked: card.dismiss()
                     }
 
                     // the content fades in once the card is open, so the droplet stays empty
@@ -164,12 +186,12 @@ PanelWindow {
                             MouseArea {
                                 id: actionMouse
                                 anchors.fill: parent
-                                enabled: card.open
+                                enabled: card.open && !card.closing
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
                                     card.action.invoke()
-                                    Notifications.expire(card.modelData)
+                                    card.dismiss()
                                 }
                             }
                         }
