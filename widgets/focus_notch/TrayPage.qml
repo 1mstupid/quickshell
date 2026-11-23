@@ -77,12 +77,8 @@ Item {
             current = Math.max(0, Math.min(shown.length - 1, index))
     }
 
-    // Left past the first card goes up a folder, so a folder can be left with the arrows alone
+    // Left and Right stop at the ends; going up is a deliberate key, not an overshoot
     function stepBy(delta) {
-        if (delta < 0 && current === 0) {
-            up()
-            return
-        }
         if (shown.length > 0)
             current = Math.max(0, Math.min(shown.length - 1, current + delta))
     }
