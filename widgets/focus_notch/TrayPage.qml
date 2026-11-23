@@ -71,9 +71,56 @@ Item {
         return /\.(png|jpe?g|webp|gif|bmp)$/i.test(path)
     }
 
+    // Left past the first card goes up a folder, so a folder can be left with the arrows alone
     function stepBy(delta) {
+        if (delta < 0 && current === 0) {
+            up()
+            return
+        }
         if (shown.length > 0)
             current = Math.max(0, Math.min(shown.length - 1, current + delta))
+    }
+
+    // video thumbnails: one frame of each, made by ffmpeg into the cache the first time the card
+    // is near the centre, one at a time, and shown once it is there
+    readonly property string thumbDir: Quickshell.env("HOME") + "/.cache/lumin/tray-thumbs"
+    property var thumbReady: ({})
+    property var thumbQueue: []
+
+    function thumbUrl(path) {
+        return "file://" + thumbDir + "/" + TrayGlyphs.thumbName(path)
+    }
+
+    function queueThumb(path) {
+        if (thumbReady[path] === true || thumbQueue.indexOf(path) >= 0 || thumbProc.thumbFor === path)
+            return
+        thumbQueue = thumbQueue.concat([path])
+        runThumbs()
+    }
+
+    function runThumbs() {
+        if (thumbProc.running || thumbQueue.length === 0)
+            return
+        const path = thumbQueue[0]
+        thumbQueue = thumbQueue.slice(1)
+        thumbProc.thumbFor = path
+        // the path and the output go in as arguments, never into the script; -n keeps an
+        // existing thumbnail, and a clip shorter than a second simply gets none
+        thumbProc.command = ["sh", "-c",
+            "mkdir -p \"$(dirname \"$2\")\" && ffmpeg -v error -n -ss 1 -i \"$1\" -frames:v 1 -vf scale=320:-2 \"$2\"",
+            "sh", path, thumbDir + "/" + TrayGlyphs.thumbName(path)]
+        thumbProc.running = true
+    }
+
+    Process {
+        id: thumbProc
+        property string thumbFor: ""
+        onExited: {
+            const done = Object.assign({}, page.thumbReady)
+            done[thumbFor] = true
+            page.thumbReady = done
+            page.runThumbs()
+        }
     }
 
     function openCurrent() {
@@ -326,6 +373,12 @@ Item {
                 readonly property bool focused: page.current === cell.index
                 readonly property bool isDir: page.isFolder(cell.modelData)
                 readonly property bool picture: !cell.isDir && page.isImage(cell.modelData)
+                readonly property bool video: !cell.isDir && TrayGlyphs.isVideo(cell.modelData)
+                readonly property bool near: Math.abs(cell.d) < 3
+                readonly property bool thumbed: page.thumbReady[cell.modelData] === true
+
+                onNearChanged: if (cell.near && cell.video && !cell.thumbed) page.queueThumb(cell.modelData)
+                Component.onCompleted: if (cell.near && cell.video && !cell.thumbed) page.queueThumb(cell.modelData)
                 readonly property bool missing: page.isMissing(cell.modelData)
 
                 width: page.cardW
@@ -371,9 +424,12 @@ Item {
                         }
 
                         Image {
+                            id: thumbImg
                             anchors.fill: parent
-                            visible: cell.picture
-                            source: cell.picture && cell.d > -3 && cell.d < 3 ? "file://" + cell.modelData : ""
+                            visible: cell.picture || cell.video
+                            source: cell.picture && cell.near ? "file://" + cell.modelData
+                                : cell.video && cell.thumbed ? page.thumbUrl(cell.modelData)
+                                : ""
                             sourceSize.width: page.cardW * 2
                             fillMode: Image.PreserveAspectCrop
                             asynchronous: true
@@ -387,7 +443,7 @@ Item {
                         // anything that is not a picture: its glyph by kind, and its name
                         Column {
                             anchors.centerIn: parent
-                            visible: !cell.picture
+                            visible: !cell.picture && thumbImg.status !== Image.Ready
                             spacing: 6
                             width: parent.width - 16
 

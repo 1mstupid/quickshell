@@ -26,3 +26,23 @@ function glyphFor(path, isDir) {
         return FILE
     return BY_EXT[path.slice(dot + 1).toLowerCase()] ?? FILE
 }
+
+const VIDEO = ["mp4", "mkv", "webm", "mov", "avi", "m4v"]
+
+function isVideo(path) {
+    const slash = path.lastIndexOf("/")
+    const dot = path.lastIndexOf(".")
+    if (dot <= slash + 1)
+        return false
+    return VIDEO.indexOf(path.slice(dot + 1).toLowerCase()) >= 0
+}
+
+// the cached thumbnail's file name: a 32-bit FNV-1a hash of the path, so it is the same each time
+function thumbName(path) {
+    let h = 0x811c9dc5
+    for (let i = 0; i < path.length; i++) {
+        h ^= path.charCodeAt(i)
+        h = Math.imul(h, 0x01000193)
+    }
+    return (h >>> 0).toString(16) + ".png"
+}

@@ -568,12 +568,15 @@ PanelWindow {
                     event.accepted = true
                 }
             }
-            // X takes the centre favourite off the tray, S cycles its sort; typing in the search
-            // box never reaches here
+            // X takes the centre favourite off the tray, S cycles its sort, Backspace goes up a
+            // folder; typing in the search box never reaches here
             Keys.onPressed: event => {
                 if (root.tab !== "tray" || event.modifiers !== Qt.NoModifier)
                     return
-                if (event.key === Qt.Key_X) {
+                if (event.key === Qt.Key_Backspace) {
+                    trayPage.up()
+                    event.accepted = true
+                } else if (event.key === Qt.Key_X) {
                     trayPage.removeCurrent()
                     event.accepted = true
                 } else if (event.key === Qt.Key_S) {
