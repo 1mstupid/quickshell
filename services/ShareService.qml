@@ -26,8 +26,39 @@ Singleton {
         id: favFile
         path: Quickshell.env("HOME") + "/.local/state/lumin/tray"
         atomicWrites: true
-        onLoaded: root.favorites = text().split("\n").filter(p => p !== "")
+        onLoaded: {
+            root.favorites = text().split("\n").filter(p => p !== "")
+            root.statFavorites()
+        }
         onLoadFailed: root.favorites = []
+    }
+
+    // which favourites are folders, by path, from one stat over them; a path not yet read is a file
+    property var folders: ({})
+    function statFavorites() {
+        statFavProc.running = false
+        if (favorites.length === 0) {
+            folders = ({})
+            return
+        }
+        statFavProc.command = ["timeout", "3", "stat", "-c", "%F\t%n", "--"].concat(favorites)
+        statFavProc.running = true
+    }
+    Process {
+        id: statFavProc
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var m = {};
+                for (const line of text.split("\n")) {
+                    const a = line.indexOf("\t");
+                    if (a < 0)
+                        continue;
+                    if (line.slice(0, a) === "directory")
+                        m[line.slice(a + 1)] = true;
+                }
+                root.folders = m;
+            }
+        }
     }
     property int totalFileCount: 0
     property real totalSize: 0
@@ -129,6 +160,22 @@ Singleton {
     function setFavorites(next) {
         favorites = next
         favFile.setText(next.join("\n") + "\n")
+        statFavorites()
+    }
+
+    // a tray card dropped on another one moves to its place; the paths name the cards, so a
+    // search that hides some of them does not move the wrong one
+    function moveFavorite(from, to) {
+        if (from === to || favorites.indexOf(from) < 0 || favorites.indexOf(to) < 0)
+            return
+        const next = favorites.filter(p => p !== from)
+        next.splice(next.indexOf(to), 0, from)
+        setFavorites(next)
+    }
+
+    // the URI a tray card carries when it is dragged, with each name escaped
+    function fileUrl(path) {
+        return "file://" + path.split("/").map(encodeURIComponent).join("/")
     }
 
     // a tray file opens in whatever the desktop uses for it

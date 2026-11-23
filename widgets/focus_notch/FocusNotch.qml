@@ -549,8 +549,33 @@ PanelWindow {
                 if (!(root.onControl && controlPage.leaveView()))
                     root.close()
             }
-            Keys.onLeftPressed: root.stepPage(-1)
-            Keys.onRightPressed: root.stepPage(1)
+            // Left and Right are the tray's, on its page; Tab and Shift+Tab move between pages
+            Keys.onLeftPressed: event => {
+                if (root.tab === "tray") {
+                    trayPage.stepBy(-1)
+                    event.accepted = true
+                }
+            }
+            Keys.onRightPressed: event => {
+                if (root.tab === "tray") {
+                    trayPage.stepBy(1)
+                    event.accepted = true
+                }
+            }
+            Keys.onReturnPressed: event => {
+                if (root.tab === "tray") {
+                    trayPage.openCurrent()
+                    event.accepted = true
+                }
+            }
+            Keys.onTabPressed: event => {
+                root.stepPage(1)
+                event.accepted = true
+            }
+            Keys.onBacktabPressed: event => {
+                root.stepPage(-1)
+                event.accepted = true
+            }
         }
 
         // ── The strip ──────────────────────────────────────────────────────
@@ -2552,6 +2577,7 @@ PanelWindow {
 
             // ── Tray: favourite files, a carousel to open them from ───────
             TrayPage {
+                id: trayPage
                 visible: root.tab === "tray"
                 y: 40
                 width: panel.width

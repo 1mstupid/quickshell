@@ -2,11 +2,14 @@ import QtQuick
 import QtQuick.Effects
 import "../../services"
 import "../wallpaper/Fuzzy.js" as Fuzzy
+import "TrayGlyphs.js" as TrayGlyphs
 
-// The Tray page of the focus notch: the favourite files as a carousel, like the wallpaper
-// picker. Type to search their names (fuzzy), click a side card or the arrows to move, click
-// the centre card or press Enter to open the file with xdg-open. The x takes the file off the
-// tray. A file dropped on the page is kept. Favourites are not sent with the LocalSend queue.
+// The Tray page of the focus notch: the favourite files and folders as a carousel, like the
+// wallpaper picker. Type to search their names (fuzzy). Left and Right move (the notch passes
+// them on), a click on a side card moves to it, a click on the centre card or Enter opens it with
+// xdg-open. A card dragged onto another takes its place; dragged out, it is a file for other
+// apps. The x takes it off the tray. A file dropped on the page is kept. Favourites are not
+// sent with the LocalSend queue.
 Item {
     id: page
 
@@ -119,6 +122,8 @@ Item {
 
                 readonly property real d: cell.index - carousel.pos
                 readonly property bool focused: page.current === cell.index
+                readonly property bool isDir: ShareService.folders[cell.modelData] === true
+                readonly property bool picture: !cell.isDir && page.isImage(cell.modelData)
 
                 width: page.cardW
                 height: page.cardH
@@ -128,69 +133,99 @@ Item {
                 opacity: Math.abs(d) > 2.5 ? 0 : Math.max(0.3, 1 - 0.3 * Math.abs(d))
                 visible: opacity > 0
 
-                Rectangle {
+                // a card dropped on this one takes its place in the tray
+                DropArea {
                     anchors.fill: parent
-                    radius: 10
-                    color: Qt.alpha(Theme.fg, 0.06)
-                    border.width: cell.focused ? 2 : 0
-                    border.color: Theme.accent
-
-                    // hidden rounded shape, used only to mask the picture
-                    Item {
-                        id: thumbMask
-                        anchors.fill: parent
-                        visible: false
-                        layer.enabled: true
-                        Rectangle { anchors.fill: parent; radius: 10; color: "white" }
+                    keys: ["tray"]
+                    onDropped: drop => {
+                        ShareService.moveFavorite(drop.getDataAsString("application/x-tray-path"), cell.modelData)
+                        drop.accept(Qt.MoveAction)
                     }
+                }
 
-                    Image {
+                // the card: dragged to move it in the tray, or out to another app as a file
+                Item {
+                    id: ghost
+                    width: cell.width
+                    height: cell.height
+                    Drag.active: cardMa.drag.active
+                    Drag.keys: ["tray"]
+                    Drag.supportedActions: Qt.MoveAction | Qt.CopyAction
+                    Drag.mimeData: ({
+                        "text/uri-list": ShareService.fileUrl(cell.modelData),
+                        "application/x-tray-path": cell.modelData
+                    })
+
+                    Rectangle {
                         anchors.fill: parent
-                        visible: page.isImage(cell.modelData)
-                        source: visible && cell.d > -3 && cell.d < 3 ? "file://" + cell.modelData : ""
-                        sourceSize.width: page.cardW * 2
-                        fillMode: Image.PreserveAspectCrop
-                        asynchronous: true
-                        layer.enabled: true
-                        layer.effect: MultiEffect {
-                            maskEnabled: true
-                            maskSource: thumbMask
-                        }
-                    }
+                        radius: 10
+                        color: Qt.alpha(Theme.fg, 0.06)
+                        border.width: cell.focused ? 2 : 0
+                        border.color: Theme.accent
 
-                    // a file that is not a picture: its glyph and name
-                    Column {
-                        anchors.centerIn: parent
-                        visible: !page.isImage(cell.modelData)
-                        spacing: 6
-                        width: parent.width - 16
-
-                        Text {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            text: "󰈔"
-                            color: Qt.alpha(Theme.fg, 0.5)
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 28
+                        // hidden rounded shape, used only to mask the picture
+                        Item {
+                            id: thumbMask
+                            anchors.fill: parent
+                            visible: false
+                            layer.enabled: true
+                            Rectangle { anchors.fill: parent; radius: 10; color: "white" }
                         }
-                        Text {
-                            width: parent.width
-                            horizontalAlignment: Text.AlignHCenter
-                            text: page.nameOf(cell.modelData)
-                            elide: Text.ElideMiddle
-                            color: Qt.alpha(Theme.fg, 0.8)
-                            font.family: Theme.fontFamilySans
-                            font.pixelSize: 11
-                        }
-                    }
 
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            if (cell.focused)
-                                page.openCurrent()
-                            else
-                                page.current = cell.index
+                        Image {
+                            anchors.fill: parent
+                            visible: cell.picture
+                            source: cell.picture && cell.d > -3 && cell.d < 3 ? "file://" + cell.modelData : ""
+                            sourceSize.width: page.cardW * 2
+                            fillMode: Image.PreserveAspectCrop
+                            asynchronous: true
+                            layer.enabled: true
+                            layer.effect: MultiEffect {
+                                maskEnabled: true
+                                maskSource: thumbMask
+                            }
+                        }
+
+                        // anything that is not a picture: its glyph by kind, and its name
+                        Column {
+                            anchors.centerIn: parent
+                            visible: !cell.picture
+                            spacing: 6
+                            width: parent.width - 16
+
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: TrayGlyphs.glyphFor(cell.modelData, cell.isDir)
+                                color: cell.isDir ? Theme.accent : Qt.alpha(Theme.fg, 0.55)
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 28
+                            }
+                            Text {
+                                width: parent.width
+                                horizontalAlignment: Text.AlignHCenter
+                                text: page.nameOf(cell.modelData)
+                                elide: Text.ElideMiddle
+                                color: Qt.alpha(Theme.fg, 0.8)
+                                font.family: Theme.fontFamilySans
+                                font.pixelSize: 11
+                            }
+                        }
+
+                        MouseArea {
+                            id: cardMa
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            drag.target: ghost
+                            onReleased: {
+                                ghost.x = 0
+                                ghost.y = 0
+                            }
+                            onClicked: {
+                                if (cell.focused)
+                                    page.openCurrent()
+                                else
+                                    page.current = cell.index
+                            }
                         }
                     }
                 }
