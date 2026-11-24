@@ -42,6 +42,7 @@ Scope {
         command: ["test", "-r", "/etc/pam.d/" + root.pamService]
         onExited: exitCode => {
             if (exitCode === 0) {
+                Sounds.play("lock")
                 root.buffer = ""
                 root.pending = ""
                 root.busy = false

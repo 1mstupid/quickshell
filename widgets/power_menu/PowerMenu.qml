@@ -119,7 +119,6 @@ PanelWindow {
     function openMenu() {
         if (!PillState.claim("powermenu"))
             return
-        Sounds.play("open-power")
         const from = PillState.takeOver()
         startW = from.w
         startH = from.h
@@ -136,7 +135,7 @@ PanelWindow {
 
     function closeMenu() {
         if (root.visible)
-            Sounds.play("close-power")
+            Sounds.play("close")
         if (PillState.owner === "powermenu")
             PillState.returning = true
         startW = PillState.pillWidth
