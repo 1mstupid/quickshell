@@ -478,13 +478,10 @@ PanelWindow {
         }
     }
 
-    // a click in the band outside the card closes the open panel
+    // a click anywhere outside the card closes the open panel; the card sits above it
     MouseArea {
         id: catcher
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.top: parent.top
-        height: PillState.pillTop + root.shownH + 12
+        anchors.fill: parent
         onClicked: root.close()
     }
 
@@ -591,6 +588,10 @@ PanelWindow {
                     event.accepted = true
                 } else if (event.key === Qt.Key_S) {
                     trayPage.cycleSort()
+                    event.accepted = true
+                // "/" or a printable key opens the search; control keys (Enter, Escape, Tab) have no printable text
+                } else if (event.text.length === 1 && event.text >= " " && event.text !== "\x7f") {
+                    trayPage.startSearch(event.key === Qt.Key_Slash ? "" : event.text)
                     event.accepted = true
                 }
             }
@@ -2615,6 +2616,7 @@ PanelWindow {
 
             // ── Tray: favourite files, a carousel to open them from ───────
             TrayPage {
+                onSearchLeft: keyHost.forceActiveFocus()
                 id: trayPage
                 visible: root.tab === "tray"
                 y: 40
