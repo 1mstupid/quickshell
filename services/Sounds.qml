@@ -16,6 +16,8 @@ Singleton {
         open: "assets/reusables/dropdown/list.wav",
         close: "assets/network/silk_retract.wav",
         page: "assets/network/tick-1.wav",
+        toggle: "assets/reusables/switch/sfx.wav",
+        slide: "assets/network/tick-2.wav",
         launch: "assets/network/switch.wav",
         apply: "assets/system/quick_click.wav",
         notify: "assets/notifications/Progress.wav",

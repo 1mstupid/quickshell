@@ -126,7 +126,10 @@ Item {
         anchors.topMargin: -10
         anchors.bottomMargin: -10
         cursorShape: Qt.PointingHandCursor
-        onPressed: mouse => UserSettings[row.def.key] = row.at(mouse.x, width)
+        onPressed: mouse => {
+            Sounds.play("slide")
+            UserSettings[row.def.key] = row.at(mouse.x, width)
+        }
         onPositionChanged: mouse => {
             if (pressed)
                 UserSettings[row.def.key] = row.at(mouse.x, width)

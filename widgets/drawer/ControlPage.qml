@@ -188,7 +188,10 @@ Item {
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
-            onClicked: tile.clicked()
+            onClicked: {
+                Sounds.play("toggle")
+                tile.clicked()
+            }
         }
 
         Text {
@@ -326,7 +329,10 @@ Item {
             function set(x) {
                 row.moved(Math.max(0, Math.min(1, x / width)))
             }
-            onPressed: mouse => set(mouse.x)
+            onPressed: mouse => {
+                Sounds.play("slide")
+                set(mouse.x)
+            }
             onPositionChanged: mouse => {
                 if (pressed)
                     set(mouse.x)
@@ -343,10 +349,12 @@ Item {
             acceptedButtons: Qt.LeftButton | Qt.RightButton
             cursorShape: Qt.PointingHandCursor
             onClicked: mouse => {
-                if (mouse.button === Qt.RightButton)
+                if (mouse.button === Qt.RightButton) {
                     row.glyphRightClicked()
-                else
+                } else {
+                    Sounds.play("toggle")
                     row.glyphClicked()
+                }
             }
         }
     }
