@@ -127,6 +127,13 @@ FocusScope {
     // the search has let go of the keys: the notch's key handler takes them back
     signal searchLeft()
 
+    // "/" or a typed letter opens the search, with that letter already in it
+    function startSearch(typed) {
+        search.forceActiveFocus()
+        if (typed)
+            search.text += typed
+    }
+
     function openCurrent() {
         if (shown.length === 0)
             return
