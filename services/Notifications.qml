@@ -32,20 +32,38 @@ Singleton {
 
     function isToast(n) { return Meta.isToast(meta, n.id) }
     function timeOf(n) { return Meta.timeOf(meta, n.id) }
-    function expire(n) { meta = Meta.expired(meta, n.id) }
-
-    // ends the toasts; critical ones only when `includeCritical`, as they never time out
-    function endToasts(includeCritical) {
-        for (const n of server.trackedNotifications.values.slice())
-            if (isToast(n) && (includeCritical || n.urgency !== NotificationUrgency.Critical))
-                expire(n)
+    function expire(n) {
+        meta = Meta.expired(meta, n.id)
+        delete deadlines[n.id]
     }
 
-    // one timer for all the toasts: each arrival starts it over, as it does the ring
+    // when each toast ends, by id: a toast's own lifetime runs from its arrival, so a later one
+    // does not hold the earlier ones back, and they do not all end together
+    property var deadlines: ({})
+
+    // one timer, set to the next deadline (no polling)
     Timer {
         id: toastTimer
-        interval: root.toastLifetime
-        onTriggered: root.endToasts(false)
+        onTriggered: root.expireDue()
+    }
+
+    function scheduleToasts() {
+        let next = Infinity
+        for (const id in deadlines)
+            next = Math.min(next, deadlines[id])
+        toastTimer.stop()
+        if (next !== Infinity) {
+            toastTimer.interval = Math.max(0, next - Date.now())
+            toastTimer.start()
+        }
+    }
+
+    function expireDue() {
+        const now = Date.now()
+        for (const id in deadlines)
+            if (deadlines[id] <= now)
+                expire({ id: Number(id) })
+        scheduleToasts()
     }
 
     function clearAll() {
@@ -69,7 +87,10 @@ Singleton {
             n.tracked = true
             AppUsage.countNotification()
             if (!quiet) {
-                toastTimer.restart()
+                // a critical toast never times out: it has no deadline and stays until clicked
+                if (n.urgency !== NotificationUrgency.Critical)
+                    root.deadlines[n.id] = Date.now() + root.toastLifetime
+                root.scheduleToasts()
                 Sounds.play("notify")
             }
 
