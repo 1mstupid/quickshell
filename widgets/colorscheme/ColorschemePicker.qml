@@ -186,6 +186,8 @@ Item {
     }
 
     function close() {
+        if (visible)
+            Sounds.play("close")
         if (PillState.owner === "colorschemes")
             PillState.returning = true
         startW = PillState.pillWidth

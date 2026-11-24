@@ -46,10 +46,8 @@ Singleton {
     // `before` is the page it goes back to.
     property string before: "home"
     function showControl() {
-        if (page !== "control") {
+        if (page !== "control")
             before = page
-            Sounds.play("open")
-        }
         page = "control"
         show()
     }

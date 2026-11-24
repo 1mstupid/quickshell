@@ -234,6 +234,8 @@ Item {
     }
 
     function close() {
+        if (visible)
+            Sounds.play("close")
         if (PillState.owner === "wallpapers")
             PillState.returning = true
         startW = PillState.pillWidth

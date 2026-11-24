@@ -134,6 +134,8 @@ PanelWindow {
     }
 
     function closeMenu() {
+        if (root.visible)
+            Sounds.play("close")
         if (PillState.owner === "powermenu")
             PillState.returning = true
         startW = PillState.pillWidth

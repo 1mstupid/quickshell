@@ -282,6 +282,7 @@ Item {
 
     function close() {
         if (!visible) return;
+        Sounds.play("close");
         if (PillState.owner === "applauncher")
             PillState.returning = true;
         startW = PillState.pillWidth;
