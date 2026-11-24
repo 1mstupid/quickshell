@@ -495,8 +495,8 @@ PanelWindow {
 
     Notch {
         bodyWidth: card.width
-        // the outline is the card, as on the other panels: an extra band here shows as a block under the pill
-        bodyHeight: card.height
+        // the band grows with the card, so it is nothing at the pill (no block under it) and full once open
+        bodyHeight: card.height + 18 * root.grow
         x: card.x - bodyX
         y: card.y
     }
