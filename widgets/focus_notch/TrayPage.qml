@@ -124,6 +124,9 @@ FocusScope {
         }
     }
 
+    // the search has let go of the keys: the notch's key handler takes them back
+    signal searchLeft()
+
     function openCurrent() {
         if (shown.length === 0)
             return
@@ -296,7 +299,7 @@ FocusScope {
                     Sounds.play("toggle")
                 } else {
                     search.focus = false
-                    page.forceActiveFocus()
+                    page.searchLeft()
                     Sounds.play("page")
                 }
                 event.accepted = true

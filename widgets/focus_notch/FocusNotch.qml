@@ -2615,6 +2615,7 @@ PanelWindow {
 
             // ── Tray: favourite files, a carousel to open them from ───────
             TrayPage {
+                onSearchLeft: keyHost.forceActiveFocus()
                 id: trayPage
                 visible: root.tab === "tray"
                 y: 40
