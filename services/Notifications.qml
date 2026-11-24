@@ -68,8 +68,10 @@ Singleton {
             root.meta = Meta.arrived(root.meta, live, n.id, Qt.formatTime(new Date(), "hh:mm"), quiet)
             n.tracked = true
             AppUsage.countNotification()
-            if (!quiet)
+            if (!quiet) {
                 toastTimer.restart()
+                Sounds.play("notify")
+            }
 
             // nothing times out of the list, so cap it
             const all = server.trackedNotifications.values

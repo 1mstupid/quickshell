@@ -53,6 +53,7 @@ Singleton {
     property bool wave: Schema.defaultOf("wave")
     property bool recording: Schema.defaultOf("recording")
     property bool pomo: Schema.defaultOf("pomo")
+    property bool sounds: Schema.defaultOf("sounds")
     // the faces of the text: the body font and the one for the big figures
     property string bodyFont: Schema.defaultOf("bodyFont")
     property string displayFont: Schema.defaultOf("displayFont")

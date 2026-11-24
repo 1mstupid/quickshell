@@ -2,6 +2,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import ".."
 
 // The task timer: one task from todo.md in focus at a time, with the time spent
 // on it counted up. Pausing keeps the task in focus; stopping or finishing banks
@@ -110,8 +111,10 @@ Singleton {
 
     // ends the focus and ticks the task
     function complete() {
-        if (active)
+        if (active) {
+            Sounds.play("done")
             commit(true)
+        }
     }
 
     Timer {

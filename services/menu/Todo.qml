@@ -2,6 +2,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import ".."
 import "TodoMd.js" as TodoMd
 
 // Todo data layer, kept in todo.md in the config directory and edited by hand.
@@ -78,6 +79,8 @@ Singleton {
     }
 
     function toggle(item) {
+        if (!item.done)
+            Sounds.play("done")
         edit(item, TodoMd.toggled(item.raw))
     }
 
