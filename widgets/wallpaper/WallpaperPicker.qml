@@ -211,6 +211,7 @@ Item {
         focusCurrent()
         if (!PillState.claim("wallpapers"))
             return
+        Sounds.play("open-wallpaper")
         const from = PillState.takeOver()
         startW = from.w
         startH = from.h
@@ -235,7 +236,7 @@ Item {
 
     function close() {
         if (visible)
-            Sounds.play("close")
+            Sounds.play("close-wallpaper")
         if (PillState.owner === "wallpapers")
             PillState.returning = true
         startW = PillState.pillWidth
@@ -250,7 +251,6 @@ Item {
         if (visible && PillState.owner === "wallpapers") {
             close()
         } else {
-            Sounds.play("open")
             openPicker()
         }
     }

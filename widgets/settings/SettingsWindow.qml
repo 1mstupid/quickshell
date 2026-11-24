@@ -42,7 +42,7 @@ PanelWindow {
 
     function open() {
         if (!visible)
-            Sounds.play("open")
+            Sounds.play("open-settings")
         visible = true
         fade.stop()
         fade.from = root.t
@@ -52,7 +52,7 @@ PanelWindow {
 
     function close() {
         if (fade.to === 1)
-            Sounds.play("close")
+            Sounds.play("close-settings")
         fade.stop()
         fade.from = root.t
         fade.to = 0

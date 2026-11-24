@@ -163,6 +163,7 @@ Item {
         focusCurrent()
         if (!PillState.claim("colorschemes"))
             return
+        Sounds.play("open-colors")
         const from = PillState.takeOver()
         startW = from.w
         startH = from.h
@@ -187,7 +188,7 @@ Item {
 
     function close() {
         if (visible)
-            Sounds.play("close")
+            Sounds.play("close-colors")
         if (PillState.owner === "colorschemes")
             PillState.returning = true
         startW = PillState.pillWidth
@@ -202,7 +203,6 @@ Item {
         if (visible && PillState.owner === "colorschemes") {
             close()
         } else {
-            Sounds.play("open")
             openPicker()
         }
     }
