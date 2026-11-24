@@ -41,7 +41,12 @@ PanelWindow {
         spacing: 8
 
         Repeater {
-            model: root.shown
+            // keyed by id: a new toast or a dismissal then changes only its own card. A plain
+            // array is replaced whole, which rebuilds every card and replays its opening.
+            model: ScriptModel {
+                values: root.shown
+                objectProp: "id"
+            }
 
             // the slot is the card's full height from the start: resizing the column or the
             // window every frame of the opening is what made it choppy
