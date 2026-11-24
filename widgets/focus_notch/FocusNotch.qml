@@ -135,6 +135,10 @@ PanelWindow {
     // 0 = the bar pill, 1 = the strip; 0 = the strip, 1 = the full panel
     property real grow: 0
     property real expand: 0
+    // how long the strip takes to open and close, from the strip page of the settings
+    readonly property int stripMs: Math.round(UserSettings.stripMs)
+    // a fresh opening owes its sound until the strip has fully opened (see chime)
+    property bool chimeDue: false
     // the card the previous panel gave up; the panel grows from it instead of from the strip
     property real takeW: 0
     property real takeH: 0
@@ -332,6 +336,15 @@ PanelWindow {
     readonly property bool canTake: (PillState.owner === "" || PillState.owner === "focus")
         && !Overview.open && FocusNotchState.available
 
+    // The open sound plays when the strip reaches full size for its stage, not when it starts,
+    // so a pointer that leaves early makes no sound: a stopped animation never finishes.
+    function chime() {
+        if (chimeDue && stage !== "" && grow >= 0.999 && (stage === "hover" || expand >= 0.999)) {
+            chimeDue = false
+            Sounds.play("open-notch")
+        }
+    }
+
     function goTo(g, e) {
         growAnim.stop()
         expandAnim.stop()
@@ -359,9 +372,9 @@ PanelWindow {
     function show(next) {
         if (!PillState.claim("focus"))
             return
-        // only a fresh open plays, not the hover strip growing into the panel
+        // only a fresh open chimes, and only once it has fully opened (see chime)
         if (stage === "")
-            Sounds.play("open-notch")
+            chimeDue = true
         stripEntered = cardHover.hovered
         hoverIdle.stop()
         hoverLeave.stop()
@@ -389,6 +402,7 @@ PanelWindow {
         expandAnim.stop()
         grow = 0
         expand = 0
+        chimeDue = false
         stage = ""
         FocusNotchState.openRequested = false
         hoverIdle.stop()
@@ -400,6 +414,7 @@ PanelWindow {
         if (stage === "")
             return
         Sounds.play("close-notch")
+        chimeDue = false
         stage = ""
         FocusNotchState.openRequested = false
         hoverIdle.stop()
@@ -420,11 +435,12 @@ PanelWindow {
         id: growAnim
         target: root
         property: "grow"
-        duration: 180
+        duration: root.stripMs
         // back out: the strip overshoots its size and settles, so the open reads as a spring
         easing.type: Easing.OutBack
         easing.overshoot: 2.5
         onFinished: {
+            root.chime()
             if (root.stage === "" && root.grow < 0.01) {
                 root.visible = false
                 FocusNotchState.leaveControl()
@@ -438,9 +454,10 @@ PanelWindow {
         id: expandAnim
         target: root
         property: "expand"
-        duration: PillState.morphMs
+        duration: root.stripMs
         easing.type: PillState.openEase
         easing.period: PillState.easePeriod
+        onFinished: root.chime()
     }
 
 
