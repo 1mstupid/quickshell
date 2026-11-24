@@ -1,0 +1,3 @@
+quack.ogg: one quack (0.34 s), cut and level-matched from "Anas platyrhynchos - Mallard - XC62258.ogg" by
+Jonathon Jongsma (xeno-canto), CC BY-SA 3.0, https://commons.wikimedia.org/wiki/File:Anas_platyrhynchos_-_Mallard_-_XC62258.ogg
+As a cut of a CC BY-SA recording, quack.ogg is CC BY-SA 3.0 as well.
