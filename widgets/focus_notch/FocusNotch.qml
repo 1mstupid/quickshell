@@ -368,6 +368,12 @@ PanelWindow {
         interval: 1200
         onTriggered: if (root.stage === "hover" && !root.stripEntered) root.close()
     }
+    // a pointer that only crosses the pill does not open the strip: it has to stay for a moment
+    Timer {
+        id: hoverDwell
+        interval: 100
+        onTriggered: if (FocusNotchState.pillHovered && root.stage === "" && root.canTake) root.show("hover")
+    }
 
     function show(next) {
         if (!PillState.claim("focus"))
@@ -460,12 +466,12 @@ PanelWindow {
         target: FocusNotchState
         function onPillHoveredChanged() {
             if (FocusNotchState.pillHovered) {
-                // the hover ramp starts at once; leaving it again retreats (below)
                 if (root.stage === "" && root.canTake)
-                    root.show("hover")
+                    hoverDwell.restart()
                 return
             }
             // leaving the pill before the strip is open: it retreats, unless the pointer went into it
+            hoverDwell.stop()
             if (root.stage === "hover")
                 hoverLeave.restart()
         }
