@@ -11,6 +11,7 @@
 // the pages of the panel, in order; a group with no setting has no page
 const GROUPS = [
     { id: "bar", title: "Bar & Island", glyph: "󰍜" },
+    { id: "strip", title: "Strip", glyph: "󰔟" },
     { id: "appearance", title: "Appearance", glyph: "󰏘" },
     { id: "clock", title: "Clock", glyph: "󰅐" },
     { id: "widgets", title: "Widgets", glyph: "󰕮" },
@@ -46,14 +47,15 @@ const SETTINGS = [
     // the corner widgets and the media player
     { key: "usageRing", type: "bool", def: true, layout: "usage", group: "widgets", label: "Usage ring" },
     { key: "focusWidget", type: "bool", def: true, layout: "focus", group: "widgets", label: "Focus" },
-    { key: "focusNotch", type: "bool", def: true, group: "widgets", label: "Focus notch" },
-    { key: "focusHome", type: "bool", def: true, group: "widgets", label: "Focus: Home page" },
-    { key: "focusWork", type: "bool", def: true, group: "widgets", label: "Focus: Work page" },
-    { key: "focusPorts", type: "bool", def: true, group: "widgets", label: "Focus: Ports page" },
-    { key: "focusUsage", type: "bool", def: true, group: "widgets", label: "Focus: Usage page" },
-    { key: "focusShare", type: "bool", def: true, group: "widgets", label: "Focus: Share page" },
-    { key: "focusBuds", type: "bool", def: true, group: "widgets", label: "Focus: Buds page" },
-    { key: "focusTray", type: "bool", def: true, group: "widgets", label: "Focus: Tray page" },
+    // the strip and its modules, one page per module like the bar's modules above
+    { key: "focusNotch", type: "bool", def: true, group: "strip", label: "Strip" },
+    { key: "focusHome", type: "bool", def: true, group: "strip", label: "Home Module" },
+    { key: "focusWork", type: "bool", def: true, group: "strip", label: "Work Module" },
+    { key: "focusPorts", type: "bool", def: true, group: "strip", label: "Ports Module" },
+    { key: "focusUsage", type: "bool", def: true, group: "strip", label: "Usage Module" },
+    { key: "focusShare", type: "bool", def: true, group: "strip", label: "Share Module" },
+    { key: "focusBuds", type: "bool", def: true, group: "strip", label: "Buds Module" },
+    { key: "focusTray", type: "bool", def: true, group: "strip", label: "Tray Module" },
     { key: "todoWidget", type: "bool", def: true, layout: "todo", group: "widgets", label: "Todo" },
     { key: "habitsWidget", type: "bool", def: true, layout: "habits", group: "widgets", label: "Habits" },
     { key: "mediaWidget", type: "bool", def: true, layout: "media", group: "widgets", label: "Media player" },

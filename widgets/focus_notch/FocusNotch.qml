@@ -133,8 +133,14 @@ PanelWindow {
     }
     onStageChanged: if (stage === "open") keyHost.forceActiveFocus()
     // 0 = the bar pill, 1 = the strip; 0 = the strip, 1 = the full panel
-    property real grow: 0
-    property real expand: 0
+    // one morph, as the other panels have: 0 = the pill, 1 = the hover strip, 2 = the full panel.
+    // grow is the first half and expand the second; both clamp, so the elastic overshoot stays in range
+    property real t: 0
+    readonly property int hoverMs: PillState.morphMs * 2
+    readonly property real grow: Math.min(1, Math.max(0, t))
+    readonly property real expand: Math.min(1, Math.max(0, t - 1))
+    // a fresh opening owes its sound until the strip has fully opened (see chime)
+    property bool chimeDue: false
     // the card the previous panel gave up; the panel grows from it instead of from the strip
     property real takeW: 0
     property real takeH: 0
@@ -332,13 +338,20 @@ PanelWindow {
     readonly property bool canTake: (PillState.owner === "" || PillState.owner === "focus")
         && !Overview.open && FocusNotchState.available
 
-    function goTo(g, e) {
-        growAnim.stop()
-        expandAnim.stop()
-        growAnim.to = g
-        expandAnim.to = e
-        growAnim.start()
-        expandAnim.start()
+    // The open sound plays when the strip reaches full size for its stage, not when it starts,
+    // so a pointer that leaves early makes no sound: a stopped animation never finishes.
+    function chime() {
+        if (chimeDue && stage !== "" && t >= (stage === "hover" ? 0.999 : 1.999)) {
+            chimeDue = false
+            Sounds.play("open-notch")
+        }
+    }
+
+    function goTo(target) {
+        morph.stop()
+        morph.from = root.t
+        morph.to = target
+        morph.start()
     }
 
     // A hovered strip closes when the pointer leaves it after having been in it, or after a
@@ -355,13 +368,19 @@ PanelWindow {
         interval: 1200
         onTriggered: if (root.stage === "hover" && !root.stripEntered) root.close()
     }
+    // a pointer that only crosses the pill does not open the strip: it has to stay for a moment
+    Timer {
+        id: hoverDwell
+        interval: 100
+        onTriggered: if (FocusNotchState.pillHovered && root.stage === "" && root.canTake) root.show("hover")
+    }
 
     function show(next) {
         if (!PillState.claim("focus"))
             return
-        // only a fresh open plays, not the hover strip growing into the panel
+        // only a fresh open chimes, and only once it has fully opened (see chime)
         if (stage === "")
-            Sounds.play("open-notch")
+            chimeDue = true
         stripEntered = cardHover.hovered
         hoverIdle.stop()
         hoverLeave.stop()
@@ -371,12 +390,16 @@ PanelWindow {
         const from = PillState.takeOver()
         takeW = from.taken ? from.w : 0
         takeH = from.taken ? from.h : 0
+        // taken over from another panel, the card starts at the size of the strip it would show
+        // (an open takes over at the strip's size, a hover at the pill's), so nothing jumps
+        if (from.taken)
+            t = next === "open" ? 1 : 0
         // the strip's clock fades in on open
         if (!focusOn)
             fadeIn.restart()
         visible = true
         stage = next
-        goTo(from.taken ? 0 : 1, next === "open" ? 1 : 0)
+        goTo(next === "open" ? 2 : 1)
     }
 
     // another panel took the pill: hand this card over and step aside at once
@@ -385,10 +408,9 @@ PanelWindow {
         PillState.takeoverH = card.height
         takeW = 0
         takeH = 0
-        growAnim.stop()
-        expandAnim.stop()
-        grow = 0
-        expand = 0
+        morph.stop()
+        t = 0
+        chimeDue = false
         stage = ""
         FocusNotchState.openRequested = false
         hoverIdle.stop()
@@ -399,7 +421,10 @@ PanelWindow {
     function close() {
         if (stage === "")
             return
-        Sounds.play("close-notch")
+        // only a panel that was fully open says so; a hover that retreats stays quiet
+        if (stage === "open")
+            Sounds.play("close-notch")
+        chimeDue = false
         stage = ""
         FocusNotchState.openRequested = false
         hoverIdle.stop()
@@ -413,19 +438,21 @@ PanelWindow {
         // closing shrinks back into the strip, as it does when it was not a takeover
         takeW = 0
         takeH = 0
-        goTo(0, 0)
+        goTo(0)
     }
 
+    // the same morph as the other panels: it ends at the pill on a close, when the panel lets go
     NumberAnimation {
-        id: growAnim
+        id: morph
         target: root
-        property: "grow"
-        duration: 180
-        // back out: the strip overshoots its size and settles, so the open reads as a spring
-        easing.type: Easing.OutBack
-        easing.overshoot: 2.5
+        property: "t"
+        // the hover grows slower than the panel opens, so a passing pointer does not open it at once
+        duration: root.stage === "hover" ? root.hoverMs : PillState.morphMs
+        easing.type: PillState.openEase
+        easing.period: PillState.easePeriod
         onFinished: {
-            if (root.stage === "" && root.grow < 0.01) {
+            root.chime()
+            if (root.stage === "" && root.t < 0.5) {
                 root.visible = false
                 FocusNotchState.leaveControl()
                 if (PillState.owner === "focus")
@@ -434,22 +461,19 @@ PanelWindow {
         }
     }
 
-    NumberAnimation {
-        id: expandAnim
-        target: root
-        property: "expand"
-        duration: PillState.morphMs
-        easing.type: PillState.openEase
-        easing.period: PillState.easePeriod
-    }
-
 
     Connections {
         target: FocusNotchState
         function onPillHoveredChanged() {
-            // a strip already showing stays as it is; the strip's own leave or the idle timer closes it
-            if (FocusNotchState.pillHovered && root.stage === "" && root.canTake)
-                root.show("hover")
+            if (FocusNotchState.pillHovered) {
+                if (root.stage === "" && root.canTake)
+                    hoverDwell.restart()
+                return
+            }
+            // leaving the pill before the strip is open: it retreats, unless the pointer went into it
+            hoverDwell.stop()
+            if (root.stage === "hover")
+                hoverLeave.restart()
         }
         function onOpenRequestedChanged() {
             // the notch is off or has no page on: a request to open it is dropped
@@ -487,7 +511,8 @@ PanelWindow {
 
     Notch {
         bodyWidth: card.width
-        bodyHeight: card.height + 18
+        // the band grows with the card, so it is nothing at the pill (no block under it) and full once open
+        bodyHeight: card.height + 18 * root.grow
         x: card.x - bodyX
         y: card.y
     }
@@ -623,7 +648,7 @@ PanelWindow {
             width: root.hoverW
             height: root.hoverH
             x: (card.width - width) / 2
-            opacity: Math.max(0, (root.grow - 0.5) * 2) * Math.max(0, 1 - root.expand * 2) * (root.focusOn ? 1 : 0)
+            opacity: root.grow * Math.max(0, 1 - root.expand * 2) * (root.focusOn ? 1 : 0)
             visible: opacity > 0
 
             Row {
@@ -740,7 +765,7 @@ PanelWindow {
             width: root.hoverW
             height: root.hoverH + 10
             x: (card.width - width) / 2
-            opacity: Math.max(0, (root.grow - 0.5) * 2) * Math.max(0, 1 - root.expand * 2) * (root.focusOn ? 0 : 1)
+            opacity: root.grow * Math.max(0, 1 - root.expand * 2) * (root.focusOn ? 0 : 1)
             visible: opacity > 0
 
             // the clock ticks on the minute, not every second: no polling

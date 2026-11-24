@@ -20,7 +20,7 @@ Singleton {
         "open-settings": "assets/network/connect.wav",
         "close-settings": "assets/reusables/clickbutton/click2.wav",
         lock: "assets/network/silk_drag.wav",
-        "open-notch": "assets/network/bh_orb_pop.wav",
+        "open-notch": "assets/network/switch.wav",
         "close-notch": "assets/reusables/dropdown/click.wav",
         page: "assets/network/tick-1.wav",
         toggle: "assets/reusables/switch/sfx.wav",
