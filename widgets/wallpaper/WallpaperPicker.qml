@@ -344,6 +344,7 @@ Item {
             return
         lastMove = now
         currentIndex = next
+        Sounds.play("slide")
     }
 
     // Keyboard: letters go into the search; the arrows move, Enter applies. Esc clears

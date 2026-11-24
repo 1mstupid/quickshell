@@ -457,6 +457,7 @@ Item {
             selectionAnchor = -1;
             selectedIndex = nextIndex;
         }
+        Sounds.play("slide");
 
         listView.positionViewAtIndex(selectedIndex, ListView.Contain);
     }
