@@ -495,7 +495,8 @@ PanelWindow {
 
     Notch {
         bodyWidth: card.width
-        bodyHeight: card.height + 18
+        // the outline is the card, as on the other panels: an extra band here shows as a block under the pill
+        bodyHeight: card.height
         x: card.x - bodyX
         y: card.y
     }
