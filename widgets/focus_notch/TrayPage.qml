@@ -7,17 +7,12 @@ import "../wallpaper/Fuzzy.js" as Fuzzy
 import "TrayGlyphs.js" as TrayGlyphs
 import "TraySort.js" as TraySort
 
-// The Tray page of the focus notch: the favourite files and folders as a carousel, like the
-// wallpaper picker. A folder opens into its contents, with a breadcrumb back. Type to search
-// the names (fuzzy). Left and Right move between cards, Up goes to the folder above, Down or
-// Enter opens the centre card (a folder goes in, a file opens with xdg-open), S cycles the sort
-// and X takes the centre favourite off the tray. Only the centre card can be dragged: out of
-// the notch it is a file for other apps, and it snaps back when it is let go. A file from
-// another app dropped on the tray is kept there.
-Item {
+FocusScope {
     id: page
+    focus: true
 
-    // the lowest drop area, so the cards above it take the drops they match
+    readonly property alias searching: search.activeFocus
+
     DropArea {
         anchors.fill: parent
         keys: ["text/uri-list"]
@@ -25,6 +20,7 @@ Item {
             if (page.dir !== "")
                 return
             ShareService.addFavorites(drop.urls)
+            Sounds.play("done")
             drop.accept(Qt.CopyAction)
         }
     }
@@ -39,10 +35,8 @@ Item {
     property int current: 0
     property int sortIndex: 0
     readonly property string sortMode: TraySort.MODES[sortIndex].key
-    // the folders gone into, outermost first; empty is the tray itself
     property var trail: []
     readonly property string dir: trail.length > 0 ? trail[trail.length - 1] : ""
-    // the contents of the folder in view, and what each of them is
     property var children: []
     property var childInfo: ({})
     property string listedFor: ""
@@ -71,20 +65,26 @@ Item {
         return /\.(png|jpe?g|webp|gif|bmp)$/i.test(path)
     }
 
-    // Home and End jump to the first and last card, so a long folder needs no run of Left or Right
     function stepTo(index) {
-        if (shown.length > 0)
-            current = Math.max(0, Math.min(shown.length - 1, index))
+        if (shown.length > 0) {
+            const next = Math.max(0, Math.min(shown.length - 1, index))
+            if (next !== current) {
+                current = next
+                Sounds.play("slide")
+            }
+        }
     }
 
-    // Left and Right stop at the ends; going up is a deliberate key, not an overshoot
     function stepBy(delta) {
-        if (shown.length > 0)
-            current = Math.max(0, Math.min(shown.length - 1, current + delta))
+        if (shown.length > 0) {
+            const next = Math.max(0, Math.min(shown.length - 1, current + delta))
+            if (next !== current) {
+                current = next
+                Sounds.play("slide")
+            }
+        }
     }
 
-    // thumbnails of clips: a frame of a video, or the cover art of a song, made by ffmpeg into the
-    // cache the first time the card is near the centre, one at a time, and shown once it is there
     readonly property string thumbDir: Quickshell.env("HOME") + "/.cache/lumin/tray-thumbs"
     property var thumbReady: ({})
     property var thumbQueue: []
@@ -106,10 +106,6 @@ Item {
         const path = thumbQueue[0]
         thumbQueue = thumbQueue.slice(1)
         thumbProc.thumbFor = path
-        // the path and the output go in as arguments, never into the script; -n keeps an
-        // existing thumbnail, and a clip shorter than a second simply gets none
-        // a video gives its frame a second in; a song gives its cover art, which ffmpeg reads as a
-        // still picture stream, so there is no seek
         const frame = TrayGlyphs.isAudio(path) ? "-an -frames:v 1" : "-ss 1 -frames:v 1"
         thumbProc.command = ["sh", "-c",
             "mkdir -p \"$(dirname \"$2\")\" && ffmpeg -v error -n -i \"$1\" " + frame + " -vf scale=320:-2 \"$2\"",
@@ -131,27 +127,33 @@ Item {
     function openCurrent() {
         if (shown.length === 0)
             return
+        current = Math.min(current, shown.length - 1)
         const p = shown[current]
-        if (isFolder(p))
+        if (isFolder(p)) {
+            Sounds.play("open")
             enter(p)
-        else
+        } else {
+            Sounds.play("launch")
             ShareService.openFile(p)
+        }
     }
 
-    // Down: into the centre card when it is a folder
     function enterCurrent() {
-        if (shown.length > 0 && isFolder(shown[current]))
+        if (shown.length > 0 && isFolder(shown[current])) {
+            Sounds.play("open")
             enter(shown[current])
+        }
     }
 
-    // X: takes the centre favourite off the tray; a folder's contents are left alone
     function removeCurrent() {
         if (dir !== "" || shown.length === 0)
             return
+        Sounds.play("toggle")
         ShareService.removeFavorite(shown[current])
     }
 
     function cycleSort() {
+        Sounds.play("slide")
         sortIndex = (sortIndex + 1) % TraySort.MODES.length
         current = 0
     }
@@ -163,7 +165,6 @@ Item {
         refreshListing()
     }
 
-    // Up: to the folder above, or out to the tray
     function up() {
         if (trail.length === 0)
             return
@@ -171,12 +172,13 @@ Item {
         trail = trail.slice(0, -1)
         current = 0
         refreshListing()
+        Sounds.play("page")
     }
 
-    // the breadcrumb: depth 0 is the tray, depth n the folder n levels in
     function jump(depth) {
         if (depth >= trail.length)
             return
+        Sounds.play("page")
         search.text = ""
         trail = trail.slice(0, depth)
         current = 0
@@ -196,8 +198,6 @@ Item {
         listProc.running = true
     }
 
-    // the contents of a folder, from find: its type, size, and modified time in seconds, then
-    // the path. Dotfiles are left out, as the launcher leaves them out.
     Process {
         id: listProc
         stdout: StdioCollector {
@@ -226,8 +226,42 @@ Item {
         }
     }
 
-    // the search, typed straight in. Enter opens the centre card; Escape clears the search,
-    // and with nothing typed it goes on to close the panel.
+    Keys.onPressed: event => {
+        if (search.activeFocus)
+            return
+
+        if (event.key === Qt.Key_Left) {
+            page.stepBy(-1)
+            event.accepted = true
+        } else if (event.key === Qt.Key_Right) {
+            page.stepBy(1)
+            event.accepted = true
+        } else if (event.key === Qt.Key_Up) {
+            page.up()
+            event.accepted = true
+        } else if (event.key === Qt.Key_Down || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            page.openCurrent()
+            event.accepted = true
+        } else if (event.key === Qt.Key_Home) {
+            page.stepTo(0)
+            event.accepted = true
+        } else if (event.key === Qt.Key_End) {
+            page.stepTo(page.shown.length - 1)
+            event.accepted = true
+        } else if (event.key === Qt.Key_S && event.modifiers === Qt.NoModifier) {
+            page.cycleSort()
+            event.accepted = true
+        } else if (event.key === Qt.Key_X && event.modifiers === Qt.NoModifier) {
+            page.removeCurrent()
+            event.accepted = true
+        } else if (event.key === Qt.Key_Slash || (event.text.length === 1 && event.modifiers === Qt.NoModifier)) {
+            search.forceActiveFocus()
+            if (event.key !== Qt.Key_Slash)
+                search.text += event.text
+            event.accepted = true
+        }
+    }
+
     Item {
         id: searchRow
         x: page.pad
@@ -245,15 +279,27 @@ Item {
             selectedTextColor: Theme.bg
             font.family: Theme.fontFamilySans
             font.pixelSize: 12
-            onTextChanged: page.query = text
+
+            onTextChanged: {
+                page.query = text
+                page.current = 0
+                if (UserSettings.sounds) {
+                    Quickshell.execDetached(["paplay", "--volume=" + Sounds.volume, Quickshell.shellDir + "/assets/reusables/input/type.wav"])
+                }
+            }
 
             Keys.onReturnPressed: page.openCurrent()
             Keys.onEnterPressed: page.openCurrent()
             Keys.onEscapePressed: event => {
                 if (text !== "") {
                     text = ""
-                    event.accepted = true
+                    Sounds.play("toggle")
+                } else {
+                    search.focus = false
+                    page.forceActiveFocus()
+                    Sounds.play("page")
                 }
+                event.accepted = true
             }
         }
 
@@ -267,8 +313,6 @@ Item {
         }
     }
 
-    // where the view is: the tray, then each folder gone into; a crumb goes back to it.
-    // On the right, the sort mode, which a click or S cycles.
     Item {
         id: crumbRow
         x: page.pad
@@ -282,7 +326,6 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 6
 
-            // up one folder, without going to the first card
             Text {
                 visible: page.trail.length > 0
                 text: "󰅁 up"
@@ -292,7 +335,7 @@ Item {
                 MouseArea {
                     id: upMouse
                     anchors.fill: parent
-                    anchors.margins: -4
+                    anchors.margins: -6
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: page.up()
@@ -358,8 +401,6 @@ Item {
         }
     }
 
-    // the carousel: each card is placed from the centre by its distance, so the cards
-    // either side shrink and fade; the centre one is the card in focus
     Item {
         id: carousel
         x: page.pad
@@ -368,7 +409,6 @@ Item {
         height: page.height - y - page.bottomH
         clip: true
 
-        // animated centre, so moving between cards glides
         property real pos: page.current
         Behavior on pos {
             NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
@@ -402,7 +442,6 @@ Item {
                 opacity: Math.abs(d) > 2.5 ? 0 : Math.max(0.3, 1 - 0.3 * Math.abs(d))
                 visible: opacity > 0
 
-                // the card: only the one in focus can be dragged, out to another app as a file
                 Item {
                     id: ghost
                     width: cell.width
@@ -412,7 +451,6 @@ Item {
                     Drag.supportedActions: Qt.CopyAction | Qt.MoveAction
                     Drag.mimeData: ({ "text/uri-list": ShareService.fileUrl(cell.modelData) })
 
-                    // back to the card's place after a drop, smoothly
                     ParallelAnimation {
                         id: snapBack
                         NumberAnimation { target: ghost; property: "x"; to: 0; duration: 180; easing.type: Easing.OutCubic }
@@ -425,7 +463,6 @@ Item {
                         color: Qt.alpha(Theme.fg, 0.06)
                         opacity: cell.missing ? 0.45 : 1
 
-                        // hidden rounded shape, used only to mask the picture
                         Item {
                             id: thumbMask
                             anchors.fill: parent
@@ -451,7 +488,6 @@ Item {
                             }
                         }
 
-                        // anything that is not a picture: its glyph by kind, and its name
                         Column {
                             anchors.centerIn: parent
                             visible: !cell.picture && thumbImg.status !== Image.Ready
@@ -488,17 +524,19 @@ Item {
                             id: cardMa
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
-                            // only the centre card moves; the others are clicked to bring them in
                             drag.target: cell.focused ? ghost : null
                             onPressed: snapBack.stop()
                             onReleased: snapBack.restart()
                             onClicked: {
-                                if (cell.isDir && cell.focused)
+                                if (cell.isDir && cell.focused) {
+                                    Sounds.play("open")
                                     page.enter(cell.modelData)
-                                else if (cell.focused)
+                                } else if (cell.focused) {
                                     page.openCurrent()
-                                else
+                                } else {
+                                    Sounds.play("slide")
                                     page.current = cell.index
+                                }
                             }
                         }
                     }
@@ -506,7 +544,6 @@ Item {
             }
         }
 
-        // the cards dissolve into the panel at both ends, as in the wallpaper picker
         Rectangle {
             anchors.left: parent.left
             anchors.top: parent.top
@@ -530,7 +567,6 @@ Item {
             }
         }
 
-        // arrows, when there is more than one card to move between
         Text {
             visible: page.shown.length > 1 && page.current > 0
             anchors.left: parent.left
@@ -547,6 +583,7 @@ Item {
                 onClicked: page.stepBy(-1)
             }
         }
+
         Text {
             visible: page.shown.length > 1 && page.current < page.shown.length - 1
             anchors.right: parent.right
@@ -564,7 +601,6 @@ Item {
             }
         }
 
-        // what the carousel says when there is nothing to show
         Text {
             visible: page.shown.length === 0
             anchors.centerIn: parent
@@ -577,7 +613,6 @@ Item {
         }
     }
 
-    // under the carousel: the name of the card in focus, and its place
     Item {
         x: page.pad
         y: carousel.y + carousel.height + 6
