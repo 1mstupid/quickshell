@@ -183,14 +183,10 @@ Singleton {
         return "file://" + path.split("/").map(encodeURIComponent).join("/")
     }
 
-    // a tray file opens in whatever the desktop uses for it
+    // a tray file opens in whatever the desktop uses for it; one detached process per file,
+    // so a second file is not held until the first (mpv, say) closes
     function openFile(path) {
-        openProc.command = ["xdg-open", path]
-        openProc.running = true
-    }
-
-    Process {
-        id: openProc
+        Quickshell.execDetached(["xdg-open", path])
     }
 
     function addUrls(urls) {
