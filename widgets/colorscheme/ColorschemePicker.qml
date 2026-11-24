@@ -163,6 +163,7 @@ Item {
         focusCurrent()
         if (!PillState.claim("colorschemes"))
             return
+        Sounds.play("open-colors")
         const from = PillState.takeOver()
         startW = from.w
         startH = from.h
@@ -186,6 +187,8 @@ Item {
     }
 
     function close() {
+        if (visible)
+            Sounds.play("close-colors")
         if (PillState.owner === "colorschemes")
             PillState.returning = true
         startW = PillState.pillWidth
@@ -197,10 +200,11 @@ Item {
     }
 
     function toggle() {
-        if (visible && PillState.owner === "colorschemes")
+        if (visible && PillState.owner === "colorschemes") {
             close()
-        else
+        } else {
             openPicker()
+        }
     }
     function toggleMode(): void {
         root.lightMode = !root.lightMode
@@ -313,6 +317,7 @@ Item {
 
         Quickshell.execDetached(
             ["wallpaper-theme", mode, imgPath].concat(palette).concat(ansi))
+        Sounds.play("apply")
 
         root.currentId = id
         Quickshell.execDetached(["sh", "-c", "printf '%s\\n' \"$1\" >| \"$2\"",

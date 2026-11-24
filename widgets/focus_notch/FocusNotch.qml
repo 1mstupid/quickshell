@@ -359,6 +359,9 @@ PanelWindow {
     function show(next) {
         if (!PillState.claim("focus"))
             return
+        // only a fresh open plays, not the hover strip growing into the panel
+        if (stage === "")
+            Sounds.play("open-notch")
         stripEntered = cardHover.hovered
         hoverIdle.stop()
         hoverLeave.stop()
@@ -396,6 +399,7 @@ PanelWindow {
     function close() {
         if (stage === "")
             return
+        Sounds.play("close-notch")
         stage = ""
         FocusNotchState.openRequested = false
         hoverIdle.stop()

@@ -211,6 +211,7 @@ Item {
         focusCurrent()
         if (!PillState.claim("wallpapers"))
             return
+        Sounds.play("open-wallpaper")
         const from = PillState.takeOver()
         startW = from.w
         startH = from.h
@@ -234,6 +235,8 @@ Item {
     }
 
     function close() {
+        if (visible)
+            Sounds.play("close-wallpaper")
         if (PillState.owner === "wallpapers")
             PillState.returning = true
         startW = PillState.pillWidth
@@ -245,10 +248,11 @@ Item {
     }
 
     function toggle() {
-        if (visible && PillState.owner === "wallpapers")
+        if (visible && PillState.owner === "wallpapers") {
             close()
-        else
+        } else {
             openPicker()
+        }
     }
 
     function apply(path) {
@@ -719,6 +723,7 @@ Item {
         Quickshell.execDetached(
             ["wallpaper-theme", isLight ? "--light" : "--dark", root.applyingPath]
                 .concat(result.palette).concat(result.ansi))
+        Sounds.play("apply")
         // Remember current wallpaper for next boot
         root.currentPath = root.applyingPath
         Quickshell.execDetached(["sh", "-c", "printf '%s\\n' \"$1\" >| \"$2\"",

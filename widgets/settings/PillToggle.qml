@@ -30,6 +30,9 @@ Rectangle {
     MouseArea {
         anchors.fill: parent
         cursorShape: Qt.PointingHandCursor
-        onClicked: sw.toggled()
+        onClicked: {
+            Sounds.play("toggle")
+            sw.toggled()
+        }
     }
 }

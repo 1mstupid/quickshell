@@ -66,7 +66,8 @@ const SETTINGS = [
     { key: "powerProfile", type: "bool", def: true, group: "controlCenter", label: "Power profile" },
     { key: "nightLight", type: "bool", def: true, group: "controlCenter", label: "Night light" },
     { key: "keepAwake", type: "bool", def: true, group: "controlCenter", label: "Keep awake" },
-    { key: "screenshot", type: "bool", def: true, group: "controlCenter", label: "Screenshot" }
+    { key: "screenshot", type: "bool", def: true, group: "controlCenter", label: "Screenshot" },
+    { key: "sounds", type: "bool", def: false, group: "controlCenter", label: "Sound effects" }
 ]
 
 function find(key) {
