@@ -41,6 +41,8 @@ PanelWindow {
     property real t: 0
 
     function open() {
+        if (!visible)
+            Sounds.play("open")
         visible = true
         fade.stop()
         fade.from = root.t
@@ -49,6 +51,8 @@ PanelWindow {
     }
 
     function close() {
+        if (fade.to === 1)
+            Sounds.play("close")
         fade.stop()
         fade.from = root.t
         fade.to = 0
@@ -188,6 +192,8 @@ PanelWindow {
                         onClicked: {
                             // first, so a text being edited is written before its page goes
                             keys.forceActiveFocus()
+                            if (page.modelData.id !== root.group)
+                                Sounds.play("page")
                             root.group = page.modelData.id
                         }
                     }

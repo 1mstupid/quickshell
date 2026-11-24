@@ -17,7 +17,12 @@ Singleton {
 
     // the page the open panel shows; kept across openings, reset on shell restart
     property string page: "home"
-    function setPage(key) { page = key }
+    // every page change goes through here (tabs, the strip, the wheel and the arrow keys)
+    function setPage(key) {
+        if (key !== page)
+            Sounds.play("page")
+        page = key
+    }
 
     // the pages the settings leave on: a page that is off is left out of the strip and the
     // wheel, and with the notch off or no page left, the notch does not open
