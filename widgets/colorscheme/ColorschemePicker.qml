@@ -197,10 +197,12 @@ Item {
     }
 
     function toggle() {
-        if (visible && PillState.owner === "colorschemes")
+        if (visible && PillState.owner === "colorschemes") {
             close()
-        else
+        } else {
+            Sounds.play("open")
             openPicker()
+        }
     }
     function toggleMode(): void {
         root.lightMode = !root.lightMode
@@ -313,6 +315,7 @@ Item {
 
         Quickshell.execDetached(
             ["wallpaper-theme", mode, imgPath].concat(palette).concat(ansi))
+        Sounds.play("apply")
 
         root.currentId = id
         Quickshell.execDetached(["sh", "-c", "printf '%s\\n' \"$1\" >| \"$2\"",

@@ -256,6 +256,7 @@ Item {
 
     function openLauncher() {
         if (!PillState.claim("applauncher")) return;
+        Sounds.play("open");
         const from = PillState.takeOver();
         startW = from.w;
         startH = from.h;
@@ -373,6 +374,7 @@ Item {
         }
 
         if (r.kind === "app") {
+            Sounds.play("launch");
             AppLauncherState.recordLaunch(r.entry.id);
             r.entry.execute();
             AppLauncherState.hide();
@@ -385,6 +387,7 @@ Item {
             if (r.next !== "") {
                 searchInput.text = r.next;
             } else {
+                Sounds.play("launch");
                 Quickshell.execDetached(["xdg-open", r.value]);
                 AppLauncherState.hide();
             }

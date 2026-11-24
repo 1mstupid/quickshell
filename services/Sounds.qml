@@ -13,6 +13,9 @@ Singleton {
 
     // the name a caller passes, and the file it plays (relative to the shell folder)
     readonly property var files: ({
+        open: "assets/reusables/dropdown/list.wav",
+        launch: "assets/network/switch.wav",
+        apply: "assets/system/quick_click.wav",
         notify: "assets/notifications/Progress.wav",
         done: "assets/reusables/clickbutton/click.wav"
     })
