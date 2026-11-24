@@ -49,7 +49,6 @@ const SETTINGS = [
     { key: "focusWidget", type: "bool", def: true, layout: "focus", group: "widgets", label: "Focus" },
     // the strip and its modules, one page per module like the bar's modules above
     { key: "focusNotch", type: "bool", def: true, group: "strip", label: "Strip" },
-    { key: "stripMs", type: "number", def: 360, min: 120, max: 900, step: 10, unit: "ms", group: "strip", label: "Open speed" },
     { key: "focusHome", type: "bool", def: true, group: "strip", label: "Home Module" },
     { key: "focusWork", type: "bool", def: true, group: "strip", label: "Work Module" },
     { key: "focusPorts", type: "bool", def: true, group: "strip", label: "Ports Module" },

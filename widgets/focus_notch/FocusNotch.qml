@@ -133,10 +133,11 @@ PanelWindow {
     }
     onStageChanged: if (stage === "open") keyHost.forceActiveFocus()
     // 0 = the bar pill, 1 = the strip; 0 = the strip, 1 = the full panel
-    property real grow: 0
-    property real expand: 0
-    // how long the strip takes to open and close, from the strip page of the settings
-    readonly property int stripMs: Math.round(UserSettings.stripMs)
+    // one morph, as the other panels have: 0 = the pill, 1 = the hover strip, 2 = the full panel.
+    // grow is the first half and expand the second; both clamp, so the elastic overshoot stays in range
+    property real t: 0
+    readonly property real grow: Math.min(1, Math.max(0, t))
+    readonly property real expand: Math.min(1, Math.max(0, t - 1))
     // a fresh opening owes its sound until the strip has fully opened (see chime)
     property bool chimeDue: false
     // the card the previous panel gave up; the panel grows from it instead of from the strip
@@ -339,19 +340,17 @@ PanelWindow {
     // The open sound plays when the strip reaches full size for its stage, not when it starts,
     // so a pointer that leaves early makes no sound: a stopped animation never finishes.
     function chime() {
-        if (chimeDue && stage !== "" && grow >= 0.999 && (stage === "hover" || expand >= 0.999)) {
+        if (chimeDue && stage !== "" && t >= (stage === "hover" ? 0.999 : 1.999)) {
             chimeDue = false
             Sounds.play("open-notch")
         }
     }
 
-    function goTo(g, e) {
-        growAnim.stop()
-        expandAnim.stop()
-        growAnim.to = g
-        expandAnim.to = e
-        growAnim.start()
-        expandAnim.start()
+    function goTo(target) {
+        morph.stop()
+        morph.from = root.t
+        morph.to = target
+        morph.start()
     }
 
     // A hovered strip closes when the pointer leaves it after having been in it, or after a
@@ -384,12 +383,16 @@ PanelWindow {
         const from = PillState.takeOver()
         takeW = from.taken ? from.w : 0
         takeH = from.taken ? from.h : 0
+        // taken over from another panel, the card starts at the size of the strip it would show
+        // (an open takes over at the strip's size, a hover at the pill's), so nothing jumps
+        if (from.taken)
+            t = next === "open" ? 1 : 0
         // the strip's clock fades in on open
         if (!focusOn)
             fadeIn.restart()
         visible = true
         stage = next
-        goTo(from.taken ? 0 : 1, next === "open" ? 1 : 0)
+        goTo(next === "open" ? 2 : 1)
     }
 
     // another panel took the pill: hand this card over and step aside at once
@@ -398,10 +401,8 @@ PanelWindow {
         PillState.takeoverH = card.height
         takeW = 0
         takeH = 0
-        growAnim.stop()
-        expandAnim.stop()
-        grow = 0
-        expand = 0
+        morph.stop()
+        t = 0
         chimeDue = false
         stage = ""
         FocusNotchState.openRequested = false
@@ -428,36 +429,26 @@ PanelWindow {
         // closing shrinks back into the strip, as it does when it was not a takeover
         takeW = 0
         takeH = 0
-        goTo(0, 0)
+        goTo(0)
     }
 
+    // the same morph as the other panels: it ends at the pill on a close, when the panel lets go
     NumberAnimation {
-        id: growAnim
+        id: morph
         target: root
-        property: "grow"
-        duration: root.stripMs
-        // back out: the strip overshoots its size and settles, so the open reads as a spring
-        easing.type: Easing.OutBack
-        easing.overshoot: 2.5
+        property: "t"
+        duration: PillState.morphMs
+        easing.type: PillState.openEase
+        easing.period: PillState.easePeriod
         onFinished: {
             root.chime()
-            if (root.stage === "" && root.grow < 0.01) {
+            if (root.stage === "" && root.t < 0.5) {
                 root.visible = false
                 FocusNotchState.leaveControl()
                 if (PillState.owner === "focus")
                     PillState.owner = ""
             }
         }
-    }
-
-    NumberAnimation {
-        id: expandAnim
-        target: root
-        property: "expand"
-        duration: root.stripMs
-        easing.type: PillState.openEase
-        easing.period: PillState.easePeriod
-        onFinished: root.chime()
     }
 
 
