@@ -41,32 +41,19 @@ import "../bar"
 // it again. `qs ipc call drawer toggle` opens it too.
 // The strip closes when the pointer leaves it; the open panel closes on Escape
 // or a click outside.
-PanelWindow {
+Item {
     id: root
 
-    screen: PillState.originScreen
+    // hosted by the origin bar's window, like the pickers, so it grows out of the pill
     visible: false
 
-    // the whole height: the control page is as tall as its rows. The mask keeps the
-    // rest of the screen usable.
-    anchors {
-        top: true
-        bottom: true
-        left: true
-        right: true
-    }
+    // the whole screen, as the bar's window is: the control page is as tall as its rows
+    anchors.fill: parent
 
-    color: "transparent"
-    exclusionMode: ExclusionMode.Ignore
-    WlrLayershell.layer: WlrLayer.Overlay
-    // the pinned strip and the open panel hold the keys, so Escape reaches them; on demand focus
-    // was dropped as soon as the pointer left the strip
-    WlrLayershell.keyboardFocus: root.stage !== "" ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
-    WlrLayershell.namespace: "quickshell-focusnotch"
-
-    // the strip only takes input on the card, so the screen below stays usable;
-    // the open panel also takes the band around it, to catch a click outside
-    mask: Region { item: root.stage === "open" ? catcher : card }
+    // the strip and the open panel hold the keys (the bar's window takes them while this
+    // item is shown); the bar's mask reads this to take input only on the card, or on the
+    // band around it while the panel is open, to catch a click outside
+    readonly property Item maskItem: root.stage === "open" ? catcher : card
 
     // ── Geometry ───────────────────────────────────────────────────────────
     readonly property int hoverW: 560
