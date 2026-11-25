@@ -26,7 +26,9 @@ PanelWindow {
 
     anchors { top: true; left: true; right: true }
 
-    WlrLayershell.layer: WlrLayer.Top
+    // the origin bar hosts the panels, so it rises above fullscreen apps while one is open;
+    // the other screens' bars stay on Top
+    WlrLayershell.layer: root.isOrigin && PillState.active ? WlrLayer.Overlay : WlrLayer.Top
     WlrLayershell.keyboardFocus: openBand !== null ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     // notch: the bar sits flush with the top edge; pill: it floats a little below it. Every
