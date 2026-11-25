@@ -11,7 +11,8 @@ import "../../services"
 // in; on release the widget goes to the nearest corner at that offset, and the
 // choice is written to layout.json. Another shown widget acts as a barrier: the
 // outline stops at its edge and can still slide along it. A drop that would
-// still cover one is refused: the preview turns red and the widget goes back. Nothing is
+// still cover one is refused: the preview turns red and the widget goes back. A
+// dot grid marks the cell edges a widget can land on. Nothing is
 // written until a drop or a button press. Done or Escape (after a click, since
 // the panel takes keyboard focus on demand) leaves.
 PanelWindow {
@@ -79,6 +80,36 @@ PanelWindow {
 
             // swallows clicks, so nothing underneath is hit while editing
             MouseArea { anchors.fill: parent }
+        }
+
+        // a dot where each cell edge can fall: a box's left or top edge in the
+        // left or top half of the screen, its right or bottom edge in the other
+        // half. The same positions the snap uses, so the dots show where a widget
+        // can land.
+        Canvas {
+            id: gridDots
+            anchors.fill: parent
+            visible: root.editing
+
+            onWidthChanged: requestPaint()
+            onHeightChanged: requestPaint()
+            onVisibleChanged: if (visible) requestPaint()
+
+            onPaint: {
+                const ctx = getContext("2d")
+                const cell = WidgetLayout.cell
+                const inset = Theme.edgeInset
+                const xs = [], ys = []
+                for (let x = inset; x < width / 2; x += cell) xs.push(x)
+                for (let x = width - inset; x >= width / 2; x -= cell) xs.push(x)
+                for (let y = inset; y < height / 2; y += cell) ys.push(y)
+                for (let y = height - inset; y >= height / 2; y -= cell) ys.push(y)
+                ctx.reset()
+                ctx.fillStyle = String(Qt.alpha(Theme.fg, 0.3))
+                for (const x of xs)
+                    for (const y of ys)
+                        ctx.fillRect(x - 1, y - 1, 2, 2)
+            }
         }
 
         Repeater {
