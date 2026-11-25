@@ -22,12 +22,15 @@ import "./widgets/usage"
 import "./widgets/wallpaper"
 import "./widgets/colorscheme"
 import "./widgets/share"
+import "./widgets/spike"
 
 ShellRoot {
 
 
 
     PowerMenu {}
+
+    NotchHostSpike {}
 
     SharePanel {}
 
