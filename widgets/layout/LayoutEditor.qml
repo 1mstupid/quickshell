@@ -54,15 +54,19 @@ PanelWindow {
         }
     }
 
-    // whether a box at (x, y) would cover a shown widget other than `id`
+    // whether a box at (x, y) would come within one cell of a shown widget other
+    // than `id`. The gap keeps neighbours from touching, and the barrier and the
+    // refusal both use it.
     function overlapsOther(id, x, y, w, h) {
+        const gap = WidgetLayout.cell
         for (const other of Object.keys(WidgetLayout.defaults)) {
             const win = WidgetLayout.windows[other]
             if (other === id || !win || !WidgetLayout.shown(other))
                 continue
             const b = boxAt(WidgetLayout.anchor(other), WidgetLayout.cells(other, "x"),
                 WidgetLayout.cells(other, "y"), win.implicitWidth, win.implicitHeight)
-            if (x < b.x + win.implicitWidth && b.x < x + w && y < b.y + win.implicitHeight && b.y < y + h)
+            if (x < b.x + win.implicitWidth + gap && b.x < x + w + gap
+                    && y < b.y + win.implicitHeight + gap && b.y < y + h + gap)
                 return true
         }
         return false
