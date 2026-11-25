@@ -49,6 +49,7 @@ Item {
 
     // the whole screen, as the bar's window is: the control page is as tall as its rows
     anchors.fill: parent
+    onTChanged: if (morph.running && morph.to === 0 && t <= 0) visible = false
 
     // the strip and the open panel hold the keys (the bar's window takes them while this
     // item is shown); the bar's mask reads this to take input only on the card, or on the
@@ -408,24 +409,31 @@ Item {
     function close() {
         if (stage === "")
             return
-        // only a panel that was fully open says so; a hover that retreats stays quiet
+            
         if (stage === "open")
             Sounds.play("close-notch")
+            
         chimeDue = false
         stage = ""
         FocusNotchState.openRequested = false
         hoverIdle.stop()
         hoverLeave.stop()
+        
         if (PillState.owner === "focus")
             PillState.returning = true
-        // the strip's clock fades out on close, the reverse of the fade in
+
         fadeIn.stop()
         if (!focusOn)
             fadeOut.restart()
-        // closing shrinks back into the strip, as it does when it was not a takeover
+
+        // Keep these 0 so it collapses correctly through the strip size
         takeW = 0
         takeH = 0
-        goTo(0)
+
+        morph.stop()
+        morph.from = root.t
+        morph.to = 0
+        morph.start()
     }
 
     // the same morph as the other panels: it ends at the pill on a close, when the panel lets go
@@ -433,13 +441,13 @@ Item {
         id: morph
         target: root
         property: "t"
-        // the hover grows slower than the panel opens, so a passing pointer does not open it at once
+        // Keeps your dynamic hover vs. open duration logic
         duration: root.stage === "hover" ? root.hoverMs : PillState.morphMs
         easing.type: PillState.openEase
         easing.period: PillState.easePeriod
         onFinished: {
             root.chime()
-            if (root.stage === "" && root.t < 0.5) {
+            if (root.t < 0.5) {
                 root.visible = false
                 FocusNotchState.leaveControl()
                 if (PillState.owner === "focus")
