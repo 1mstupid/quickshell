@@ -41,32 +41,20 @@ import "../bar"
 // it again. `qs ipc call drawer toggle` opens it too.
 // The strip closes when the pointer leaves it; the open panel closes on Escape
 // or a click outside.
-PanelWindow {
+Item {
     id: root
 
-    screen: PillState.originScreen
+    // hosted by the origin bar's window, like the pickers, so it grows out of the pill
     visible: false
 
-    // the whole height: the control page is as tall as its rows. The mask keeps the
-    // rest of the screen usable.
-    anchors {
-        top: true
-        bottom: true
-        left: true
-        right: true
-    }
+    // the whole screen, as the bar's window is: the control page is as tall as its rows
+    anchors.fill: parent
+    onTChanged: if (morph.running && morph.to === 0 && t <= 0) visible = false
 
-    color: "transparent"
-    exclusionMode: ExclusionMode.Ignore
-    WlrLayershell.layer: WlrLayer.Overlay
-    // the pinned strip and the open panel hold the keys, so Escape reaches them; on demand focus
-    // was dropped as soon as the pointer left the strip
-    WlrLayershell.keyboardFocus: root.stage !== "" ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
-    WlrLayershell.namespace: "quickshell-focusnotch"
-
-    // the strip only takes input on the card, so the screen below stays usable;
-    // the open panel also takes the band around it, to catch a click outside
-    mask: Region { item: root.stage === "open" ? catcher : card }
+    // the strip and the open panel hold the keys (the bar's window takes them while this
+    // item is shown); the bar's mask reads this to take input only on the card, or on the
+    // band around it while the panel is open, to catch a click outside
+    readonly property Item maskItem: root.stage === "open" ? catcher : card
 
     // ── Geometry ───────────────────────────────────────────────────────────
     readonly property int hoverW: 560
@@ -421,24 +409,31 @@ PanelWindow {
     function close() {
         if (stage === "")
             return
-        // only a panel that was fully open says so; a hover that retreats stays quiet
+            
         if (stage === "open")
             Sounds.play("close-notch")
+            
         chimeDue = false
         stage = ""
         FocusNotchState.openRequested = false
         hoverIdle.stop()
         hoverLeave.stop()
+        
         if (PillState.owner === "focus")
             PillState.returning = true
-        // the strip's clock fades out on close, the reverse of the fade in
+
         fadeIn.stop()
         if (!focusOn)
             fadeOut.restart()
-        // closing shrinks back into the strip, as it does when it was not a takeover
+
+        // Keep these 0 so it collapses correctly through the strip size
         takeW = 0
         takeH = 0
-        goTo(0)
+
+        morph.stop()
+        morph.from = root.t
+        morph.to = 0
+        morph.start()
     }
 
     // the same morph as the other panels: it ends at the pill on a close, when the panel lets go
@@ -446,13 +441,13 @@ PanelWindow {
         id: morph
         target: root
         property: "t"
-        // the hover grows slower than the panel opens, so a passing pointer does not open it at once
+        // Keeps your dynamic hover vs. open duration logic
         duration: root.stage === "hover" ? root.hoverMs : PillState.morphMs
         easing.type: PillState.openEase
         easing.period: PillState.easePeriod
         onFinished: {
             root.chime()
-            if (root.stage === "" && root.t < 0.5) {
+            if (root.t < 0.5) {
                 root.visible = false
                 FocusNotchState.leaveControl()
                 if (PillState.owner === "focus")

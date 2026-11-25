@@ -36,8 +36,6 @@ ShellRoot {
     SettingsWindow {}
 
 
-    FocusNotch {}
-
     MediaWidget {}
 
     LyricsWidget {}
