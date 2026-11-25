@@ -9,8 +9,9 @@ import "../../services"
 // bottom holds a glyph button per widget to switch it on or off. While you
 // drag, only the outline moves and a second one shows the cell it will land
 // in; on release the widget goes to the nearest corner at that offset, and the
-// choice is written to layout.json. A drop that would cover another shown
-// widget is refused: the preview turns red and the widget goes back. Nothing is
+// choice is written to layout.json. Another shown widget acts as a barrier: the
+// outline stops at its edge and can still slide along it. A drop that would
+// still cover one is refused: the preview turns red and the widget goes back. Nothing is
 // written until a drop or a button press. Done or Escape (after a click, since
 // the panel takes keyboard focus on demand) leaves.
 PanelWindow {
@@ -109,7 +110,8 @@ PanelWindow {
                     && root.overlapsOther(modelData, landing.px, landing.py, w, h)
 
                 // nearest corner for a top-left position, then whole cells in
-                // from it, never past the opposite edge
+                // from it, never past the opposite edge. Where the nearest cell
+                // would cover a widget, the nearest free cell around it is used
                 function snap(px, py) {
                     const cell = WidgetLayout.cell
                     const inset = Theme.edgeInset
@@ -119,15 +121,22 @@ PanelWindow {
                     const maxY = Math.max(0, Math.floor((root.height - h - 2 * inset) / cell))
                     const gx = left ? px - inset : root.width - px - w - inset
                     const gy = top ? py - inset : root.height - py - h - inset
-                    const cx = Math.min(maxX, Math.max(0, Math.round(gx / cell)))
-                    const cy = Math.min(maxY, Math.max(0, Math.round(gy / cell)))
-                    return {
-                        anchor: (top ? "top" : "bottom") + "-" + (left ? "left" : "right"),
-                        x: cx,
-                        y: cy,
-                        px: left ? inset + cx * cell : root.width - w - inset - cx * cell,
-                        py: top ? inset + cy * cell : root.height - h - inset - cy * cell
+                    const anchorName = (top ? "top" : "bottom") + "-" + (left ? "left" : "right")
+                    const clampX = v => Math.min(maxX, Math.max(0, v))
+                    const clampY = v => Math.min(maxY, Math.max(0, v))
+                    // the four whole cells around the drop point, nearest first
+                    const cands = []
+                    for (const cx of [clampX(Math.floor(gx / cell)), clampX(Math.ceil(gx / cell))])
+                        for (const cy of [clampY(Math.floor(gy / cell)), clampY(Math.ceil(gy / cell))])
+                            cands.push({ x: cx, y: cy, d: Math.abs(cx * cell - gx) + Math.abs(cy * cell - gy) })
+                    cands.sort((a, b) => a.d - b.d)
+                    const fits = c => {
+                        const b = root.boxAt(anchorName, c.x, c.y, w, h)
+                        return !root.overlapsOther(modelData, b.x, b.y, w, h)
                     }
+                    const c = cands.find(fits) ?? { x: clampX(Math.round(gx / cell)), y: clampY(Math.round(gy / cell)) }
+                    const b = root.boxAt(anchorName, c.x, c.y, w, h)
+                    return { anchor: anchorName, x: c.x, y: c.y, px: b.x, py: b.y }
                 }
 
                 Rectangle {
@@ -173,8 +182,19 @@ PanelWindow {
                             if (!pressed)
                                 return
                             const p = mapToItem(scene, m.x, m.y)
-                            slot.dx = Math.max(-slot.homeX, Math.min(root.width - slot.w - slot.homeX, p.x - startX))
-                            slot.dy = Math.max(-slot.homeY, Math.min(root.height - slot.h - slot.homeY, p.y - startY))
+                            const nx = Math.max(-slot.homeX, Math.min(root.width - slot.w - slot.homeX, p.x - startX))
+                            const ny = Math.max(-slot.homeY, Math.min(root.height - slot.h - slot.homeY, p.y - startY))
+                            const id = slot.modelData
+                            // a widget that already covers another is free to move out of it
+                            if (root.overlapsOther(id, slot.homeX + slot.dx, slot.homeY + slot.dy, slot.w, slot.h)) {
+                                slot.dx = nx
+                                slot.dy = ny
+                                return
+                            }
+                            // barrier: an axis that would cover a widget stops where it was, so
+                            // the other axis can still slide along the edge
+                            slot.dx = root.overlapsOther(id, slot.homeX + nx, slot.homeY + slot.dy, slot.w, slot.h) ? slot.dx : nx
+                            slot.dy = root.overlapsOther(id, slot.homeX + slot.dx, slot.homeY + ny, slot.w, slot.h) ? slot.dy : ny
                         }
                         onReleased: {
                             const t = slot.snap(frame.x, frame.y)
