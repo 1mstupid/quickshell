@@ -72,6 +72,55 @@ PanelWindow {
         return false
     }
 
+    // the line a dragged box is lined up with on each axis, or -1 for none
+    property real guideX: -1
+    property real guideY: -1
+
+    // the smallest move that lines one of `features` up with one of `lines`, or null
+    function nearest(features, lines, reach) {
+        let best = null
+        for (const f of features)
+            for (const l of lines) {
+                const d = l - f
+                if (Math.abs(d) <= reach && (best === null || Math.abs(d) < Math.abs(best.d)))
+                    best = { d: d, line: l }
+            }
+        return best
+    }
+
+    // lines a box can line up with: the left, centre and right of every other
+    // shown widget, and the screen's centre lines. Each axis is moved onto its
+    // nearest line within reach, unless that would cover a widget.
+    function align(id, x, y, w, h) {
+        const reach = Math.round(6 * Theme.autoScale)
+        const xs = [root.width / 2]
+        const ys = [root.height / 2]
+        for (const other of Object.keys(WidgetLayout.defaults)) {
+            const win = WidgetLayout.windows[other]
+            if (other === id || !win || !WidgetLayout.shown(other))
+                continue
+            const b = boxAt(WidgetLayout.anchor(other), WidgetLayout.cells(other, "x"),
+                WidgetLayout.cells(other, "y"), win.implicitWidth, win.implicitHeight)
+            xs.push(b.x, b.x + win.implicitWidth / 2, b.x + win.implicitWidth)
+            ys.push(b.y, b.y + win.implicitHeight / 2, b.y + win.implicitHeight)
+        }
+        const hx = nearest([x, x + w / 2, x + w], xs, reach)
+        let ax = x
+        let gx = -1
+        if (hx !== null && !overlapsOther(id, x + hx.d, y, w, h)) {
+            ax = x + hx.d
+            gx = hx.line
+        }
+        const vy = nearest([y, y + h / 2, y + h], ys, reach)
+        let ay = y
+        let gy = -1
+        if (vy !== null && !overlapsOther(id, ax, y + vy.d, w, h)) {
+            ay = y + vy.d
+            gy = vy.line
+        }
+        return { x: ax, y: ay, gx: gx, gy: gy }
+    }
+
     Item {
         id: scene
         anchors.fill: parent
@@ -160,9 +209,12 @@ PanelWindow {
                     const clampX = v => Math.min(maxX, Math.max(0, v))
                     const clampY = v => Math.min(maxY, Math.max(0, v))
                     // the four whole cells around the drop point, nearest first
+                    // an axis lined up with a guide keeps its exact spot; the others round to cells
+                    const xs = root.guideX >= 0 ? [gx / cell] : [Math.floor(gx / cell), Math.ceil(gx / cell)]
+                    const ys = root.guideY >= 0 ? [gy / cell] : [Math.floor(gy / cell), Math.ceil(gy / cell)]
                     const cands = []
-                    for (const cx of [clampX(Math.floor(gx / cell)), clampX(Math.ceil(gx / cell))])
-                        for (const cy of [clampY(Math.floor(gy / cell)), clampY(Math.ceil(gy / cell))])
+                    for (const cx of xs.map(clampX))
+                        for (const cy of ys.map(clampY))
                             cands.push({ x: cx, y: cy, d: Math.abs(cx * cell - gx) + Math.abs(cy * cell - gy) })
                     cands.sort((a, b) => a.d - b.d)
                     const fits = c => {
@@ -224,15 +276,25 @@ PanelWindow {
                             if (root.overlapsOther(id, slot.homeX + slot.dx, slot.homeY + slot.dy, slot.w, slot.h)) {
                                 slot.dx = nx
                                 slot.dy = ny
+                                root.guideX = -1
+                                root.guideY = -1
                                 return
                             }
                             // barrier: an axis that would cover a widget stops where it was, so
                             // the other axis can still slide along the edge
-                            slot.dx = root.overlapsOther(id, slot.homeX + nx, slot.homeY + slot.dy, slot.w, slot.h) ? slot.dx : nx
-                            slot.dy = root.overlapsOther(id, slot.homeX + slot.dx, slot.homeY + ny, slot.w, slot.h) ? slot.dy : ny
+                            const bx = root.overlapsOther(id, slot.homeX + nx, slot.homeY + slot.dy, slot.w, slot.h) ? slot.dx : nx
+                            const by = root.overlapsOther(id, slot.homeX + bx, slot.homeY + ny, slot.w, slot.h) ? slot.dy : ny
+                            // then lined up with a neighbour's edge or centre, or a screen centre line
+                            const a = root.align(id, slot.homeX + bx, slot.homeY + by, slot.w, slot.h)
+                            slot.dx = a.x - slot.homeX
+                            slot.dy = a.y - slot.homeY
+                            root.guideX = a.gx
+                            root.guideY = a.gy
                         }
                         onReleased: {
                             const t = slot.snap(frame.x, frame.y)
+                            root.guideX = -1
+                            root.guideY = -1
                             slot.dx = 0
                             slot.dy = 0
                             const id = slot.modelData
@@ -246,12 +308,32 @@ PanelWindow {
                                 WidgetLayout.place(id, t.anchor, t.x, t.y)
                         }
                         onCanceled: {
+                            root.guideX = -1
+                            root.guideY = -1
                             slot.dx = 0
                             slot.dy = 0
                         }
                     }
                 }
             }
+        }
+
+        // the guide lines a drag has lined up with, over the outlines
+        Rectangle {
+            visible: root.guideX >= 0
+            x: root.guideX
+            y: 0
+            width: 1
+            height: root.height
+            color: Theme.accent
+        }
+        Rectangle {
+            visible: root.guideY >= 0
+            x: 0
+            y: root.guideY
+            width: root.width
+            height: 1
+            color: Theme.accent
         }
 
         Rectangle {
