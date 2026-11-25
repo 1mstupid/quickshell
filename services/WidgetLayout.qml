@@ -7,8 +7,9 @@ import Quickshell.Io
 // ~/.local/state/lumin/layout.json:
 //   {"todo": {"anchor": "top-left", "x": 0, "y": 0, "visible": true}}
 // anchor is one of top-left, top-right, bottom-left, bottom-right, or
-// bottom-center (centred, with no side margin); x and y are whole grid cells
-// (20 px at scale 1) further in from that corner, on top of the usual edge
+// bottom-center (centred, with no side margin); x and y are grid cells
+// (20 px at scale 1), fractional where a smart guide lined the widget up, further
+// in from that corner, on top of the usual edge
 // inset. A missing file, entry or key keeps the default place,
 // so with no file the widgets sit where they always did. `visible` wins over
 // the widget keys in config.toml's [settings] table once it is set. The edit mode writes this
@@ -71,7 +72,7 @@ Singleton {
 
     function cells(id, key) {
         const e = entries[id]
-        return e && Number.isInteger(e[key]) && e[key] >= 0 ? e[key] : 0
+        return e && typeof e[key] === "number" && isFinite(e[key]) && e[key] >= 0 ? e[key] : 0
     }
 
     function shown(id) {
