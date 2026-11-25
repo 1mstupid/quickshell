@@ -9,9 +9,10 @@ import "../../services"
 // bottom holds a glyph button per widget to switch it on or off. While you
 // drag, only the outline moves and a second one shows the cell it will land
 // in; on release the widget goes to the nearest corner at that offset, and the
-// choice is written to layout.json. Nothing is written until a drop or a
-// button press. Done or Escape (after a click, since the panel takes keyboard
-// focus on demand) leaves.
+// choice is written to layout.json. A drop that would cover another shown
+// widget is refused: the preview turns red and the widget goes back. Nothing is
+// written until a drop or a button press. Done or Escape (after a click, since
+// the panel takes keyboard focus on demand) leaves.
 PanelWindow {
     id: root
 
@@ -35,6 +36,34 @@ PanelWindow {
     IpcHandler {
         target: "layout"
         function toggle(): void { root.editing = !root.editing }
+    }
+
+    // where a w x h box sits for an anchor and cell offset, as the compositor
+    // places it. The outlines and the overlap check both use it, so they agree.
+    function boxAt(anchorName, cx, cy, w, h) {
+        const inset = Theme.edgeInset
+        const cell = WidgetLayout.cell
+        const left = anchorName.endsWith("left")
+        const top = anchorName.startsWith("top")
+        const center = anchorName === "bottom-center"
+        return {
+            x: left ? inset + cx * cell : center ? (root.width - w) / 2 : root.width - w - inset - cx * cell,
+            y: top ? inset + cy * cell : root.height - h - inset - cy * cell
+        }
+    }
+
+    // whether a box at (x, y) would cover a shown widget other than `id`
+    function overlapsOther(id, x, y, w, h) {
+        for (const other of Object.keys(WidgetLayout.defaults)) {
+            const win = WidgetLayout.windows[other]
+            if (other === id || !win || !WidgetLayout.shown(other))
+                continue
+            const b = boxAt(WidgetLayout.anchor(other), WidgetLayout.cells(other, "x"),
+                WidgetLayout.cells(other, "y"), win.implicitWidth, win.implicitHeight)
+            if (x < b.x + win.implicitWidth && b.x < x + w && y < b.y + win.implicitHeight && b.y < y + h)
+                return true
+        }
+        return false
     }
 
     Item {
@@ -65,14 +94,10 @@ PanelWindow {
                 readonly property real w: win ? win.implicitWidth : 0
                 readonly property real h: win ? win.implicitHeight : 0
 
-                readonly property real homeX: WidgetLayout.hasLeft(modelData)
-                    ? WidgetLayout.insetX(modelData)
-                    : WidgetLayout.hasCenter(modelData)
-                        ? (root.width - w) / 2
-                        : root.width - w - WidgetLayout.insetX(modelData)
-                readonly property real homeY: WidgetLayout.hasTop(modelData)
-                    ? WidgetLayout.insetY(modelData)
-                    : root.height - h - WidgetLayout.insetY(modelData)
+                readonly property var home: root.boxAt(WidgetLayout.anchor(modelData),
+                    WidgetLayout.cells(modelData, "x"), WidgetLayout.cells(modelData, "y"), w, h)
+                readonly property real homeX: home.x
+                readonly property real homeY: home.y
 
                 // how far the outline is dragged from home
                 property real dx: 0
@@ -80,6 +105,8 @@ PanelWindow {
 
                 readonly property bool dragging: pointer.pressed
                 readonly property var landing: dragging ? snap(frame.x, frame.y) : null
+                readonly property bool blocked: landing !== null
+                    && root.overlapsOther(modelData, landing.px, landing.py, w, h)
 
                 // nearest corner for a top-left position, then whole cells in
                 // from it, never past the opposite edge
@@ -112,7 +139,7 @@ PanelWindow {
                     radius: 12
                     color: "transparent"
                     border.width: 1
-                    border.color: Qt.alpha(Theme.fg, 0.35)
+                    border.color: slot.blocked ? Theme.alert : Qt.alpha(Theme.fg, 0.35)
                 }
 
                 Rectangle {
@@ -153,8 +180,11 @@ PanelWindow {
                             const t = slot.snap(frame.x, frame.y)
                             slot.dx = 0
                             slot.dy = 0
-                            // a click that moved nothing writes nothing
                             const id = slot.modelData
+                            // a drop onto another widget is refused, so it goes back home
+                            if (root.overlapsOther(id, t.px, t.py, slot.w, slot.h))
+                                return
+                            // a click that moved nothing writes nothing
                             if (t.anchor !== WidgetLayout.anchor(id)
                                     || t.x !== WidgetLayout.cells(id, "x")
                                     || t.y !== WidgetLayout.cells(id, "y"))
