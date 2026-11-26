@@ -33,7 +33,11 @@ Item {
     }
     readonly property bool playing: player !== null
         && player.playbackState === MprisPlaybackState.Playing
-    onPlayingChanged: if (playing) lastPlayer = player
+    // a pause or resume reads the exact position, not the last one-second tick
+    onPlayingChanged: {
+        if (playing) lastPlayer = player
+        pos = player?.position ?? 0
+    }
 
     // a track is loaded, playing or paused; stopped or no player is not
     readonly property bool hasTrack: player !== null
@@ -80,9 +84,6 @@ Item {
         triggeredOnStart: true
         onTriggered: root.pos = root.player?.position ?? 0
     }
-
-    // a pause or resume reads the exact position, not the last one-second tick
-    onPlayingChanged: root.pos = root.player?.position ?? 0
 
     // re-read immediately on track change or seek while paused
     Connections {
