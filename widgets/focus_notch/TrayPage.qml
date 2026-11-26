@@ -559,6 +559,8 @@ FocusScope {
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             width: parent.width * 0.2
+            // under glass the blur would show these as a box; the icons just end at the edge
+            visible: !UserSettings.liquidGlass
             gradient: Gradient {
                 orientation: Gradient.Horizontal
                 GradientStop { position: 0.0; color: Qt.alpha(Theme.bg, 0.95) }
@@ -570,6 +572,8 @@ FocusScope {
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             width: parent.width * 0.2
+            // under glass the blur would show these as a box; the icons just end at the edge
+            visible: !UserSettings.liquidGlass
             gradient: Gradient {
                 orientation: Gradient.Horizontal
                 GradientStop { position: 0.0; color: Qt.alpha(Theme.bg, 0) }

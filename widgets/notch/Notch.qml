@@ -18,7 +18,8 @@ Canvas {
     property bool rightShoulder: true
     // square bottom-right corner, for a notch flush with the right screen edge
     property bool bottomRightSquare: false
-    property color fillColor: Theme.bg
+    // translucent under the Liquid glass setting, so a compositor blur behind the shape shows through
+    property color fillColor: Qt.alpha(Theme.bg, UserSettings.liquidGlass ? 0.72 : 1)
 
     readonly property bool asPill: UserSettings.pill
     // a pill has no shoulders, so its body starts at x = 0
