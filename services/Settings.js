@@ -40,6 +40,8 @@ const SETTINGS = [
     // elastic curve, where a shorter one bounces more (0.4 is about 27% past the target)
     { key: "morphMs", type: "number", def: 180, min: 60, max: 600, step: 10, unit: "ms", group: "appearance", label: "Panel speed" },
     { key: "morphPeriod", type: "number", def: 0.4, min: 0.3, max: 2.0, step: 0.05, group: "appearance", label: "Panel bounce" },
+    // the focus strip as translucent glass, so a compositor blur behind it can show through
+    { key: "liquidGlass", type: "bool", def: false, group: "appearance", label: "Liquid glass" },
 
     // 12 or 24 hours on the clocks (the bar and the lock screen)
     { key: "clock24", type: "bool", def: false, group: "clock", label: "24-hour clock" },

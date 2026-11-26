@@ -537,7 +537,7 @@ Item {
         x: card.x - bodyX
         y: card.y
         // translucent, so a compositor blur shows through it; opaque text stays readable at this tint
-        fillColor: Qt.alpha(Theme.bg, 0.72)
+        fillColor: Qt.alpha(Theme.bg, UserSettings.liquidGlass ? 0.72 : 1)
     }
 
     Rectangle {
