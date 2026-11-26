@@ -401,7 +401,8 @@ Item {
         height: fromH + (root.bandHeight - fromH) * Math.max(0, root.t)
         x: (root.width - width) / 2
         y: PillState.pillTop
-        color: Theme.bg
+        // under glass the outline behind it is the fill, so this must not paint over the blur
+        color: UserSettings.liquidGlass ? "transparent" : Theme.bg
         radius: 26
     }
 
