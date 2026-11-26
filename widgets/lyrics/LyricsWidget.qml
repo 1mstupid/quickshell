@@ -68,6 +68,8 @@ PanelWindow {
     readonly property string trackSig: root.trackTitle + "␟" + media.artistText
 
     onTrackSigChanged: {
+        root.forceLookup = false
+        lenWait.stop()
         root.clk = LM.clockReset(0, Date.now())
         root.lastPolled = -1
         root.stalePolls = 0
@@ -78,6 +80,7 @@ PanelWindow {
     onPlayingChanged: {
         // freeze the clock where it was on pause, or restart it from there
         const now = Date.now()
+        root.lastToggle = now
         root.clk = LM.clockReset(LM.estimate(root.clk, now, !root.playing), now)
         root.lastPolled = -1
         root.stalePolls = 0
@@ -108,6 +111,23 @@ PanelWindow {
     // this session's nudge, in ms: the words are moved earlier by it
     property int nudgeMs: 0
 
+    // the lookup waits for the track's length for a few seconds, then goes without it
+    property bool forceLookup: false
+    Timer {
+        id: lenWait
+        interval: 3000
+        onTriggered: {
+            root.forceLookup = true
+            root.loadLyrics()
+        }
+    }
+    Connections {
+        target: media
+        function onLenChanged() {
+            root.loadLyrics()
+        }
+    }
+
     function loadLyrics() {
         const title = root.trackTitle
         if (!root.visible || title === "") {
@@ -119,6 +139,13 @@ PanelWindow {
             return
         }
         const artist = media.artistText
+        // the length can arrive a moment after the title; a lookup without it can match the
+        // wrong song or none, so wait for it (the length arriving starts the lookup)
+        if (media.len <= 0 && !root.forceLookup) {
+            root.status = "searching"
+            lenWait.restart()
+            return
+        }
         const key = LM.trackKey(artist, title, media.len)
         if (key === root.lyricsKey)
             return
@@ -202,6 +229,7 @@ PanelWindow {
 
     // ===== the clock =====
     property var clk: LM.clockReset(0, 0)
+    property real lastToggle: 0
     property real now: Date.now()
     property real lastPolled: -1
     property int stalePolls: 0
@@ -216,7 +244,8 @@ PanelWindow {
         const trust = LM.pollTrust(root.lastPolled, polled, root.stalePolls, root.playing)
         root.lastPolled = polled
         root.stalePolls = trust.stale
-        if (trust.use)
+        // no reading for a second after a toggle: the player's position is least reliable then
+        if (trust.use && Date.now() - root.lastToggle >= 1000)
             root.clk = LM.observe(root.clk, polled, Date.now(), root.playing)
         root.now = Date.now()
     }
