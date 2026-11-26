@@ -38,8 +38,6 @@ PanelWindow {
     Component.onCompleted: WidgetLayout.register("media", root)
 
     readonly property int panelW: 300
-    readonly property int discD: 300
-    readonly property int discLower: 0
 
     // Local smooth position tracker for live updating during playback
     property real livePos: 0.0
@@ -88,144 +86,79 @@ PanelWindow {
     }
 
     // ── Card ───────────────────────────────────────────────────────────────
+    // the cover fills the card, with a shadow rising from the bottom for the text
     Rectangle {
         id: card
 
         width: root.panelW
         height: root.panelW
         radius: 12
-        color: Qt.alpha(Theme.bg, 0.92)
+        color: Theme.altbg
         border.width: 1
         border.color: Qt.alpha(Theme.border, 0.6)
-        clip: true
 
         HoverHandler { id: hover }
 
+        // the cover, cut to the card's rounded corners by the mask below
         Item {
-            id: disc
-            width: root.panelW
-            height: root.discLower + root.discD / 2
-
+            id: art
+            anchors.fill: parent
             layer.enabled: true
             layer.effect: MultiEffect {
                 maskEnabled: true
-                maskSource: discMask
+                maskSource: cardMask
             }
 
-            Item {
-                id: discMask
+            Image {
                 anchors.fill: parent
-                visible: false
-                layer.enabled: true
-
-                Rectangle {
-                    anchors.fill: parent
-                    radius: card.radius
-                    color: "white"
-                }
+                source: media.player?.trackArtUrl ?? ""
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                sourceSize.width: root.panelW * 2
             }
 
             Rectangle {
-                id: face
-                width: root.discD
-                height: root.discD
-                x: (root.panelW - width) / 2
-                y: root.discLower - height / 2
-                radius: width / 2
-                color: Theme.altbg
-
-                NumberAnimation on rotation {
-                    running: media.playing
-                    loops: Animation.Infinite
-                    from: face.rotation
-                    to: face.rotation + 360
-                    duration: 12000
-                }
-
-                Image {
-                    id: art
-                    anchors.fill: parent
-                    source: media.player?.trackArtUrl ?? ""
-                    fillMode: Image.PreserveAspectCrop
-                    asynchronous: true
-                    sourceSize.width: root.discD * 2
-                    layer.enabled: true
-                    layer.effect: MultiEffect {
-                        maskEnabled: true
-                        maskSource: faceMask
-                    }
-                }
-
-                Item {
-                    id: faceMask
-                    anchors.fill: parent
-                    visible: false
-                    layer.enabled: true
-
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: width / 2
-                        color: "white"
-                    }
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: parent.height * 0.6
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: Qt.alpha(Theme.bg, 0) }
+                    GradientStop { position: 1.0; color: Qt.alpha(Theme.bg, 0.9) }
                 }
             }
+        }
+
+        // hidden rounded shape, used only to mask the cover
+        Item {
+            id: cardMask
+            anchors.fill: parent
+            visible: false
+            layer.enabled: true
 
             Rectangle {
-                anchors.horizontalCenter: parent.horizontalCenter
-                y: root.discLower - 8
-                width: 16
-                height: 16
-                radius: 8
-                color: Theme.bg
-                border.width: 3
-                border.color: Qt.alpha(Theme.fg, 0.35)
+                anchors.fill: parent
+                radius: card.radius
+                color: "white"
             }
         }
 
         Column {
-            x: 24
-            y: disc.height + 14
-            width: card.width - 48
-            spacing: 8
-
-            Row {
-                x: (parent.width - width) / 2
-                height: 14
-                spacing: 2
-
-                Repeater {
-                    model: 5
-
-                    Rectangle {
-                        id: waveBar
-                        required property int index
-                        y: (parent.height - height) / 2
-                        width: 2
-                        height: 6
-                        radius: 1
-                        color: Qt.alpha(Theme.fg, 0.4)
-
-                        SequentialAnimation on height {
-                            running: media.playing
-                            loops: Animation.Infinite
-                            NumberAnimation { to: 13; duration: 280 + waveBar.index * 60; easing.type: Easing.InOutSine }
-                            NumberAnimation { to: 4; duration: 280 + waveBar.index * 60; easing.type: Easing.InOutSine }
-                        }
-                    }
-                }
-            }
+            x: 18
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 16
+            width: card.width - 36
+            spacing: 4
 
             Text {
                 width: parent.width
-                horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
                 text: media.artistText
-                color: Qt.alpha(Theme.fg, 0.5)
+                color: Qt.alpha(Theme.fg, 0.6)
                 font.family: Theme.fontFamily
-                font.pixelSize: 13
+                font.pixelSize: 12
             }
 
-            // --- Normal Mode: Track Title (Upgraded to MarqueeText) ---
             MarqueeText {
                 width: parent.width
                 height: 20
@@ -233,17 +166,17 @@ PanelWindow {
                 color: Theme.fg
                 font.family: Theme.fontFamily
                 font.pixelSize: 16
+                font.bold: true
             }
 
             Item {
-                x: (parent.width - width) / 2
-                width: 40
+                width: parent.width
                 height: 2
 
                 Rectangle {
                     anchors.fill: parent
                     radius: 1
-                    color: Qt.alpha(Theme.fg, 0.15)
+                    color: Qt.alpha(Theme.fg, 0.2)
                 }
                 Rectangle {
                     height: parent.height
@@ -255,10 +188,11 @@ PanelWindow {
 
             Item {
                 width: parent.width
-                height: 24
+                height: 22
 
                 Row {
-                    anchors.centerIn: parent
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
                     visible: !hover.hovered
                     spacing: 0
 
@@ -266,15 +200,15 @@ PanelWindow {
                         text: media.fmt(root.livePos)
                         color: Theme.fg
                         font.family: Theme.fontFamilyAlt
-                        font.pixelSize: 15
+                        font.pixelSize: 11
                         font.bold: true
                     }
                     Text {
                         visible: media.timed
                         text: " / " + media.fmt(media.len)
-                        color: Qt.alpha(Theme.fg, 0.4)
+                        color: Qt.alpha(Theme.fg, 0.6)
                         font.family: Theme.fontFamilyAlt
-                        font.pixelSize: 15
+                        font.pixelSize: 11
                     }
                 }
 
@@ -321,7 +255,6 @@ PanelWindow {
                         allowed: media.player?.canGoNext ?? false
                         onTapped: media.player.next()
                     }
-
                 }
             }
         }
