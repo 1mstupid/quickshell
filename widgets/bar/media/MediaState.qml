@@ -34,10 +34,7 @@ Item {
     readonly property bool playing: player !== null
         && player.playbackState === MprisPlaybackState.Playing
     // a pause or resume reads the exact position, not the last one-second tick
-    onPlayingChanged: {
-        if (playing) lastPlayer = player
-        pos = player?.position ?? 0
-    }
+    onPlayingChanged: if (playing) lastPlayer = player
 
     // a track is loaded, playing or paused; stopped or no player is not
     readonly property bool hasTrack: player !== null
@@ -79,7 +76,8 @@ Item {
 
     Timer {
         running: root.active && root.playing
-        interval: 1000
+        // short enough that a pause shows the last reading within a quarter second
+        interval: 250
         repeat: true
         triggeredOnStart: true
         onTriggered: root.pos = root.player?.position ?? 0
