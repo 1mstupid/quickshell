@@ -41,6 +41,15 @@ PanelWindow {
             root.screenshot.resetSelection();
     }
 
+    // Window mode: the selection becomes the window under the pointer, if any
+    function hover(x: real, y: real) {
+        const win = root.screenshot.windowAt(root.modelData.name, x, y);
+        if (win)
+            root.screenshot.setRegion(win.x, win.y, win.x + win.w, win.y + win.h);
+        else
+            root.screenshot.resetSelection();
+    }
+
     // Screen mode fills in the screen the selection is on, whichever overlay has focus
     Connections {
         target: root.screenshot
@@ -123,26 +132,35 @@ PanelWindow {
         function clampX(v: real): real { return Math.max(0, Math.min(v, root.width)); }
         function clampY(v: real): real { return Math.max(0, Math.min(v, root.height)); }
 
-        // Screen mode follows the pointer; a region is only moved to another screen by a press
-        // there, so a drawn selection survives the pointer crossing monitors
-        onEntered: {
-            if (root.screenshot.mode === "screen")
+        // Screen and window modes follow the pointer; a region is only moved to another
+        // screen by a press there, so a drawn selection survives the pointer crossing monitors
+        function follow(x: real, y: real) {
+            if (root.screenshot.mode === "screen") {
                 root.claim();
+            } else if (root.screenshot.mode === "window" && !root.screenshot.pinned) {
+                root.claim();
+                root.hover(x, y);
+            }
         }
+
+        onEntered: follow(mouseX, mouseY)
         onPositionChanged: mouse => {
-            if (root.screenshot.mode === "screen")
-                root.claim();
+            follow(mouse.x, mouse.y);
             if (drawing)
                 root.screenshot.setRegion(startX, startY, clampX(mouse.x), clampY(mouse.y));
         }
         onPressed: mouse => {
-            if (root.screenshot.mode !== "region")
-                return;
-            root.claim();
-            startX = clampX(mouse.x);
-            startY = clampY(mouse.y);
-            drawing = true;
-            root.screenshot.setRegion(startX, startY, startX, startY);
+            if (root.screenshot.mode === "region") {
+                root.claim();
+                startX = clampX(mouse.x);
+                startY = clampY(mouse.y);
+                drawing = true;
+                root.screenshot.setRegion(startX, startY, startX, startY);
+            } else if (root.screenshot.mode === "window") {
+                root.claim();
+                root.hover(mouse.x, mouse.y);
+                root.screenshot.pinned = root.screenshot.hasSelection;
+            }
         }
         onReleased: drawing = false
         onDoubleClicked: root.screenshot.finish("save")
@@ -177,6 +195,11 @@ PanelWindow {
     }
 
     Shortcut {
+        sequence: "w"
+        onActivated: root.screenshot.setMode("window")
+    }
+
+    Shortcut {
         sequence: "s"
         onActivated: root.screenshot.setMode("screen")
     }
@@ -201,9 +224,15 @@ PanelWindow {
             color: Theme.fg
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSize
-            text: root.screenshot.hasSelection
-                ? Math.round(root.screenshot.selW) + " × " + Math.round(root.screenshot.selH) + "   ⏎ save · C copy · E edit · esc cancel"
-                : (root.screenshot.mode === "screen" ? "S screen · R region · esc cancel" : "drag to select · S screen · esc cancel")
+            text: {
+                if (root.screenshot.hasSelection)
+                    return Math.round(root.screenshot.selW) + " × " + Math.round(root.screenshot.selH) + "   ⏎ save · C copy · E edit · esc cancel";
+                if (root.screenshot.mode === "window")
+                    return "click a window · R region · S screen · esc cancel";
+                if (root.screenshot.mode === "screen")
+                    return "R region · W window · esc cancel";
+                return "drag to select · W window · S screen · esc cancel";
+            }
         }
     }
 }
