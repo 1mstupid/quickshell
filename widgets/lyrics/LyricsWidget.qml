@@ -96,7 +96,12 @@ PanelWindow {
     // ===== the words =====
     property var lines: []
     property string lyricsKey: ""
-    property string fetchKey: ""
+    // the lookup that is running, and the one waiting for it to stop; each run has a number,
+    // printed with its output, so a result is matched to its own song whatever the timing
+    property int runSeq: 0
+    property var runKeys: ({})
+    property var pendingArgs: null
+    property string pendingKey: ""
     property var cache: ({})
     // "" (nothing to say), "searching", or "none" (the service has no synced words)
     property string status: ""
@@ -127,7 +132,6 @@ PanelWindow {
 
         root.lines = []
         root.status = "searching"
-        root.fetchKey = key
 
         const cands = LM.candidates(artist, title)
         const qArtist = cands.length > 0 ? cands[0].artist : artist
@@ -138,28 +142,59 @@ PanelWindow {
         if (media.len > 0)
             args.push("--data-urlencode", "duration=" + Math.round(media.len))
 
-        fetchProc.running = false
-        fetchProc.command = args
+        // one lookup at a time: a newer song stops the running one, and starts once it has exited
+        root.pendingArgs = args
+        root.pendingKey = key
+        if (fetchProc.running)
+            fetchProc.running = false
+        else
+            root.startPending()
+    }
+
+    function startPending() {
+        if (root.pendingArgs === null)
+            return
+        root.runSeq = root.runSeq + 1
+        const keys = Object.assign({}, root.runKeys)
+        keys[root.runSeq] = root.pendingKey
+        root.runKeys = keys
+        // the script prints the run's number last, after curl's output
+        fetchProc.command = ["sh", "-c", 'curl "$@"; echo; echo RUN:' + root.runSeq, "sh"]
+            .concat(root.pendingArgs.slice(1))
+        root.pendingArgs = null
         fetchProc.running = true
     }
 
     Process {
         id: fetchProc
+        onExited: root.startPending()
         stdout: StdioCollector {
             onStreamFinished: {
-                let parsed = []
+                // without the run's number at the end, the output was cut off: nothing to keep
+                const m = /\nRUN:(\d+)\s*$/.exec(text)
+                if (m === null)
+                    return
+                const key = root.runKeys[Number(m[1])]
+                let parsed = null
                 try {
-                    parsed = LM.foldEchoes(LM.parseLrc(JSON.parse(text).syncedLyrics ?? ""))
+                    parsed = LM.foldEchoes(LM.parseLrc(JSON.parse(text.slice(0, m.index)).syncedLyrics ?? ""))
                 } catch (e) {
-                    parsed = []
+                    parsed = null
                 }
-                // kept for the next time this song plays, whatever is on screen by then
-                const c = Object.assign({}, root.cache)
-                c[root.fetchKey] = parsed
-                root.cache = c
-                if (root.fetchKey === root.lyricsKey) {
-                    root.lines = parsed
-                    root.status = parsed.length ? "" : "none"
+                // a lookup that failed or was cut short is not kept, so the song is asked for again
+                if (parsed !== null) {
+                    const c = Object.assign({}, root.cache)
+                    c[key] = parsed
+                    root.cache = c
+                }
+                if (key === root.lyricsKey) {
+                    if (parsed === null) {
+                        root.lyricsKey = ""
+                        root.status = "none"
+                    } else {
+                        root.lines = parsed
+                        root.status = parsed.length ? "" : "none"
+                    }
                 }
             }
         }
