@@ -9,8 +9,10 @@ import "../../services"
 // bottom holds a glyph button per widget to switch it on or off. While you
 // drag, only the outline moves and a second one shows the cell it will land
 // in; on release the widget goes to the nearest corner at that offset, and the
-// choice is written to layout.json. A drop that would cover another shown
-// widget is refused: the preview turns red and the widget goes back. Nothing is
+// choice is written to layout.json. Another shown widget acts as a barrier: the
+// outline stops at its edge and can still slide along it. A drop that would
+// still cover one is refused: the preview turns red and the widget goes back. A
+// dot grid marks the cell edges a widget can land on. Nothing is
 // written until a drop or a button press. Done or Escape (after a click, since
 // the panel takes keyboard focus on demand) leaves.
 PanelWindow {
@@ -52,18 +54,71 @@ PanelWindow {
         }
     }
 
-    // whether a box at (x, y) would cover a shown widget other than `id`
+    // whether a box at (x, y) would come within one cell of a shown widget other
+    // than `id`. The gap keeps neighbours from touching, and the barrier and the
+    // refusal both use it.
     function overlapsOther(id, x, y, w, h) {
+        const gap = WidgetLayout.cell
         for (const other of Object.keys(WidgetLayout.defaults)) {
             const win = WidgetLayout.windows[other]
             if (other === id || !win || !WidgetLayout.shown(other))
                 continue
             const b = boxAt(WidgetLayout.anchor(other), WidgetLayout.cells(other, "x"),
                 WidgetLayout.cells(other, "y"), win.implicitWidth, win.implicitHeight)
-            if (x < b.x + win.implicitWidth && b.x < x + w && y < b.y + win.implicitHeight && b.y < y + h)
+            if (x < b.x + win.implicitWidth + gap && b.x < x + w + gap
+                    && y < b.y + win.implicitHeight + gap && b.y < y + h + gap)
                 return true
         }
         return false
+    }
+
+    // the line a dragged box is lined up with on each axis, or -1 for none
+    property real guideX: -1
+    property real guideY: -1
+
+    // the smallest move that lines one of `features` up with one of `lines`, or null
+    function nearest(features, lines, reach) {
+        let best = null
+        for (const f of features)
+            for (const l of lines) {
+                const d = l - f
+                if (Math.abs(d) <= reach && (best === null || Math.abs(d) < Math.abs(best.d)))
+                    best = { d: d, line: l }
+            }
+        return best
+    }
+
+    // lines a box can line up with: the left, centre and right of every other
+    // shown widget, and the screen's centre lines. Each axis is moved onto its
+    // nearest line within reach, unless that would cover a widget.
+    function align(id, x, y, w, h) {
+        const reach = Math.round(6 * Theme.autoScale)
+        const xs = [root.width / 2]
+        const ys = [root.height / 2]
+        for (const other of Object.keys(WidgetLayout.defaults)) {
+            const win = WidgetLayout.windows[other]
+            if (other === id || !win || !WidgetLayout.shown(other))
+                continue
+            const b = boxAt(WidgetLayout.anchor(other), WidgetLayout.cells(other, "x"),
+                WidgetLayout.cells(other, "y"), win.implicitWidth, win.implicitHeight)
+            xs.push(b.x, b.x + win.implicitWidth / 2, b.x + win.implicitWidth)
+            ys.push(b.y, b.y + win.implicitHeight / 2, b.y + win.implicitHeight)
+        }
+        const hx = nearest([x, x + w / 2, x + w], xs, reach)
+        let ax = x
+        let gx = -1
+        if (hx !== null && !overlapsOther(id, x + hx.d, y, w, h)) {
+            ax = x + hx.d
+            gx = hx.line
+        }
+        const vy = nearest([y, y + h / 2, y + h], ys, reach)
+        let ay = y
+        let gy = -1
+        if (vy !== null && !overlapsOther(id, ax, y + vy.d, w, h)) {
+            ay = y + vy.d
+            gy = vy.line
+        }
+        return { x: ax, y: ay, gx: gx, gy: gy }
     }
 
     Item {
@@ -78,6 +133,36 @@ PanelWindow {
 
             // swallows clicks, so nothing underneath is hit while editing
             MouseArea { anchors.fill: parent }
+        }
+
+        // a dot where each cell edge can fall: a box's left or top edge in the
+        // left or top half of the screen, its right or bottom edge in the other
+        // half. The same positions the snap uses, so the dots show where a widget
+        // can land.
+        Canvas {
+            id: gridDots
+            anchors.fill: parent
+            visible: root.editing
+
+            onWidthChanged: requestPaint()
+            onHeightChanged: requestPaint()
+            onVisibleChanged: if (visible) requestPaint()
+
+            onPaint: {
+                const ctx = getContext("2d")
+                const cell = WidgetLayout.cell
+                const inset = Theme.edgeInset
+                const xs = [], ys = []
+                for (let x = inset; x < width / 2; x += cell) xs.push(x)
+                for (let x = width - inset; x >= width / 2; x -= cell) xs.push(x)
+                for (let y = inset; y < height / 2; y += cell) ys.push(y)
+                for (let y = height - inset; y >= height / 2; y -= cell) ys.push(y)
+                ctx.reset()
+                ctx.fillStyle = String(Qt.alpha(Theme.fg, 0.3))
+                for (const x of xs)
+                    for (const y of ys)
+                        ctx.fillRect(x - 1, y - 1, 2, 2)
+            }
         }
 
         Repeater {
@@ -109,7 +194,8 @@ PanelWindow {
                     && root.overlapsOther(modelData, landing.px, landing.py, w, h)
 
                 // nearest corner for a top-left position, then whole cells in
-                // from it, never past the opposite edge
+                // from it, never past the opposite edge. Where the nearest cell
+                // would cover a widget, the nearest free cell around it is used
                 function snap(px, py) {
                     const cell = WidgetLayout.cell
                     const inset = Theme.edgeInset
@@ -119,15 +205,25 @@ PanelWindow {
                     const maxY = Math.max(0, Math.floor((root.height - h - 2 * inset) / cell))
                     const gx = left ? px - inset : root.width - px - w - inset
                     const gy = top ? py - inset : root.height - py - h - inset
-                    const cx = Math.min(maxX, Math.max(0, Math.round(gx / cell)))
-                    const cy = Math.min(maxY, Math.max(0, Math.round(gy / cell)))
-                    return {
-                        anchor: (top ? "top" : "bottom") + "-" + (left ? "left" : "right"),
-                        x: cx,
-                        y: cy,
-                        px: left ? inset + cx * cell : root.width - w - inset - cx * cell,
-                        py: top ? inset + cy * cell : root.height - h - inset - cy * cell
+                    const anchorName = (top ? "top" : "bottom") + "-" + (left ? "left" : "right")
+                    const clampX = v => Math.min(maxX, Math.max(0, v))
+                    const clampY = v => Math.min(maxY, Math.max(0, v))
+                    // the four whole cells around the drop point, nearest first
+                    // an axis lined up with a guide keeps its exact spot; the others round to cells
+                    const xs = root.guideX >= 0 ? [gx / cell] : [Math.floor(gx / cell), Math.ceil(gx / cell)]
+                    const ys = root.guideY >= 0 ? [gy / cell] : [Math.floor(gy / cell), Math.ceil(gy / cell)]
+                    const cands = []
+                    for (const cx of xs.map(clampX))
+                        for (const cy of ys.map(clampY))
+                            cands.push({ x: cx, y: cy, d: Math.abs(cx * cell - gx) + Math.abs(cy * cell - gy) })
+                    cands.sort((a, b) => a.d - b.d)
+                    const fits = c => {
+                        const b = root.boxAt(anchorName, c.x, c.y, w, h)
+                        return !root.overlapsOther(modelData, b.x, b.y, w, h)
                     }
+                    const c = cands.find(fits) ?? { x: clampX(Math.round(gx / cell)), y: clampY(Math.round(gy / cell)) }
+                    const b = root.boxAt(anchorName, c.x, c.y, w, h)
+                    return { anchor: anchorName, x: c.x, y: c.y, px: b.x, py: b.y }
                 }
 
                 Rectangle {
@@ -173,11 +269,32 @@ PanelWindow {
                             if (!pressed)
                                 return
                             const p = mapToItem(scene, m.x, m.y)
-                            slot.dx = Math.max(-slot.homeX, Math.min(root.width - slot.w - slot.homeX, p.x - startX))
-                            slot.dy = Math.max(-slot.homeY, Math.min(root.height - slot.h - slot.homeY, p.y - startY))
+                            const nx = Math.max(-slot.homeX, Math.min(root.width - slot.w - slot.homeX, p.x - startX))
+                            const ny = Math.max(-slot.homeY, Math.min(root.height - slot.h - slot.homeY, p.y - startY))
+                            const id = slot.modelData
+                            // a widget that already covers another is free to move out of it
+                            if (root.overlapsOther(id, slot.homeX + slot.dx, slot.homeY + slot.dy, slot.w, slot.h)) {
+                                slot.dx = nx
+                                slot.dy = ny
+                                root.guideX = -1
+                                root.guideY = -1
+                                return
+                            }
+                            // barrier: an axis that would cover a widget stops where it was, so
+                            // the other axis can still slide along the edge
+                            const bx = root.overlapsOther(id, slot.homeX + nx, slot.homeY + slot.dy, slot.w, slot.h) ? slot.dx : nx
+                            const by = root.overlapsOther(id, slot.homeX + bx, slot.homeY + ny, slot.w, slot.h) ? slot.dy : ny
+                            // then lined up with a neighbour's edge or centre, or a screen centre line
+                            const a = root.align(id, slot.homeX + bx, slot.homeY + by, slot.w, slot.h)
+                            slot.dx = a.x - slot.homeX
+                            slot.dy = a.y - slot.homeY
+                            root.guideX = a.gx
+                            root.guideY = a.gy
                         }
                         onReleased: {
                             const t = slot.snap(frame.x, frame.y)
+                            root.guideX = -1
+                            root.guideY = -1
                             slot.dx = 0
                             slot.dy = 0
                             const id = slot.modelData
@@ -191,12 +308,32 @@ PanelWindow {
                                 WidgetLayout.place(id, t.anchor, t.x, t.y)
                         }
                         onCanceled: {
+                            root.guideX = -1
+                            root.guideY = -1
                             slot.dx = 0
                             slot.dy = 0
                         }
                     }
                 }
             }
+        }
+
+        // the guide lines a drag has lined up with, over the outlines
+        Rectangle {
+            visible: root.guideX >= 0
+            x: root.guideX
+            y: 0
+            width: 1
+            height: root.height
+            color: Theme.accent
+        }
+        Rectangle {
+            visible: root.guideY >= 0
+            x: 0
+            y: root.guideY
+            width: root.width
+            height: 1
+            color: Theme.accent
         }
 
         Rectangle {
