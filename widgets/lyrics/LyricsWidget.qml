@@ -78,6 +78,7 @@ PanelWindow {
     onPlayingChanged: {
         // freeze the clock where it was on pause, or restart it from there
         const now = Date.now()
+        root.lastToggle = now
         root.clk = LM.clockReset(LM.estimate(root.clk, now, !root.playing), now)
         root.lastPolled = -1
         root.stalePolls = 0
@@ -167,6 +168,7 @@ PanelWindow {
 
     // ===== the clock =====
     property var clk: LM.clockReset(0, 0)
+    property real lastToggle: 0
     property real now: Date.now()
     property real lastPolled: -1
     property int stalePolls: 0
@@ -181,7 +183,8 @@ PanelWindow {
         const trust = LM.pollTrust(root.lastPolled, polled, root.stalePolls, root.playing)
         root.lastPolled = polled
         root.stalePolls = trust.stale
-        if (trust.use)
+        // no reading for a second after a toggle: the player's position is least reliable then
+        if (trust.use && Date.now() - root.lastToggle >= 1000)
             root.clk = LM.observe(root.clk, polled, Date.now(), root.playing)
         root.now = Date.now()
     }
