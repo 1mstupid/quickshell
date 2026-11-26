@@ -28,6 +28,8 @@ PanelWindow {
     anchors { top: true; left: true; right: true }
 
     WlrLayershell.layer: WlrLayer.Top
+    // its own name, so a compositor blur rule can target the bar and the strip in it alone
+    WlrLayershell.namespace: "qs-bar"
     WlrLayershell.keyboardFocus: openBand !== null ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     // notch: the bar sits flush with the top edge; pill: it floats a little below it. Every
