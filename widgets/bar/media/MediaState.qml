@@ -34,7 +34,14 @@ Item {
     readonly property bool playing: player !== null
         && player.playbackState === MprisPlaybackState.Playing
     // a pause or resume reads the exact position, not the last one-second tick
-    onPlayingChanged: if (playing) lastPlayer = player
+    // a pause or resume is when the player's reported position is least reliable, so no
+    // reading is taken for a second after one; the readout runs on its own until then
+    property real lastToggle: 0
+    function settled() { return Date.now() - root.lastToggle >= 1000 }
+    onPlayingChanged: {
+        if (playing) lastPlayer = player
+        lastToggle = Date.now()
+    }
 
     // a track is loaded, playing or paused; stopped or no player is not
     readonly property bool hasTrack: player !== null
@@ -80,7 +87,7 @@ Item {
         interval: 250
         repeat: true
         triggeredOnStart: true
-        onTriggered: root.pos = root.player?.position ?? 0
+        onTriggered: if (root.settled()) root.pos = root.player?.position ?? 0
     }
 
     // re-read immediately on track change or seek while paused
@@ -91,7 +98,7 @@ Item {
             root.dismissed = false
         }
         function onPositionChanged() {
-            root.pos = root.player?.position ?? 0
+            if (root.settled()) root.pos = root.player?.position ?? 0
         }
     }
 
