@@ -96,8 +96,10 @@ PanelWindow {
     // ===== the words =====
     property var lines: []
     property string lyricsKey: ""
-    // the lookup that is running, and the one waiting for it to stop
-    property string runKey: ""
+    // the lookup that is running, and the one waiting for it to stop; each run has a number,
+    // printed with its output, so a result is matched to its own song whatever the timing
+    property int runSeq: 0
+    property var runKeys: ({})
     property var pendingArgs: null
     property string pendingKey: ""
     property var cache: ({})
@@ -152,8 +154,13 @@ PanelWindow {
     function startPending() {
         if (root.pendingArgs === null)
             return
-        root.runKey = root.pendingKey
-        fetchProc.command = root.pendingArgs
+        root.runSeq = root.runSeq + 1
+        const keys = Object.assign({}, root.runKeys)
+        keys[root.runSeq] = root.pendingKey
+        root.runKeys = keys
+        // the script prints the run's number last, after curl's output
+        fetchProc.command = ["sh", "-c", 'curl "$@"; echo; echo RUN:' + root.runSeq, "sh"]
+            .concat(root.pendingArgs.slice(1))
         root.pendingArgs = null
         fetchProc.running = true
     }
@@ -163,10 +170,14 @@ PanelWindow {
         onExited: root.startPending()
         stdout: StdioCollector {
             onStreamFinished: {
-                const key = root.runKey
+                // without the run's number at the end, the output was cut off: nothing to keep
+                const m = /\nRUN:(\d+)\s*$/.exec(text)
+                if (m === null)
+                    return
+                const key = root.runKeys[Number(m[1])]
                 let parsed = null
                 try {
-                    parsed = LM.foldEchoes(LM.parseLrc(JSON.parse(text).syncedLyrics ?? ""))
+                    parsed = LM.foldEchoes(LM.parseLrc(JSON.parse(text.slice(0, m.index)).syncedLyrics ?? ""))
                 } catch (e) {
                     parsed = null
                 }
