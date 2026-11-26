@@ -536,6 +536,8 @@ Item {
         bodyHeight: card.height + 18 * root.grow
         x: card.x - bodyX
         y: card.y
+        // translucent, so a compositor blur shows through it; opaque text stays readable at this tint
+        fillColor: Qt.alpha(Theme.bg, 0.72)
     }
 
     Rectangle {
