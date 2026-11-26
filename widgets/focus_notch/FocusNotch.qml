@@ -360,7 +360,7 @@ Item {
     Timer {
         id: hoverDwell
         interval: 100
-        onTriggered: if (FocusNotchState.pillHovered && root.stage === "" && root.canTake) root.show("hover")
+        onTriggered: if (FocusNotchState.pillHovered && root.stage === "" && root.canTake && !PillState.returning) root.show("hover")
     }
 
     function show(next) {
@@ -461,7 +461,8 @@ Item {
         target: FocusNotchState
         function onPillHoveredChanged() {
             if (FocusNotchState.pillHovered) {
-                if (root.stage === "" && root.canTake)
+                // not while the strip is shrinking back into the pill, or the close morph is cut short
+                if (root.stage === "" && root.canTake && !PillState.returning)
                     hoverDwell.restart()
                 return
             }
