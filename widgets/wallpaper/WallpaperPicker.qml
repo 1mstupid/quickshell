@@ -612,6 +612,8 @@ Item {
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             width: parent.width * 0.25
+            // under glass the blur would show these as a box; the cards just end at the edge
+            visible: !UserSettings.liquidGlass
             gradient: Gradient {
                 orientation: Gradient.Horizontal
                 GradientStop { position: 0.0; color: Qt.alpha(Theme.bg, 0.95) }
@@ -624,6 +626,8 @@ Item {
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             width: parent.width * 0.25
+            // under glass the blur would show these as a box; the cards just end at the edge
+            visible: !UserSettings.liquidGlass
             gradient: Gradient {
                 orientation: Gradient.Horizontal
                 GradientStop { position: 0.0; color: Qt.alpha(Theme.bg, 0) }
