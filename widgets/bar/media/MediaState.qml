@@ -81,6 +81,9 @@ Item {
         onTriggered: root.pos = root.player?.position ?? 0
     }
 
+    // a pause or resume reads the exact position, not the last one-second tick
+    onPlayingChanged: root.pos = root.player?.position ?? 0
+
     // re-read immediately on track change or seek while paused
     Connections {
         target: root.player
