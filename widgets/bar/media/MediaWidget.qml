@@ -40,6 +40,9 @@ PanelWindow {
         cavaConfigWriter.running = true;
     }
 
+    // cava listens only while the card is up and a track plays, so it is not left running
+    property bool cavaReady: false
+
     readonly property int panelW: 300
 
     property real livePos: 0.0
@@ -54,6 +57,9 @@ PanelWindow {
         target: media
         function onPosChanged() {
             root.livePos = media.pos
+        }
+        function onPlayingChanged() {
+            waveCanvas.requestPaint()
         }
     }
 
@@ -72,15 +78,13 @@ PanelWindow {
             "sh", "-c",
             "printf '[general]\nbars = 20\nframerate = 60\n[input]\nmethod = pipewire\nsource = auto\n[output]\nmethod = raw\ndata_format = ascii\nascii_max_range = 100\n' > /tmp/quickshell_cava_config"
         ]
-        onExited: {
-            cavaProcess.running = true;
-        }
+        onExited: root.cavaReady = true
     }
 
     // ── 2. Run Cava using the generated config file ────────────────────────
     Process {
         id: cavaProcess
-        running: false
+        running: root.cavaReady && root.visible && media.playing
         command: ["cava", "-p", "/tmp/quickshell_cava_config"]
 
         stdout: SplitParser {
@@ -130,15 +134,16 @@ PanelWindow {
                 sourceSize.width: root.panelW * 2
             }
 
-            // Increased shadow height and themed opacity gradient
+            // a black shadow, not themed: a theme colour reads as a grey smudge on light covers
             Rectangle {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
-                height: parent.height * 0.65
+                height: parent.height * 0.7
                 gradient: Gradient {
-                    GradientStop { position: 0.0; color: Qt.alpha(Theme.bg, 0) }
-                    GradientStop { position: 1.0; color: Qt.alpha(Theme.bg, 0.95) }
+                    GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, 0) }
+                    GradientStop { position: 0.5; color: Qt.rgba(0, 0, 0, 0.6) }
+                    GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.95) }
                 }
             }
         }
