@@ -96,9 +96,8 @@ PanelWindow {
         width: root.width
         height: col.implicitHeight + 2 * pad
         radius: Theme.cardRadius
-        color: Qt.alpha(Theme.bg, 0.92)
-        border.width: 1
-        border.color: Qt.alpha(Theme.border, 0.6)
+        // translucent under the Liquid glass setting, so a compositor blur shows through the card
+        color: Qt.alpha(Theme.bg, UserSettings.liquidGlass ? 0.72 : 0.92)
 
         Column {
             id: col
