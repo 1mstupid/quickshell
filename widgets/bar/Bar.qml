@@ -53,8 +53,7 @@ PanelWindow {
     // the band of whichever picker is open on the origin screen, or null
     readonly property Item openBand: pickerLoader.item?.visible ? pickerLoader.item.maskItem
         : colorLoader.item?.visible ? colorLoader.item.maskItem
-        : launcherLoader.item?.visible ? launcherLoader.item.maskItem
-        : focusLoader.item?.visible ? focusLoader.item.maskItem : null
+        : launcherLoader.item?.visible ? launcherLoader.item.maskItem : null
     mask: Region { item: root.openBand ? root.openBand : (PillState.active && !root.isOrigin ? null : hoverZone) }
 
     // the focus notch's pointer area: the pill with a margin, so a near miss still opens it
@@ -432,12 +431,5 @@ PanelWindow {
         active: root.isOrigin
         anchors.fill: parent
         sourceComponent: AppLauncher {}
-    }
-    // the focus strip grows out of the pill, so it lives here too
-    Loader {
-        id: focusLoader
-        active: root.isOrigin
-        anchors.fill: parent
-        sourceComponent: FocusNotch {}
     }
 }

@@ -34,6 +34,8 @@ ShellRoot {
 
     NotifyStack {}
 
+    FocusNotchWindow {}
+
     SettingsWindow {}
 
 
