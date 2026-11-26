@@ -35,14 +35,18 @@ PanelWindow {
 
     visible: WidgetLayout.shown("media") && media.present && !Overview.open
 
-    Component.onCompleted: WidgetLayout.register("media", root)
+    Component.onCompleted: {
+        WidgetLayout.register("media", root);
+        cavaConfigWriter.running = true;
+    }
+
+    // cava listens only while the card is up and a track plays, so it is not left running
+    property bool cavaReady: false
 
     readonly property int panelW: 300
-    readonly property int discD: 300
-    readonly property int discLower: 0
 
-    // Local smooth position tracker for live updating during playback
     property real livePos: 0.0
+    property var audioBars: [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10]
 
     MediaState {
         id: media
@@ -54,6 +58,9 @@ PanelWindow {
         function onPosChanged() {
             root.livePos = media.pos
         }
+        function onPlayingChanged() {
+            waveCanvas.requestPaint()
+        }
     }
 
     IpcHandler {
@@ -64,26 +71,38 @@ PanelWindow {
         function kill(): void { media.kill() }
     }
 
-    // ── Transport buttons ──────────────────────────────────────────────────
-    component Btn: Text {
-        id: btn
-        property bool allowed: true
-        property color tint: Theme.fg
-        signal tapped()
-        anchors.verticalCenter: parent.verticalCenter
-        font.family: Theme.fontFamily
-        font.pixelSize: 20
-        color: !allowed ? Qt.alpha(tint, 0.25)
-               : ma.containsMouse ? Theme.accent : tint
-        Behavior on color { ColorAnimation { duration: 120 } }
+    // ── 1. Write temp config file for Cava ─────────────────────────────────
+    Process {
+        id: cavaConfigWriter
+        command: [
+            "sh", "-c",
+            "printf '[general]\nbars = 20\nframerate = 60\n[input]\nmethod = pipewire\nsource = auto\n[output]\nmethod = raw\ndata_format = ascii\nascii_max_range = 100\n' > /tmp/quickshell_cava_config"
+        ]
+        onExited: root.cavaReady = true
+    }
 
-        MouseArea {
-            id: ma
-            anchors.fill: parent
-            anchors.margins: -8
-            hoverEnabled: true
-            cursorShape: btn.allowed ? Qt.PointingHandCursor : Qt.ArrowCursor
-            onClicked: if (btn.allowed) btn.tapped()
+    // ── 2. Run Cava using the generated config file ────────────────────────
+    Process {
+        id: cavaProcess
+        running: root.cavaReady && root.visible && media.playing
+        command: ["cava", "-p", "/tmp/quickshell_cava_config"]
+
+        stdout: SplitParser {
+            onRead: data => {
+                var trimmed = data.trim();
+                if (trimmed.length > 0) {
+                    var parts = trimmed.split(";");
+                    if (parts.length >= 20) {
+                        var newBars = [];
+                        for (var i = 0; i < 20; i++) {
+                            var val = parseInt(parts[i]) || 0;
+                            newBars.push(val);
+                        }
+                        root.audioBars = newBars;
+                        waveCanvas.requestPaint();
+                    }
+                }
+            }
         }
     }
 
@@ -94,138 +113,136 @@ PanelWindow {
         width: root.panelW
         height: root.panelW
         radius: 12
-        color: Qt.alpha(Theme.bg, 0.92)
+        color: Theme.altbg
         border.width: 1
         border.color: Qt.alpha(Theme.border, 0.6)
-        clip: true
-
-        HoverHandler { id: hover }
 
         Item {
-            id: disc
-            width: root.panelW
-            height: root.discLower + root.discD / 2
-
+            id: art
+            anchors.fill: parent
             layer.enabled: true
             layer.effect: MultiEffect {
                 maskEnabled: true
-                maskSource: discMask
+                maskSource: cardMask
             }
 
-            Item {
-                id: discMask
+            Image {
                 anchors.fill: parent
-                visible: false
-                layer.enabled: true
-
-                Rectangle {
-                    anchors.fill: parent
-                    radius: card.radius
-                    color: "white"
-                }
+                source: media.player?.trackArtUrl ?? ""
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                sourceSize.width: root.panelW * 2
             }
 
+            // fades into the theme background, so the text sits on the card's own colour
             Rectangle {
-                id: face
-                width: root.discD
-                height: root.discD
-                x: (root.panelW - width) / 2
-                y: root.discLower - height / 2
-                radius: width / 2
-                color: Theme.altbg
-
-                NumberAnimation on rotation {
-                    running: media.playing
-                    loops: Animation.Infinite
-                    from: face.rotation
-                    to: face.rotation + 360
-                    duration: 12000
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: parent.height * 0.7
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: Qt.alpha(Theme.bg, 0) }
+                    GradientStop { position: 0.5; color: Qt.alpha(Theme.bg, 0.6) }
+                    GradientStop { position: 1.0; color: Qt.alpha(Theme.bg, 0.95) }
                 }
-
-                Image {
-                    id: art
-                    anchors.fill: parent
-                    source: media.player?.trackArtUrl ?? ""
-                    fillMode: Image.PreserveAspectCrop
-                    asynchronous: true
-                    sourceSize.width: root.discD * 2
-                    layer.enabled: true
-                    layer.effect: MultiEffect {
-                        maskEnabled: true
-                        maskSource: faceMask
-                    }
-                }
-
-                Item {
-                    id: faceMask
-                    anchors.fill: parent
-                    visible: false
-                    layer.enabled: true
-
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: width / 2
-                        color: "white"
-                    }
-                }
-            }
-
-            Rectangle {
-                anchors.horizontalCenter: parent.horizontalCenter
-                y: root.discLower - 8
-                width: 16
-                height: 16
-                radius: 8
-                color: Theme.bg
-                border.width: 3
-                border.color: Qt.alpha(Theme.fg, 0.35)
             }
         }
 
-        Column {
-            x: 24
-            y: disc.height + 14
-            width: card.width - 48
-            spacing: 8
+        Item {
+            id: cardMask
+            anchors.fill: parent
+            visible: false
+            layer.enabled: true
 
-            Row {
-                x: (parent.width - width) / 2
-                height: 14
-                spacing: 2
+            Rectangle {
+                anchors.fill: parent
+                radius: card.radius
+                color: "white"
+            }
+        }
 
-                Repeater {
-                    model: 5
+        // ── Anchored, Symmetrically Mirrored Wave Visualizer ─────────────────
+        Item {
+            id: waveContainer
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.leftMargin: 18
+            anchors.rightMargin: 18
+            anchors.verticalCenter: parent.verticalCenter
+            height: 55
+            z: 2
+            visible: media.present
 
-                    Rectangle {
-                        id: waveBar
-                        required property int index
-                        y: (parent.height - height) / 2
-                        width: 2
-                        height: 6
-                        radius: 1
-                        color: Qt.alpha(Theme.fg, 0.4)
+            Canvas {
+                id: waveCanvas
+                anchors.fill: parent
 
-                        SequentialAnimation on height {
-                            running: media.playing
-                            loops: Animation.Infinite
-                            NumberAnimation { to: 13; duration: 280 + waveBar.index * 60; easing.type: Easing.InOutSine }
-                            NumberAnimation { to: 4; duration: 280 + waveBar.index * 60; easing.type: Easing.InOutSine }
+                onPaint: {
+                    var ctx = getContext("2d");
+                    ctx.clearRect(0, 0, width, height);
+
+                    if (!media.playing) {
+                        ctx.beginPath();
+                        ctx.strokeStyle = Qt.alpha(Theme.fg, 0.25);
+                        ctx.lineWidth = 2;
+                        ctx.moveTo(0, height / 2);
+                        ctx.lineTo(width, height / 2);
+                        ctx.stroke();
+                        return;
+                    }
+
+                    ctx.beginPath();
+                    ctx.strokeStyle = Qt.alpha(Theme.fg, 0.9);
+                    ctx.lineWidth = 2.5;
+                    ctx.lineCap = "round";
+                    ctx.lineJoin = "round";
+
+                    // Mirror the cava bars array for a centered, symmetric wave layout
+                    var rawBars = root.audioBars;
+                    var bars = rawBars.slice().reverse().concat(rawBars);
+
+                    var step = width / (bars.length - 1);
+                    var centerY = height / 2;
+
+                    for (var i = 0; i < bars.length; i++) {
+                        var x = i * step;
+                        var normalizedVal = (bars[i] / 100.0) * (height * 0.42);
+                        var y = centerY + (i % 2 === 0 ? -1 : 1) * normalizedVal;
+
+                        if (i === 0) {
+                            ctx.moveTo(x, y);
+                        } else {
+                            var prevX = (i - 1) * step;
+                            var prevNormalized = (bars[i - 1] / 100.0) * (height * 0.42);
+                            var prevY = centerY + ((i - 1) % 2 === 0 ? -1 : 1) * prevNormalized;
+                            
+                            var xc = (prevX + x) / 2;
+                            var yc = (prevY + y) / 2;
+                            ctx.quadraticCurveTo(prevX, prevY, xc, yc);
                         }
                     }
+                    ctx.stroke();
                 }
             }
+        }
+
+        // ── Metadata & Progress Bar ─────────────────────────────────────────
+        Column {
+            x: 18
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 16
+            width: card.width - 36
+            spacing: 4
 
             Text {
                 width: parent.width
-                horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
                 text: media.artistText
-                color: Qt.alpha(Theme.fg, 0.5)
+                color: Qt.alpha(Theme.fg, 0.6)
                 font.family: Theme.fontFamily
-                font.pixelSize: 13
+                font.pixelSize: 12
             }
 
-            // --- Normal Mode: Track Title (Upgraded to MarqueeText) ---
             MarqueeText {
                 width: parent.width
                 height: 20
@@ -233,17 +250,17 @@ PanelWindow {
                 color: Theme.fg
                 font.family: Theme.fontFamily
                 font.pixelSize: 16
+                font.bold: true
             }
 
             Item {
-                x: (parent.width - width) / 2
-                width: 40
+                width: parent.width
                 height: 2
 
                 Rectangle {
                     anchors.fill: parent
                     radius: 1
-                    color: Qt.alpha(Theme.fg, 0.15)
+                    color: Qt.alpha(Theme.fg, 0.2)
                 }
                 Rectangle {
                     height: parent.height
@@ -255,73 +272,27 @@ PanelWindow {
 
             Item {
                 width: parent.width
-                height: 24
+                height: 22
 
                 Row {
-                    anchors.centerIn: parent
-                    visible: !hover.hovered
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
                     spacing: 0
 
                     Text {
                         text: media.fmt(root.livePos)
                         color: Theme.fg
                         font.family: Theme.fontFamilyAlt
-                        font.pixelSize: 15
+                        font.pixelSize: 11
                         font.bold: true
                     }
                     Text {
                         visible: media.timed
                         text: " / " + media.fmt(media.len)
-                        color: Qt.alpha(Theme.fg, 0.4)
+                        color: Qt.alpha(Theme.fg, 0.6)
                         font.family: Theme.fontFamilyAlt
-                        font.pixelSize: 15
+                        font.pixelSize: 11
                     }
-                }
-
-                Row {
-                    anchors.centerIn: parent
-                    visible: hover.hovered
-                    spacing: 20
-
-                    Btn {
-                        text: "󰒮"
-                        allowed: media.player?.canGoPrevious ?? false
-                        onTapped: media.player.previous()
-                    }
-
-                    Rectangle {
-                        id: playBtn
-                        readonly property bool allowed: media.player?.canTogglePlaying ?? false
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 34
-                        height: 34
-                        radius: 17
-                        color: !allowed ? Qt.alpha(Theme.fg, 0.25)
-                               : playMa.containsMouse ? Theme.accent : Theme.fg
-                        Behavior on color { ColorAnimation { duration: 120 } }
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: media.playing ? "󰏤" : "󰐊"
-                            color: Theme.bg
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 18
-                        }
-                        MouseArea {
-                            id: playMa
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: playBtn.allowed ? Qt.PointingHandCursor : Qt.ArrowCursor
-                            onClicked: if (playBtn.allowed) media.player.togglePlaying()
-                        }
-                    }
-
-                    Btn {
-                        text: "󰒭"
-                        allowed: media.player?.canGoNext ?? false
-                        onTapped: media.player.next()
-                    }
-
                 }
             }
         }
