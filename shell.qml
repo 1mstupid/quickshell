@@ -22,6 +22,7 @@ import "./widgets/usage"
 import "./widgets/wallpaper"
 import "./widgets/colorscheme"
 import "./widgets/share"
+import "./widgets/screenshot"
 
 ShellRoot {
 
@@ -49,6 +50,8 @@ ShellRoot {
     HabitsWidget {}
 
     LayoutEditor {}
+
+    Screenshot {}
 
     Lock {}
 
