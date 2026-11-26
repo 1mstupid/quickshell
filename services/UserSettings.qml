@@ -67,6 +67,8 @@ Singleton {
     // the panel morph: its time in ms, and the period of the elastic curve (see PillState)
     property real morphMs: Schema.defaultOf("morphMs")
     property real morphPeriod: Schema.defaultOf("morphPeriod")
+    // the focus strip as translucent glass, rather than solid
+    property bool liquidGlass: Schema.defaultOf("liquidGlass")
 
     // takes the [settings] table; a key that is missing or of the wrong type keeps its default
     function parse(table) {
