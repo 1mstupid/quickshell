@@ -873,8 +873,13 @@ function estimate(state, nowMs, playing) {
 }
 
 function observe(state, polled, nowMs, playing) {
-    if (!playing)
-        return { pos: polled, at: nowMs, hist: [], cand: null }
+    if (!playing) {
+        // paused: the frozen clock stays, so a reading that is a little ahead or behind (a
+        // player still catching up after a toggle) does not move it; a seek still does
+        if (Math.abs(polled - state.pos) >= 1.5)
+            return { pos: polled, at: nowMs, hist: [], cand: null }
+        return state
+    }
     var o = polled - nowMs / 1000
     var hist = state.hist || []
     if (hist.length === 0)
