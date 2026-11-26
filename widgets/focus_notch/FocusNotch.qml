@@ -47,12 +47,12 @@ Item {
     // hosted by the origin bar's window, like the pickers, so it grows out of the pill
     visible: false
 
-    // its own window, sized to the open panel: the control page is as tall as its rows
+    // the whole screen, as the bar's window is: the control page is as tall as its rows
     anchors.fill: parent
     onTChanged: if (morph.running && morph.to === 0 && t <= 0) visible = false
 
-    // the strip and the open panel hold the keys (its own window takes them while this
-    // item is shown); that window's mask reads this to take input only on the card, or on the
+    // the strip and the open panel hold the keys (the bar's window takes them while this
+    // item is shown); the bar's mask reads this to take input only on the card, or on the
     // band around it while the panel is open, to catch a click outside
     readonly property Item maskItem: root.stage === "open" ? catcher : card
 
