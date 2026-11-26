@@ -35,12 +35,15 @@ PanelWindow {
 
     visible: WidgetLayout.shown("media") && media.present && !Overview.open
 
-    Component.onCompleted: WidgetLayout.register("media", root)
+    Component.onCompleted: {
+        WidgetLayout.register("media", root);
+        cavaConfigWriter.running = true;
+    }
 
     readonly property int panelW: 300
 
-    // Local smooth position tracker for live updating during playback
     property real livePos: 0.0
+    property var audioBars: [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10]
 
     MediaState {
         id: media
@@ -62,31 +65,44 @@ PanelWindow {
         function kill(): void { media.kill() }
     }
 
-    // ── Transport buttons ──────────────────────────────────────────────────
-    component Btn: Text {
-        id: btn
-        property bool allowed: true
-        property color tint: Theme.fg
-        signal tapped()
-        anchors.verticalCenter: parent.verticalCenter
-        font.family: Theme.fontFamily
-        font.pixelSize: 20
-        color: !allowed ? Qt.alpha(tint, 0.25)
-               : ma.containsMouse ? Theme.accent : tint
-        Behavior on color { ColorAnimation { duration: 120 } }
+    // ── 1. Write temp config file for Cava ─────────────────────────────────
+    Process {
+        id: cavaConfigWriter
+        command: [
+            "sh", "-c",
+            "printf '[general]\nbars = 20\nframerate = 60\n[input]\nmethod = pipewire\nsource = auto\n[output]\nmethod = raw\ndata_format = ascii\nascii_max_range = 100\n' > /tmp/quickshell_cava_config"
+        ]
+        onExited: {
+            cavaProcess.running = true;
+        }
+    }
 
-        MouseArea {
-            id: ma
-            anchors.fill: parent
-            anchors.margins: -8
-            hoverEnabled: true
-            cursorShape: btn.allowed ? Qt.PointingHandCursor : Qt.ArrowCursor
-            onClicked: if (btn.allowed) btn.tapped()
+    // ── 2. Run Cava using the generated config file ────────────────────────
+    Process {
+        id: cavaProcess
+        running: false
+        command: ["cava", "-p", "/tmp/quickshell_cava_config"]
+
+        stdout: SplitParser {
+            onRead: data => {
+                var trimmed = data.trim();
+                if (trimmed.length > 0) {
+                    var parts = trimmed.split(";");
+                    if (parts.length >= 20) {
+                        var newBars = [];
+                        for (var i = 0; i < 20; i++) {
+                            var val = parseInt(parts[i]) || 0;
+                            newBars.push(val);
+                        }
+                        root.audioBars = newBars;
+                        waveCanvas.requestPaint();
+                    }
+                }
+            }
         }
     }
 
     // ── Card ───────────────────────────────────────────────────────────────
-    // the cover fills the card, with a shadow rising from the bottom for the text
     Rectangle {
         id: card
 
@@ -97,9 +113,6 @@ PanelWindow {
         border.width: 1
         border.color: Qt.alpha(Theme.border, 0.6)
 
-        HoverHandler { id: hover }
-
-        // the cover, cut to the card's rounded corners by the mask below
         Item {
             id: art
             anchors.fill: parent
@@ -117,19 +130,19 @@ PanelWindow {
                 sourceSize.width: root.panelW * 2
             }
 
+            // Increased shadow height and themed opacity gradient
             Rectangle {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
-                height: parent.height * 0.6
+                height: parent.height * 0.65
                 gradient: Gradient {
                     GradientStop { position: 0.0; color: Qt.alpha(Theme.bg, 0) }
-                    GradientStop { position: 1.0; color: Qt.alpha(Theme.bg, 0.9) }
+                    GradientStop { position: 1.0; color: Qt.alpha(Theme.bg, 0.95) }
                 }
             }
         }
 
-        // hidden rounded shape, used only to mask the cover
         Item {
             id: cardMask
             anchors.fill: parent
@@ -143,6 +156,72 @@ PanelWindow {
             }
         }
 
+        // ── Anchored, Symmetrically Mirrored Wave Visualizer ─────────────────
+        Item {
+            id: waveContainer
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.leftMargin: 18
+            anchors.rightMargin: 18
+            anchors.verticalCenter: parent.verticalCenter
+            height: 55
+            z: 2
+            visible: media.present
+
+            Canvas {
+                id: waveCanvas
+                anchors.fill: parent
+
+                onPaint: {
+                    var ctx = getContext("2d");
+                    ctx.clearRect(0, 0, width, height);
+
+                    if (!media.playing) {
+                        ctx.beginPath();
+                        ctx.strokeStyle = Qt.alpha(Theme.fg, 0.25);
+                        ctx.lineWidth = 2;
+                        ctx.moveTo(0, height / 2);
+                        ctx.lineTo(width, height / 2);
+                        ctx.stroke();
+                        return;
+                    }
+
+                    ctx.beginPath();
+                    ctx.strokeStyle = Qt.alpha(Theme.fg, 0.9);
+                    ctx.lineWidth = 2.5;
+                    ctx.lineCap = "round";
+                    ctx.lineJoin = "round";
+
+                    // Mirror the cava bars array for a centered, symmetric wave layout
+                    var rawBars = root.audioBars;
+                    var bars = rawBars.slice().reverse().concat(rawBars);
+
+                    var step = width / (bars.length - 1);
+                    var centerY = height / 2;
+
+                    for (var i = 0; i < bars.length; i++) {
+                        var x = i * step;
+                        var normalizedVal = (bars[i] / 100.0) * (height * 0.42);
+                        var y = centerY + (i % 2 === 0 ? -1 : 1) * normalizedVal;
+
+                        if (i === 0) {
+                            ctx.moveTo(x, y);
+                        } else {
+                            var prevX = (i - 1) * step;
+                            var prevNormalized = (bars[i - 1] / 100.0) * (height * 0.42);
+                            var prevY = centerY + ((i - 1) % 2 === 0 ? -1 : 1) * prevNormalized;
+                            
+                            var xc = (prevX + x) / 2;
+                            var yc = (prevY + y) / 2;
+                            ctx.quadraticCurveTo(prevX, prevY, xc, yc);
+                        }
+                    }
+                    ctx.stroke();
+                }
+            }
+        }
+
+        // ── Metadata & Progress Bar ─────────────────────────────────────────
         Column {
             x: 18
             anchors.bottom: parent.bottom
@@ -193,7 +272,6 @@ PanelWindow {
                 Row {
                     anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
-                    visible: !hover.hovered
                     spacing: 0
 
                     Text {
@@ -209,51 +287,6 @@ PanelWindow {
                         color: Qt.alpha(Theme.fg, 0.6)
                         font.family: Theme.fontFamilyAlt
                         font.pixelSize: 11
-                    }
-                }
-
-                Row {
-                    anchors.centerIn: parent
-                    visible: hover.hovered
-                    spacing: 20
-
-                    Btn {
-                        text: "󰒮"
-                        allowed: media.player?.canGoPrevious ?? false
-                        onTapped: media.player.previous()
-                    }
-
-                    Rectangle {
-                        id: playBtn
-                        readonly property bool allowed: media.player?.canTogglePlaying ?? false
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 34
-                        height: 34
-                        radius: 17
-                        color: !allowed ? Qt.alpha(Theme.fg, 0.25)
-                               : playMa.containsMouse ? Theme.accent : Theme.fg
-                        Behavior on color { ColorAnimation { duration: 120 } }
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: media.playing ? "󰏤" : "󰐊"
-                            color: Theme.bg
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 18
-                        }
-                        MouseArea {
-                            id: playMa
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: playBtn.allowed ? Qt.PointingHandCursor : Qt.ArrowCursor
-                            onClicked: if (playBtn.allowed) media.player.togglePlaying()
-                        }
-                    }
-
-                    Btn {
-                        text: "󰒭"
-                        allowed: media.player?.canGoNext ?? false
-                        onTapped: media.player.next()
                     }
                 }
             }
