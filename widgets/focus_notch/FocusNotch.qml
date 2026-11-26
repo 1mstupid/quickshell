@@ -124,6 +124,9 @@ Item {
     // one morph, as the other panels have: 0 = the pill, 1 = the hover strip, 2 = the full panel.
     // grow is the first half and expand the second; both clamp, so the elastic overshoot stays in range
     property real t: 0
+    // a close from the open panel shrinks the card straight to the pill: t would pass the strip size
+    property bool shrinking: false
+    property real shrinkP: 0
     readonly property int hoverMs: PillState.morphMs * 2
     readonly property real grow: Math.min(1, Math.max(0, t))
     readonly property real expand: Math.min(1, Math.max(0, t - 1))
@@ -366,6 +369,8 @@ Item {
     function show(next) {
         if (!PillState.claim("focus"))
             return
+        shrinkAnim.stop()
+        shrinking = false
         // only a fresh open chimes, and only once it has fully opened (see chime)
         if (stage === "")
             chimeDue = true
@@ -397,6 +402,8 @@ Item {
         takeW = 0
         takeH = 0
         morph.stop()
+        shrinkAnim.stop()
+        shrinking = false
         t = 0
         chimeDue = false
         stage = ""
@@ -410,8 +417,16 @@ Item {
         if (stage === "")
             return
             
-        if (stage === "open")
+        if (stage === "open") {
             Sounds.play("close-notch")
+            const from = Math.max(0, Math.min(1, (card.width - PillState.pillWidth) / (shownW - PillState.pillWidth)))
+            shrinkAnim.stop()
+            shrinkP = from
+            shrinking = true
+            shrinkAnim.from = from
+            shrinkAnim.to = 0
+            shrinkAnim.start()
+        }
             
         chimeDue = false
         stage = ""
@@ -434,6 +449,16 @@ Item {
         morph.from = root.t
         morph.to = 0
         morph.start()
+    }
+
+    // the open panel's size on a close, eased with the morph so both end at the pill together
+    NumberAnimation {
+        id: shrinkAnim
+        target: root
+        property: "shrinkP"
+        duration: PillState.morphMs
+        easing.type: PillState.openEase
+        easing.period: PillState.easePeriod
     }
 
     // the same morph as the other panels: it ends at the pill on a close, when the panel lets go
@@ -523,8 +548,12 @@ Item {
         readonly property real startW: root.takeW > 0 ? root.takeW : stripW
         readonly property real startH: root.takeH > 0 ? root.takeH : stripH
 
-        width: startW + (root.shownW - startW) * Math.max(0, root.expand)
-        height: startH + (root.shownH - startH) * Math.max(0, root.expand)
+        width: root.shrinking
+            ? PillState.pillWidth + (root.shownW - PillState.pillWidth) * Math.max(0, root.shrinkP)
+            : startW + (root.shownW - startW) * Math.max(0, root.expand)
+        height: root.shrinking
+            ? PillState.pillHeight + (root.shownH - PillState.pillHeight) * Math.max(0, root.shrinkP)
+            : startH + (root.shownH - startH) * Math.max(0, root.expand)
         x: (root.width - width) / 2
         y: PillState.pillTop
         color: "transparent"
