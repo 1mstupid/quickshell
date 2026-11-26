@@ -45,7 +45,7 @@ Item {
     }
 
     // run once the notch has closed, so it is not in the shot
-    readonly property var screenshotCommand: ["screenshot"]
+    readonly property var screenshotCommand: ["quickshell", "-p", Quickshell.shellDir, "ipc", "call", "screenshot", "capture"]
 
     // the per-app volume list under the volume slider; a right click on its icon toggles it
     property bool mixerOpen: false
