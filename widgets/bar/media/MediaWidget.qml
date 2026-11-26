@@ -134,16 +134,16 @@ PanelWindow {
                 sourceSize.width: root.panelW * 2
             }
 
-            // a black shadow, not themed: a theme colour reads as a grey smudge on light covers
+            // fades into the theme background, so the text sits on the card's own colour
             Rectangle {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
                 height: parent.height * 0.7
                 gradient: Gradient {
-                    GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, 0) }
-                    GradientStop { position: 0.5; color: Qt.rgba(0, 0, 0, 0.6) }
-                    GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.95) }
+                    GradientStop { position: 0.0; color: Qt.alpha(Theme.bg, 0) }
+                    GradientStop { position: 0.5; color: Qt.alpha(Theme.bg, 0.6) }
+                    GradientStop { position: 1.0; color: Qt.alpha(Theme.bg, 0.95) }
                 }
             }
         }
