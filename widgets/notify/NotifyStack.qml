@@ -20,7 +20,8 @@ PanelWindow {
     readonly property int hidden: toasts.length - shown.length
 
     screen: PillState.originScreen
-    visible: toasts.length > 0
+    // the focus notch's strip and panel cover these cards, so they step aside while it holds the pill
+    visible: toasts.length > 0 && PillState.owner !== "focus"
     anchors {
         top: true
         left: true
@@ -29,7 +30,8 @@ PanelWindow {
     implicitHeight: stack.y + stack.height
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
-    WlrLayershell.layer: WlrLayer.Overlay
+    // Top, not Overlay: the focus notch draws over the cards instead of the cards over it
+    WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.namespace: "qs-notify"
     // only the cards take clicks; the rest of the strip passes them through
     mask: Region { item: stack }
