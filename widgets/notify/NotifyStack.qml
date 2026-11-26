@@ -18,6 +18,8 @@ PanelWindow {
         .reverse()
     readonly property var shown: toasts.slice(0, maxCards)
     readonly property int hidden: toasts.length - shown.length
+    // translucent under the Liquid glass setting, so a compositor blur shows through the cards
+    readonly property color cardFill: Qt.alpha(Theme.bg, UserSettings.liquidGlass ? 0.72 : 0.94)
 
     screen: PillState.originScreen
     // the focus notch's strip and panel cover these cards, so they step aside while it holds the pill
@@ -73,7 +75,7 @@ PanelWindow {
                     width: 14
                     height: 14
                     radius: height / 2
-                    color: Qt.alpha(Theme.bg, 0.94)
+                    color: root.cardFill
                     clip: true
 
                     Component.onCompleted: opening.start()
@@ -214,7 +216,7 @@ PanelWindow {
             width: Math.max(26, countLabel.implicitWidth + 14)
             height: 26
             radius: height / 2
-            color: Qt.alpha(Theme.bg, 0.94)
+            color: root.cardFill
 
             Text {
                 id: countLabel
