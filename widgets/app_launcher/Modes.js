@@ -4,8 +4,7 @@
 // of QML types so it can be tested with plain node.
 const MODES = [
     { name: "calc", title: "Calculator", subtitle: "!calc  evaluate with qalc", glyph: "󰃬", placeholder: "Calculate" },
-    { name: "file", title: "Files", subtitle: "!file  find, or / ~ to browse", glyph: "󰈔", placeholder: "Find files, or / ~ to browse" },
-    { name: "clipboard", title: "Clipboard", subtitle: "!clipboard  search clipboard history", glyph: "󰅍", placeholder: "Search clipboard history" }
+    { name: "file", title: "Files", subtitle: "!file  find, or / ~ to browse", glyph: "󰈔", placeholder: "Find files, or / ~ to browse" }
 ]
 
 function find(name) {
