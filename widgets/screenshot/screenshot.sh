@@ -131,16 +131,15 @@ id=""
 while :; do
     size="$(magick identify -format '%w × %h' "$out" 2>/dev/null)"
     if [ "$saved" = true ]; then
-        shown="$(printf '%s' "$out" | sed "s|^$HOME|~|")"
+        # Compact body: drop the multi-line file path, keep a clean inline summary
         reply="$(notify \
             -A "default=${LYNE_T_OPEN:-Open}" -A "open=${LYNE_T_OPEN:-Open}" -A "edit=${LYNE_T_EDIT:-Edit}" \
             -A "folder=${LYNE_T_FOLDER:-Folder}" -A "delete=${LYNE_T_DELETE:-Delete}" \
-            "${LYNE_T_SAVED:-Screenshot saved}" "$size · ${LYNE_T_ON_CLIPBOARD:-copied to the clipboard}
-$shown")"
+            "${LYNE_T_SAVED:-Screenshot saved}" "$size")"
     else
         reply="$(notify \
             -A "default=${LYNE_T_OPEN:-Open}" -A "save=${LYNE_T_SAVE:-Save}" -A "edit=${LYNE_T_EDIT:-Edit}" \
-            "${LYNE_T_COPIED:-Screenshot copied}" "$size · ${LYNE_T_NOT_SAVED:-not saved to a file}")"
+            "${LYNE_T_COPIED:-Screenshot copied}" "$size")"
     fi
     id="$(printf '%s\n' "$reply" | sed -n 1p)"
     choice="$(printf '%s\n' "$reply" | sed -n 2p)"
