@@ -130,17 +130,18 @@ Singleton {
     // is owed when it is open and has less than taskGateMinutes of time (done
     // counts as enough). Time on the task in focus counts live, so the way to
     // unlock an app is to work on the task, not to tick it in a blocked app.
-    function tasksOwed() {
-        return Todo.upcoming.some(t => {
-            const live = TaskFocus.sameTask(t) ? TaskFocus.elapsedMs / 60000 : 0
-            return t.spent + live < taskGateMinutes
-        })
-    }
+    // A property, not a function: it reads the running timer, so a binding that
+    // called it (the launcher's list) re-ran every second. This one only notifies
+    // when the answer changes.
+    readonly property bool tasksOwed: Todo.upcoming.some(t => {
+        const live = TaskFocus.sameTask(t) ? TaskFocus.elapsedMs / 60000 : 0
+        return t.spent + live < taskGateMinutes
+    })
 
     function taskGated(app) {
         if (!app || taskGateTargets.length === 0)
             return false
-        return taskGateTargets.some(t => matchesTarget(t, app)) && tasksOwed()
+        return taskGateTargets.some(t => matchesTarget(t, app)) && tasksOwed
     }
 
     // hyprctl eval finds the window object, which the close dispatcher takes. Hyprland
