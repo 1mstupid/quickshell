@@ -2,7 +2,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import "Modes.js" as Modes
+import "Query.js" as Query
 
 // The launcher's calculator. qalc has no QML binding, so each expression runs
 // as one short process, started once typing pauses and never two at a time.
@@ -50,7 +50,7 @@ Singleton {
         id: proc
         stdout: StdioCollector {
             onStreamFinished: {
-                root.result = Modes.answer(text, root.ran);
+                root.result = Query.answer(text, root.ran);
                 root.resultFor = root.ran;
             }
         }
