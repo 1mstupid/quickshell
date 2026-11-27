@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
 import "menu"
+import "menu/StudyMath.js" as StudyMath
 
 // App focus time, from Hyprland's toplevels. The focused toplevel holds
 // keyboard focus, and its elapsed time goes to its app_id.
@@ -22,9 +23,11 @@ Singleton {
     // { "2026-10-25": { "seconds": { "helium": 1234.5 }, "alerted": ["helium:80"],
     //   "focus": { "132": 240 }, "hours": { "9": { "helium": 600 } },
     //   "sessions": [{ "app": "helium", "start": 1761731400000, "end": 1761732000000 }],
-    //   "notifications": 3 } }
+    //   "notifications": 3,
+    //   "study": [{ "title": "Mat 1", "start": 1761731400000, "end": 1761732000000 }] } }
     //   focus: seconds per 5-minute slot from midnight; hours: seconds per clock hour
-    //   per app; sessions: one entry per focus stretch, recorded when focus moves on
+    //   per app; sessions: one entry per focus stretch, recorded when focus moves on;
+    //   study: one entry per run of the task timer, for the study widget
     property var days: ({})
     // { "helium": 60 } in minutes
     property var limits: ({})
@@ -47,6 +50,8 @@ Singleton {
     property double lastMs: Date.now()
     property bool ready: false
     property bool dirty: false
+    // study runs that ended before the file was read, added once it is
+    property var pendingStudy: []
     // the desktop widget and the focus widget show or hide through layout.json
     // (`qs ipc call usage toggle` / `toggleFocus`, or the layout edit mode)
     function toggleWidget() { WidgetLayout.toggle("usage") }
@@ -194,6 +199,7 @@ Singleton {
         rec.hours = rec.hours ?? {}
         rec.sessions = rec.sessions ?? []
         rec.runs = rec.runs ?? []
+        rec.study = rec.study ?? []
         rec.notifications = rec.notifications ?? 0
         days[key] = rec
         return rec
@@ -232,6 +238,29 @@ Singleton {
         const rec = ensureDay(dayKey())
         rec.runs.push({ start: start, end: end })
         dirty = true
+        revision++
+    }
+
+    // task timer runs: {title, start, end}. A copy, so bindings see a new run.
+    function studyOf(key, rev) {
+        const r = days[key]
+        return (r && r.study) ? r.study.slice() : []
+    }
+
+    // Saved at once: the timer banks its minutes in todo.md right away, and the
+    // run should survive a restart just as they do. A run across midnight is cut,
+    // so each day keeps its own part.
+    function addStudyRun(title, start, end) {
+        if (end - start < 1000)
+            return
+        if (!ready) {
+            pendingStudy.push({ title: title, start: start, end: end })
+            return
+        }
+        for (const piece of StudyMath.splitByDay({ title: title, start: start, end: end }))
+            ensureDay(Qt.formatDate(new Date(piece.start), "yyyy-MM-dd")).study.push(piece)
+        dirty = true
+        flush()
         revision++
     }
 
@@ -402,6 +431,13 @@ Singleton {
         while (keys.length > keepDays)
             delete days[keys.shift()]
         store.setText(JSON.stringify(days, null, 2) + "\n")
+    }
+
+    function addPendingStudy() {
+        const runs = pendingStudy
+        pendingStudy = []
+        for (const r of runs)
+            addStudyRun(r.title, r.start, r.end)
     }
 
     // [categories]: app_id or prefix* = "Category"
@@ -603,11 +639,13 @@ Singleton {
             }
             root.days = (d && typeof d === "object") ? d : {}
             root.ready = true
+            root.addPendingStudy()
             root.revision++
         }
         onLoadFailed: {
             root.days = {}
             root.ready = true
+            root.addPendingStudy()
         }
     }
 
