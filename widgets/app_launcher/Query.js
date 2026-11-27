@@ -90,8 +90,8 @@ function windowMatches(win, q) {
     )
 }
 
-// Rank windows: focused window last, then recent windows first.
-// Prefer stable application identifiers when sorting otherwise equal matches.
+// Rank windows: matches query, sorts by most recently used first, 
+// but keeps the currently focused window last and utilizes smart scoring.
 function rankWindows(windows, q, recentWindowAddresses, focusedAddress) {
     const query = q.trim().toLowerCase()
 
@@ -123,38 +123,6 @@ function rankWindows(windows, q, recentWindowAddresses, focusedAddress) {
 
         return 4
     }
-
-    return windows
-        .filter(w => windowMatches(w, query))
-        .sort((a, b) => {
-            const aFocused = a.address === focusedAddress ? 1 : 0
-            const bFocused = b.address === focusedAddress ? 1 : 0
-
-            if (aFocused !== bFocused)
-                return aFocused - bFocused
-
-            const scoreDiff = score(a) - score(b)
-            if (scoreDiff !== 0)
-                return scoreDiff
-
-            const aAge = recentWindowAddresses.indexOf(a.address)
-            const bAge = recentWindowAddresses.indexOf(b.address)
-
-            const aIndex = aAge === -1 ? Infinity : aAge
-            const bIndex = bAge === -1 ? Infinity : bAge
-
-            if (aIndex !== bIndex)
-                return aIndex - bIndex
-
-            return (a.title || "").localeCompare(b.title || "")
-        })
-}
-
-
-// Rank windows: matches query, sorts by most recently used first, 
-// but keeps the currently focused window last.
-function rankWindows(windows, q, recentWindowAddresses, focusedAddress) {
-    const query = q.trim().toLowerCase()
     
     return windows.filter(w => windowMatches(w, query)).sort((a, b) => {
         const aIsFocused = (a.address === focusedAddress) ? 1 : 0
@@ -163,6 +131,11 @@ function rankWindows(windows, q, recentWindowAddresses, focusedAddress) {
         // Focused window always goes last (0 before 1)
         if (aIsFocused !== bIsFocused) {
             return aIsFocused - bIsFocused
+        }
+
+        const scoreDiff = score(a) - score(b)
+        if (scoreDiff !== 0) {
+            return scoreDiff
         }
 
         // Recency: index in recentWindowAddresses (smaller index = more recent)
@@ -196,9 +169,9 @@ function findAppForWindow(win, entries) {
     for (const e of entries) {
         const eId = e.id.toLowerCase()
         const eName = e.name.toLowerCase()
-        if (eId.includes(cls) || cls.includes(eId) ||
-            eId.includes(initCls) || initCls.includes(eId) ||
-            eName.includes(cls) || cls.includes(eName)) {
+        if ((cls && eId.includes(cls)) || (cls && cls.includes(eId)) ||
+            (initCls && eId.includes(initCls)) || (initCls && initCls.includes(eId)) ||
+            (cls && eName.includes(cls)) || (cls && cls.includes(eName))) {
             return e
         }
     }
