@@ -1,3 +1,4 @@
+
 import QtQuick
 import Quickshell
 import Quickshell.Hyprland
@@ -21,11 +22,19 @@ RowLayout {
     }
 
     Repeater {
-        // Copy before sorting so the service's own order is not modified.
-        model: wm.workspaces
-            .slice()
-            .sort((a, b) => a.index - b.index)
-            .slice(0, root.maxVisible)
+        // Generate fixed workspace indicators independently of
+        // Hyprland's list, which may omit empty workspaces.
+        model: Array.from({ length: root.maxVisible }, (_, i) => {
+            const id = i + 1
+            const ws = wm.workspaces.find(w => w.id === id)
+
+            return {
+                id: id,
+                index: id,
+                focused: ws ? ws.focused : false,
+                occupied: ws ? ws.occupied : false
+            }
+        })
 
         Rectangle {
             id: workspaceIndicator
@@ -38,7 +47,6 @@ RowLayout {
 
             Layout.alignment: Qt.AlignVCenter
 
-            // Vertical capsules rather than circular dots
             implicitWidth: focused ? 8 : 4
             implicitHeight: focused ? 16 : 10
             radius: focused ? 4 : 2
@@ -49,7 +57,6 @@ RowLayout {
                     ? Qt.alpha(Theme.accent, 0.6)
                     : Qt.alpha(Theme.fg, 0.22)
 
-            // Disable the effect layer entirely for unfocused workspaces.
             layer.enabled: workspaceIndicator.focused
             layer.smooth: workspaceIndicator.focused
 
@@ -57,8 +64,6 @@ RowLayout {
                 shadowEnabled: workspaceIndicator.focused
                 shadowBlur: 1.0
                 shadowScale: 1.25
-
-                // Only the focused workspace can glow.
                 shadowOpacity: workspaceIndicator.focused ? 0.85 : 0.0
 
                 shadowColor: Qt.rgba(
@@ -68,6 +73,7 @@ RowLayout {
                     0.85
                 )
             }
+
             Behavior on implicitWidth {
                 NumberAnimation {
                     duration: 200
@@ -97,8 +103,11 @@ RowLayout {
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
 
-                onClicked: Hyprland.dispatch('hl.dsp.focus({ workspace = "' + modelData.id + '" })')
+                onClicked: Hyprland.dispatch(
+                    'hl.dsp.focus({ workspace = "' + modelData.id + '" })'
+                )
             }
         }
     }
 }
+
