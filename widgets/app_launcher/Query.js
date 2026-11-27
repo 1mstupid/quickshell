@@ -68,13 +68,88 @@ function rankApps(entries, q, recent) {
 
 // --- Hyprland Window Management ---
 
+
 function windowMatches(win, q) {
     const query = q.trim().toLowerCase()
     if (!query) return true
-    const titleMatch = win.title && win.title.toLowerCase().indexOf(query) !== -1
-    const classMatch = win.class && win.class.toLowerCase().indexOf(query) !== -1
-    return titleMatch || classMatch
+
+    const fields = [
+        win.title,
+        win.class,
+        win.initialClass,
+        win.initialTitle,
+        win.wayland?.appId,
+        win.lastIpcObject?.class,
+        win.lastIpcObject?.initialClass,
+        win.lastIpcObject?.title
+    ]
+
+    return fields.some(value =>
+        typeof value === "string" &&
+        value.toLowerCase().includes(query)
+    )
 }
+
+// Rank windows: focused window last, then recent windows first.
+// Prefer stable application identifiers when sorting otherwise equal matches.
+function rankWindows(windows, q, recentWindowAddresses, focusedAddress) {
+    const query = q.trim().toLowerCase()
+
+    const score = win => {
+        const fields = [
+            win.class,
+            win.initialClass,
+            win.wayland?.appId,
+            win.lastIpcObject?.class,
+            win.lastIpcObject?.initialClass
+        ]
+
+        // Stable app identity gets priority over arbitrary window titles.
+        if (fields.some(v =>
+            typeof v === "string" && v.toLowerCase() === query
+        )) return 0
+
+        if (fields.some(v =>
+            typeof v === "string" && v.toLowerCase().startsWith(query)
+        )) return 1
+
+        if (fields.some(v =>
+            typeof v === "string" && v.toLowerCase().includes(query)
+        )) return 2
+
+        if ([win.title, win.initialTitle].some(v =>
+            typeof v === "string" && v.toLowerCase().includes(query)
+        )) return 3
+
+        return 4
+    }
+
+    return windows
+        .filter(w => windowMatches(w, query))
+        .sort((a, b) => {
+            const aFocused = a.address === focusedAddress ? 1 : 0
+            const bFocused = b.address === focusedAddress ? 1 : 0
+
+            if (aFocused !== bFocused)
+                return aFocused - bFocused
+
+            const scoreDiff = score(a) - score(b)
+            if (scoreDiff !== 0)
+                return scoreDiff
+
+            const aAge = recentWindowAddresses.indexOf(a.address)
+            const bAge = recentWindowAddresses.indexOf(b.address)
+
+            const aIndex = aAge === -1 ? Infinity : aAge
+            const bIndex = bAge === -1 ? Infinity : bAge
+
+            if (aIndex !== bIndex)
+                return aIndex - bIndex
+
+            return (a.title || "").localeCompare(b.title || "")
+        })
+}
+
 
 // Rank windows: matches query, sorts by most recently used first, 
 // but keeps the currently focused window last.
