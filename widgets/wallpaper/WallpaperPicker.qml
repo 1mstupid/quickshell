@@ -36,7 +36,7 @@ Item {
     property int cardHeight: 140
     property int nameH: 18
 
-    readonly property string dirPath: Quickshell.env("HOME") + "/.local/share/wallpapers"
+    readonly property string dirPath: Quickshell.env("HOME") + "/Pictures/Wallpapers"
 
     // carousel spacing: gap between neighbouring cards, and how fast they shrink. The
     // first step is steep and the rest are flat, so the centre card stands out and the

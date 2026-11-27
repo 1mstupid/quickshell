@@ -38,7 +38,7 @@ Item {
     property int listH: 4 * (rowH + rowGap) + selH
     property int bandHeight: pad + headerH + 14 + listH + pad
 
-    readonly property string dirPath: Quickshell.env("HOME") + "/.local/share/wallpapers"
+    readonly property string dirPath: Quickshell.env("HOME") + "/Pictures/Wallpapers"
 
     // where the card grows from: the pill, or the card of the panel that gave way to this one
     property real startW: PillState.pillWidth
