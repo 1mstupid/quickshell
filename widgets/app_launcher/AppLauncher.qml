@@ -148,13 +148,6 @@ Item {
             });
         }
 
-        if (mode === "clipboard") {
-            const all = ClipboardHistory.entries;
-            return all.filter(e => q === "" || e.preview.toLowerCase().indexOf(q.toLowerCase()) !== -1).map(function (e) {
-                return { kind: "clipboard", title: e.preview, subtitle: "Clipboard entry", icon: "", glyph: modeInfo ? modeInfo.glyph : "📋", value: e };
-            });
-        }
-
         var hints = Modes.hints(searchQuery);
         if (hints.length > 0) {
             return hints.map(function (m) {
@@ -244,7 +237,6 @@ Item {
     readonly property string emptyText: {
         if (mode === "calc") return searchQuery.trim() === "" ? "Type an expression" : (Calc.busy ? "" : "No result");
         if (mode === "file") return searchQuery.trim() === "" ? "Type a name, or / or ~ to browse" : (Files.busy ? "" : "Nothing found");
-        if (mode === "clipboard") return ClipboardHistory.entries.length === 0 ? "Nothing copied yet" : "No matches";
         return "No apps found";
     }
 
@@ -264,7 +256,6 @@ Item {
         selectionAnchor = -1;
         selectedFiles = [];
         searchInput.text = "";
-        if (ClipboardHistory.reload) ClipboardHistory.reload();
         visible = true;
         morph.stop();
         morph.from = root.t;
@@ -335,9 +326,6 @@ Item {
         selectionAnchor = -1;
         selectedFiles = [];
         searchInput.text = "";
-        if (name === "clipboard" && ClipboardHistory.reload) {
-            ClipboardHistory.reload();
-        }
     }
 
     function fileUri(path) {
@@ -392,15 +380,6 @@ Item {
                 Quickshell.execDetached(["xdg-open", r.value]);
                 AppLauncherState.hide();
             }
-        } else if (r.kind === "clipboard") {
-            ClipboardHistory.copy(r.value);
-            AppLauncherState.hide();
-        }
-    }
-
-    function forgetEntry(r) {
-        if (r && r.kind === "clipboard") {
-            ClipboardHistory.remove(r.value);
         }
     }
 
@@ -613,9 +592,6 @@ Item {
                             }
                             root.activate(root.results[root.selectedIndex]);
                             event.accepted = true;
-                        } else if (event.key === Qt.Key_Delete && ctrlPressed && root.mode === "clipboard") {
-                            root.forgetEntry(root.results[root.selectedIndex]);
-                            event.accepted = true;
                         } else if (event.key === Qt.Key_Backspace
                                  && root.mode === "file"
                                  && text === "") {
@@ -634,7 +610,7 @@ Item {
                     anchors.right: parent.right
                     anchors.rightMargin: 14
                     anchors.verticalCenter: parent.verticalCenter
-                    text: root.mode !== "" ? (root.mode === "clipboard" ? root.results.length + " / " + ClipboardHistory.entries.length : (root.fileClipboardPaths.length > 0 ? (root.fileClipboardAction === "cut" ? "✂️ " : "📋 ") + root.fileClipboardPaths.length + " staged" : (root.selectedFiles.length > 0 ? root.selectedFiles.length + " selected" : ""))) : root.results.length + " / " + DesktopEntries.applications.values.length
+                    text: root.mode !== "" ? (root.fileClipboardPaths.length > 0 ? (root.fileClipboardAction === "cut" ? "✂️ " : "📋 ") + root.fileClipboardPaths.length + " staged" : (root.selectedFiles.length > 0 ? root.selectedFiles.length + " selected" : "")) : root.results.length + " / " + DesktopEntries.applications.values.length
                     color: Theme.fg
                     opacity: 0.35
                     font.family: Theme.fontFamilyAlt
@@ -825,7 +801,6 @@ Item {
                 horizontalAlignment: Text.AlignHCenter
                 text: root.mode === "calc" ? "↵ copy    ⌫ back    esc close" : 
                       root.mode === "file" ? (root.fileClipboardPaths.length > 0 ? "↵ open    ^c copy    ^x cut    ^p paste here    ⌫ delete    esc close" : "↵ open    ^c copy    ^x cut    ⌫ delete    esc close") : 
-                      root.mode === "clipboard" ? "↵ copy    ^⌫ delete    ⌫ back    esc close" : 
                       "↑↓ move    ↵ launch    esc close"
                 color: Theme.fg
                 opacity: 0.25

@@ -10,6 +10,7 @@ import "../../services/menu"
 import "../wallpaper"
 import "../colorscheme"
 import "../app_launcher"
+import "../clipboard"
 import "../focus_notch"
 
 PanelWindow {
@@ -54,6 +55,7 @@ PanelWindow {
     readonly property Item openBand: pickerLoader.item?.visible ? pickerLoader.item.maskItem
         : colorLoader.item?.visible ? colorLoader.item.maskItem
         : launcherLoader.item?.visible ? launcherLoader.item.maskItem
+        : clipboardLoader.item?.visible ? clipboardLoader.item.maskItem
         : focusLoader.item?.visible ? focusLoader.item.maskItem : null
     mask: Region { item: root.openBand ? root.openBand : (PillState.active && !root.isOrigin ? null : hoverZone) }
 
@@ -432,6 +434,12 @@ PanelWindow {
         active: root.isOrigin
         anchors.fill: parent
         sourceComponent: AppLauncher {}
+    }
+    Loader {
+        id: clipboardLoader
+        active: root.isOrigin
+        anchors.fill: parent
+        sourceComponent: ClipboardPanel {}
     }
     // the focus strip grows out of the pill, so it lives here too
     Loader {

@@ -63,6 +63,7 @@ Scope {
             return
         // the open panels close back into the pill first, so the lock waits for their morph
         AppLauncherState.hide()
+        ClipboardHistory.hide()
         PowerMenuState.hide()
         FocusNotchState.hide()
         ShareService.close()
