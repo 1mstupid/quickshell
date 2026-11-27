@@ -26,6 +26,7 @@ Singleton {
         habits: "top-right",
         focus: "bottom-left",
         usage: "bottom-right",
+        study: "bottom-right",
         media: "bottom-center",
         lyrics: "bottom-center"
     })
@@ -35,6 +36,7 @@ Singleton {
         habits: "󰄳",
         focus: "󰔟",
         usage: "󰄪",
+        study: "󰑴",
         media: "󰝚",
         lyrics: "󰎈"
     })
@@ -50,6 +52,7 @@ Singleton {
         habits: UserSettings.habitsWidget,
         focus: UserSettings.focusWidget,
         usage: UserSettings.usageRing,
+        study: UserSettings.studyWidget,
         media: UserSettings.mediaWidget,
         lyrics: false
     })
@@ -72,7 +75,13 @@ Singleton {
 
     function cells(id, key) {
         const e = entries[id]
-        return e && typeof e[key] === "number" && isFinite(e[key]) && e[key] >= 0 ? e[key] : 0
+        if (e && typeof e[key] === "number" && isFinite(e[key]) && e[key] >= 0)
+            return e[key]
+        // the study widget shares the usage ring's corner, so until it is placed it
+        // starts one cell to the left of the ring, which is 240 px wide
+        if (id === "study" && key === "x" && !(e && e.anchor))
+            return Math.ceil(240 / cell) + 1
+        return 0
     }
 
     function shown(id) {

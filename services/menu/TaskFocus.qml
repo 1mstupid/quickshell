@@ -14,6 +14,8 @@ import ".."
 // hand do not lose it. The state file holds "due<TAB>title<TAB>startMs<TAB>accMs",
 // so a focus survives a shell restart. If the task is ticked by hand, or removed
 // from the file, the focus ends; a ticked one still gets its time banked.
+// Each run, from a start to the next pause or end, also goes to AppUsage with
+// its clock times, for the study widget.
 Singleton {
     id: root
 
@@ -46,7 +48,14 @@ Singleton {
         store.setText(due + "\t" + title + "\t" + Math.round(startMs) + "\t" + Math.round(accMs) + "\n")
     }
 
+    // the run now ending, if the clock is on
+    function logRun() {
+        if (running)
+            AppUsage.addStudyRun(title, startMs, Date.now())
+    }
+
     function clear() {
+        logRun()
         due = ""
         title = ""
         startMs = 0
@@ -73,6 +82,7 @@ Singleton {
     function pause() {
         if (!running)
             return
+        logRun()
         accMs = elapsedMs
         startMs = 0
         persist()

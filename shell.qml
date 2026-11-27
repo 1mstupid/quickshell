@@ -17,6 +17,7 @@ import "./widgets/lyrics"
 import "./widgets/lock"
 import "./widgets/power_menu"
 import "./widgets/settings"
+import "./widgets/study"
 import "./widgets/todo"
 import "./widgets/usage"
 import "./widgets/wallpaper"
@@ -44,6 +45,8 @@ ShellRoot {
     Usage {}
 
     FocusWidget {}
+
+    StudyWidget {}
 
     TodoWidget {}
 
