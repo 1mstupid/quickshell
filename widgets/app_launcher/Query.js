@@ -65,3 +65,67 @@ function rankApps(entries, q, recent) {
     return entries.filter(e => appMatches(e, q)).sort((a, b) =>
         later(a) - later(b) || age(a) - age(b) || a.name.localeCompare(b.name))
 }
+
+// --- Hyprland Window Management ---
+
+function windowMatches(win, q) {
+    const query = q.trim().toLowerCase()
+    if (!query) return true
+    const titleMatch = win.title && win.title.toLowerCase().indexOf(query) !== -1
+    const classMatch = win.class && win.class.toLowerCase().indexOf(query) !== -1
+    return titleMatch || classMatch
+}
+
+// Rank windows: matches query, sorts by most recently used first, 
+// but keeps the currently focused window last.
+function rankWindows(windows, q, recentWindowAddresses, focusedAddress) {
+    const query = q.trim().toLowerCase()
+    
+    return windows.filter(w => windowMatches(w, query)).sort((a, b) => {
+        const aIsFocused = (a.address === focusedAddress) ? 1 : 0
+        const bIsFocused = (b.address === focusedAddress) ? 1 : 0
+
+        // Focused window always goes last (0 before 1)
+        if (aIsFocused !== bIsFocused) {
+            return aIsFocused - bIsFocused
+        }
+
+        // Recency: index in recentWindowAddresses (smaller index = more recent)
+        const aAge = recentWindowAddresses.indexOf(a.address)
+        const bAge = recentWindowAddresses.indexOf(b.address)
+        const aIndex = aAge === -1 ? Infinity : aAge
+        const bIndex = bAge === -1 ? Infinity : bAge
+
+        if (aIndex !== bIndex) {
+            return aIndex - bIndex
+        }
+
+        return (a.title || "").localeCompare(b.title || "")
+    })
+}
+
+// Format workspace subtitle string
+function formatWorkspaceSubtitle(win, focusedAddress) {
+    let sub = `Workspace ${win.workspace ? win.workspace.name : "unknown"}`
+    if (win.address === focusedAddress) {
+        sub += " · current"
+    }
+    return sub
+}
+
+// Match a Hyprland window to an installed desktop entry for Shift+Enter action
+function findAppForWindow(win, entries) {
+    const cls = (win.class || "").toLowerCase()
+    const initCls = (win.initialClass || "").toLowerCase()
+    
+    for (const e of entries) {
+        const eId = e.id.toLowerCase()
+        const eName = e.name.toLowerCase()
+        if (eId.includes(cls) || cls.includes(eId) ||
+            eId.includes(initCls) || initCls.includes(eId) ||
+            eName.includes(cls) || cls.includes(eName)) {
+            return e
+        }
+    }
+    return null
+}

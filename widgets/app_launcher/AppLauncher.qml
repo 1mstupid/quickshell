@@ -1,6 +1,7 @@
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Io
+import Quickshell.Hyprland
 import QtQuick
 import "../../services"
 import "../notch"
@@ -49,9 +50,9 @@ Item {
     readonly property bool hasQuery: query !== ""
     readonly property bool isMath: Query.looksLikeMath(query)
 
-    // The calculator's answer, then apps, then files. Nothing until something is typed.
+    // The calculator's answer, then windows, then apps, then files. Nothing until something is typed.
     readonly property var results: hasQuery
-        ? calcResults(query).concat(appResults(query.toLowerCase()), fileResults(query)) : []
+        ? calcResults(query).concat(windowResults(query.toLowerCase()), appResults(query.toLowerCase()), fileResults(query)) : []
 
     // The selection is the row picked, not its place: rows that arrive late (the answer, the
     // files) never move it. With nothing picked it is the top row, and new text picks nothing.
@@ -65,6 +66,23 @@ Item {
     // selection, only a pointer that moves does
     property var pointer: null
 
+    // Track window focus recency for ranking
+    property var recentWindowAddresses: []
+
+    Connections {
+        target: Hyprland
+        function onFocusedWindowChanged() {
+            if (Hyprland.focusedWindow) {
+                const addr = Hyprland.focusedWindow.address;
+                let list = recentWindowAddresses.slice();
+                const idx = list.indexOf(addr);
+                if (idx >= 0) list.splice(idx, 1);
+                list.unshift(addr);
+                recentWindowAddresses = list;
+            }
+        }
+    }
+
     // the answer row holds its place with "…" while qalc works, so the rows below do not jump
     function calcResults(q) {
         if (!isMath) return []
@@ -75,13 +93,51 @@ Item {
     }
 
     function appResults(q) {
-        // an entry is hidden if either its StartupWMClass or its id is blocked, since
-        // a window's class may match either one
+        const toplevels = Hyprland.toplevels ? (Hyprland.toplevels.values || []) : []
+        const runningAppIds = new Set()
+        for (const t of toplevels) {
+            const appId = (t.wayland?.appId || t.lastIpcObject?.class || "").toLowerCase()
+            if (appId) runningAppIds.add(appId)
+        }
+
+        // an entry is hidden if it's blocked OR if an open window already exists for it
         const vals = DesktopEntries.applications.values.filter(function (e) {
-            return !AppUsage.blockedNow(e.startupClass) && !AppUsage.blockedNow(e.id)
+            if (AppUsage.blockedNow(e.startupClass) || AppUsage.blockedNow(e.id))
+                return false
+            const eId = (e.id || "").toLowerCase()
+            const eClass = (e.startupClass || "").toLowerCase()
+            if (runningAppIds.has(eId) || (eClass && runningAppIds.has(eClass)))
+                return false
+            return true
         })
         return Query.rankApps(vals, q, AppLauncherState.recentIds).map(function (e) {
             return { kind: "app", key: "app:" + e.id, title: e.name, subtitle: subtitleOf(e), icon: e.icon, glyph: "", entry: e }
+        })
+    }
+
+    function windowResults(q) {
+        if (typeof Hyprland === "undefined" || !Hyprland.toplevels) return []
+        const toplevels = Hyprland.toplevels.values || []
+        const desktopEntries = DesktopEntries.applications.values || []
+        const focusedAddress = Hyprland.focusedWindow ? Hyprland.focusedWindow.address : ""
+
+        const ranked = Query.rankWindows(toplevels, q, recentWindowAddresses, focusedAddress)
+
+        return ranked.map(t => {
+            const title = t.title || "Untitled Window"
+            const appId = t.wayland?.appId || t.lastIpcObject?.class || ""
+            const matchedApp = desktopEntries.find(e => e.id.toLowerCase() === appId.toLowerCase() || e.startupClass?.toLowerCase() === appId.toLowerCase())
+
+            return {
+                kind: "window",
+                key: "window:" + t.address,
+                title: title,
+                subtitle: Query.formatWorkspaceSubtitle(t, focusedAddress),
+                icon: matchedApp ? matchedApp.icon : "",
+                glyph: "󰖯",
+                window: t,
+                matchedApp: matchedApp
+            }
         })
     }
 
@@ -101,6 +157,10 @@ Item {
         if (!current) return "esc close"
         if (current.kind === "calc") return "↵ copy    esc close"
         if (current.kind === "app") return "↑↓ move    ↵ launch    esc close"
+        if (current.kind === "window") {
+            const canShift = current.matchedApp !== null
+            return "↵ focus window" + (canShift ? "    ⇧↵ open new instance" : "") + "    esc close"
+        }
         const kept = ShareService.favorites.indexOf(current.value) >= 0
         return "↵ open    " + (kept ? "✓ in tray" : "^↵ add to tray") + "    esc close"
     }
@@ -185,19 +245,32 @@ Item {
         if (visible) searchInput.forceActiveFocus();
     }
 
-    function activate(r) {
+    function activate(r, shiftPressed) {
         if (!r) return;
 
         if (r.kind === "app") {
             Sounds.play("launch");
             AppLauncherState.recordLaunch(r.entry.id);
             r.entry.execute();
+        } else if (r.kind === "window") {
+            Sounds.play("launch");
+            if (shiftPressed && r.matchedApp) {
+                AppLauncherState.recordLaunch(r.matchedApp.id);
+                r.matchedApp.execute();
+            } else if (r.window) {
+                const ipc = r.window.lastIpcObject ?? {};
+                const pid = ipc.pid ?? r.window.pid;
+                if (pid) {
+                    Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.focus({ window = \"pid:" + pid + "\" })"]);
+                } else {
+                    const addr = String(r.window.address ?? "").replace(/^0x/, "");
+                    Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.focus({ window = \"address:" + addr + "\" })"]);
+                }
+            }
         } else if (r.kind === "calc") {
-            // still being worked out
             if (r.value === "") return;
             Quickshell.execDetached(["wl-copy", "--", r.value]);
         } else {
-            // a folder opens in the file manager, like a file in its app
             Sounds.play("launch");
             Quickshell.execDetached(["xdg-open", r.value]);
         }
@@ -306,6 +379,7 @@ Item {
 
                     Keys.onPressed: function (event) {
                         const ctrl = (event.modifiers & Qt.ControlModifier) !== 0;
+                        const shift = (event.modifiers & Qt.ShiftModifier) !== 0;
 
                         if (event.key === Qt.Key_Up || event.key === Qt.Key_Backtab) {
                             root.navigate(-1);
@@ -321,7 +395,7 @@ Item {
                             root.navigate(root.results.length);
                         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                             if (ctrl) root.addToTray(root.current);
-                            else root.activate(root.current);
+                            else root.activate(root.current, shift);
                         } else if (event.key === Qt.Key_Escape) {
                             AppLauncherState.hide();
                         } else {
@@ -475,7 +549,7 @@ Item {
                     }
 
                     TapHandler {
-                        onTapped: root.activate(appRow.modelData)
+                        onTapped: root.activate(appRow.modelData, false)
                     }
                 }
             }
