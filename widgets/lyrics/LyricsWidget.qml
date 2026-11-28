@@ -40,8 +40,9 @@ PanelWindow {
         bottom: WidgetLayout.insetY("lyrics")
     }
 
-    // the card's design size, in the shell's scale
-    readonly property real k: Theme.autoScale
+    // the card's design size, in the shell's scale and at the size set in the layout edit mode
+    readonly property real zoom: WidgetLayout.scaleOf("lyrics")
+    readonly property real k: Theme.autoScale * root.zoom
     readonly property int cardW: Math.round(720 * root.k)
     readonly property int cardH: Math.round(244 * root.k)
     implicitWidth: root.cardW
@@ -378,7 +379,8 @@ PanelWindow {
                     d: slot.index - root.cursorV
                     playing: root.playing
                     px: Math.round(34 * root.k)
-                    maxW: card.width - 40
+                    zoom: root.zoom
+                    maxW: card.width - 40 * root.zoom
                     cx: card.width / 2
                     cy: card.midY
                 }
@@ -393,7 +395,7 @@ PanelWindow {
             px: Math.round(28 * root.k)
             d: 0
             playing: true
-            maxW: card.width - 40
+            maxW: card.width - 40 * root.zoom
             cx: card.width / 2
             cy: card.midY
         }
