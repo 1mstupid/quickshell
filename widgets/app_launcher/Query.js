@@ -160,20 +160,3 @@ function formatWorkspaceSubtitle(win, focusedAddress) {
     }
     return sub
 }
-
-// Match a Hyprland window to an installed desktop entry for Shift+Enter action
-function findAppForWindow(win, entries) {
-    const cls = (win.class || "").toLowerCase()
-    const initCls = (win.initialClass || "").toLowerCase()
-    
-    for (const e of entries) {
-        const eId = e.id.toLowerCase()
-        const eName = e.name.toLowerCase()
-        if ((cls && eId.includes(cls)) || (cls && cls.includes(eId)) ||
-            (initCls && eId.includes(initCls)) || (initCls && initCls.includes(eId)) ||
-            (cls && eName.includes(cls)) || (cls && cls.includes(eName))) {
-            return e
-        }
-    }
-    return null
-}
