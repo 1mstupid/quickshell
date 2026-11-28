@@ -50,6 +50,7 @@ const SETTINGS = [
     { key: "usageRing", type: "bool", def: true, layout: "usage", group: "widgets", label: "Usage ring" },
     { key: "focusWidget", type: "bool", def: true, layout: "focus", group: "widgets", label: "Focus" },
     { key: "studyWidget", type: "bool", def: true, layout: "study", group: "widgets", label: "Study tracker" },
+    { key: "clockWidget", type: "bool", def: true, layout: "clock", group: "widgets", label: "Clock" },
     // the strip and its modules, one page per module like the bar's modules above
     { key: "focusNotch", type: "bool", def: true, group: "strip", label: "Strip" },
     { key: "focusHome", type: "bool", def: true, group: "strip", label: "Home Module" },

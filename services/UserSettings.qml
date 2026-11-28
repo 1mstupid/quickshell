@@ -28,6 +28,7 @@ Singleton {
     property bool usageRing: Schema.defaultOf("usageRing")
     property bool focusWidget: Schema.defaultOf("focusWidget")
     property bool studyWidget: Schema.defaultOf("studyWidget")
+    property bool clockWidget: Schema.defaultOf("clockWidget")
     property bool focusNotch: Schema.defaultOf("focusNotch")
     property bool focusHome: Schema.defaultOf("focusHome")
     property bool focusWork: Schema.defaultOf("focusWork")

@@ -8,6 +8,7 @@ import "./services"
 import "./widgets/app_launcher"
 import "./widgets/bar"
 import "./widgets/bar/media"
+import "./widgets/clock"
 import "./widgets/focus_notch"
 import "./widgets/border"
 import "./widgets/notify"
@@ -47,6 +48,8 @@ ShellRoot {
     FocusWidget {}
 
     StudyWidget {}
+
+    ClockWidget {}
 
     TodoWidget {}
 
