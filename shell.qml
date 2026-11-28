@@ -10,6 +10,7 @@ import "./widgets/bar"
 import "./widgets/bar/media"
 import "./widgets/clock"
 import "./widgets/focus_notch"
+import "./widgets/frame"
 import "./widgets/border"
 import "./widgets/notify"
 import "./widgets/habits"
@@ -50,6 +51,13 @@ ShellRoot {
     StudyWidget {}
 
     ClockWidget {}
+
+    // one per image frame added in the layout edit mode
+    Variants {
+        model: WidgetLayout.frames
+
+        ImageFrame {}
+    }
 
     TodoWidget {}
 

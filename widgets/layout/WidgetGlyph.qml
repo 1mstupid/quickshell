@@ -1,7 +1,8 @@
 import QtQuick
 import "../../services"
 
-// A glyph button for the layout bar: lit while its widget is on the wallpaper.
+// A glyph button for the edit mode. In the layout bar it is lit while its widget
+// is on the wallpaper; on a frame's outline it is a plain button.
 Item {
     id: btn
 
