@@ -16,6 +16,9 @@ Rectangle {
     color: checked ? Theme.accent : Qt.alpha(Theme.fg, 0.15)
     Behavior on color { ColorAnimation { duration: 120 } }
 
+    // keyboard hint tools find a target by its role; the owner gives it a name
+    Accessible.role: Accessible.Button
+
     Rectangle {
         width: 14
         height: 14
