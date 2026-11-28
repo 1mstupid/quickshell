@@ -9,7 +9,7 @@ import "../bar/media/LyricsMath.js" as LM
 // still being sung when the next one starts is held just above it (LyricsMath.js does the
 // timing). Adapted from sekaipop's LyricsLine.qml (GPL-3.0); see the README.
 //
-// The line is centred on (cx, cy + pose.y).
+// The line is centred on (cx, cy + pose.y * zoom).
 Item {
     id: line
 
@@ -38,6 +38,8 @@ Item {
     property real prevEnd: 0
     property real maxW: 680
     property int px: 38
+    // the widget's size: the poses' offsets are in pixels at 1
+    property real zoom: 1
     property real cx: 0
     property real cy: 0
 
@@ -90,7 +92,7 @@ Item {
     readonly property bool done: !line.still && line.t >= line.lineEnd
 
     x: line.cx
-    y: line.cy + line.pose.y
+    y: line.cy + line.pose.y * line.zoom
     width: 0
     height: 0
 

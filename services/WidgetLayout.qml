@@ -50,7 +50,7 @@ Singleton {
     property var entries: ({})
 
     // the widgets that draw themselves at their scale, and the range it is held to
-    readonly property var scalable: ["clock"]
+    readonly property var scalable: ["clock", "lyrics"]
     readonly property real minScale: 0.75
     readonly property real maxScale: 3
     readonly property real scaleStep: 0.25
