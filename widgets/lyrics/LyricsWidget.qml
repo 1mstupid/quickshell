@@ -17,7 +17,8 @@ import "../bar/media/LyricsMath.js" as LM
 // then late. A plain lyrics file only says when a LINE starts, so the words of a line share its
 // time by syllable. Adapted from sekaipop's lyrics widget (GPL-3.0); see the README.
 //
-// Placed by the layout editor like the other corner widgets. It is off until shown:
+// Placed by the layout editor like the other corner widgets. It is off until shown, and
+// then hidden until the song's words are found:
 //   qs ipc call lyrics toggle        (or: quickshell ipc call lyrics toggle)
 //   quickshell ipc call lyrics nudge 250    (the words 250 ms earlier; -250 for later)
 //   quickshell ipc call lyrics nudgeReset
@@ -54,13 +55,16 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell-lyrics"
     mask: Region { item: card }
 
-    visible: WidgetLayout.shown("lyrics") && media.present && !Overview.open
+    // switched on with a song to follow: the words are looked up from then on, and the
+    // widget appears once there are some
+    readonly property bool listening: WidgetLayout.shown("lyrics") && media.present && !Overview.open
+    visible: root.listening && root.lines.length > 0
     Component.onCompleted: WidgetLayout.register("lyrics", root)
 
     // ===== the player =====
     MediaState {
         id: media
-        active: root.visible
+        active: root.listening
     }
 
     readonly property bool playing: media.playing
@@ -88,8 +92,8 @@ PanelWindow {
         root.poll()
     }
 
-    onVisibleChanged: {
-        if (visible) {
+    onListeningChanged: {
+        if (listening) {
             root.loadLyrics()
             root.lastPolled = -1
             root.stalePolls = 0
@@ -107,8 +111,6 @@ PanelWindow {
     property var pendingArgs: null
     property string pendingKey: ""
     property var cache: ({})
-    // "" (nothing to say), "searching", or "none" (the service has no synced words)
-    property string status: ""
     // this session's nudge, in ms: the words are moved earlier by it
     property int nudgeMs: 0
 
@@ -131,10 +133,9 @@ PanelWindow {
 
     function loadLyrics() {
         const title = root.trackTitle
-        if (!root.visible || title === "") {
+        if (!root.listening || title === "") {
             if (title === "") {
                 root.lines = []
-                root.status = ""
                 root.lyricsKey = ""
             }
             return
@@ -143,7 +144,6 @@ PanelWindow {
         // the length can arrive a moment after the title; a lookup without it can match the
         // wrong song or none, so wait for it (the length arriving starts the lookup)
         if (media.len <= 0 && !root.forceLookup) {
-            root.status = "searching"
             lenWait.restart()
             return
         }
@@ -154,12 +154,10 @@ PanelWindow {
 
         if (root.cache[key] !== undefined) {
             root.lines = root.cache[key]
-            root.status = root.lines.length ? "" : "none"
             return
         }
 
         root.lines = []
-        root.status = "searching"
 
         const cands = LM.candidates(artist, title)
         const qArtist = cands.length > 0 ? cands[0].artist : artist
@@ -216,13 +214,10 @@ PanelWindow {
                     root.cache = c
                 }
                 if (key === root.lyricsKey) {
-                    if (parsed === null) {
+                    if (parsed === null)
                         root.lyricsKey = ""
-                        root.status = "none"
-                    } else {
+                    else
                         root.lines = parsed
-                        root.status = parsed.length ? "" : "none"
-                    }
                 }
             }
         }
@@ -251,11 +246,11 @@ PanelWindow {
         root.now = Date.now()
     }
 
-    // read the player while the widget is shown
+    // read the player while listening, so the clock is right when the words appear
     Timer {
         interval: 250
         repeat: true
-        running: root.visible
+        running: root.listening
         onTriggered: root.poll()
     }
 
@@ -263,7 +258,7 @@ PanelWindow {
     Timer {
         interval: 33
         repeat: true
-        running: root.visible && root.playing && root.lines.length > 0
+        running: root.visible && root.playing
         onTriggered: root.now = Date.now()
     }
 
@@ -318,11 +313,6 @@ PanelWindow {
             return 0
         return LM.rushOf(LM.overrun(root.endOf(i), root.lines[i + 1].t))
     }
-
-    // what the middle says when there are no lines to sing
-    readonly property string message: root.lines.length > 0 ? ""
-        : root.status === "searching" ? "looking for the words…"
-        : root.status === "none" ? "no synced lyrics" : ""
 
     // the small tag under the words: what is playing, and the nudge when there is one
     readonly property string tag: {
@@ -385,19 +375,6 @@ PanelWindow {
                     cy: card.midY
                 }
             }
-        }
-
-        // a message in the middle when there is nothing to sing
-        LyricsLine {
-            visible: root.message !== ""
-            still: true
-            text: root.message
-            px: Math.round(28 * root.k)
-            d: 0
-            playing: true
-            maxW: card.width - 40 * root.zoom
-            cx: card.width / 2
-            cy: card.midY
         }
 
         // what is playing, small, under the words
