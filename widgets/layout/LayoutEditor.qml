@@ -12,8 +12,10 @@ import "../../services"
 // choice is written to layout.json. Another shown widget acts as a barrier: the
 // outline stops at its edge and can still slide along it. A drop that would
 // still cover one is refused: the preview turns red and the widget goes back. A
-// dot grid marks the cell edges a widget can land on. Nothing is
-// written until a drop or a button press. Done or Escape (after a click, since
+// dot grid marks the cell edges a widget can land on. Scrolling over a widget
+// that can be scaled resizes it a step at a time; a step that would leave the
+// screen or cover another widget is refused. Nothing is written until a drop,
+// a scroll or a button press. Done or Escape (after a click, since
 // the panel takes keyboard focus on demand) leaves.
 PanelWindow {
     id: root
@@ -70,6 +72,32 @@ PanelWindow {
                 return true
         }
         return false
+    }
+
+    // one step bigger (1) or smaller (-1). The new size is estimated from the
+    // current one, as the widget only has it once it has drawn itself again.
+    function rescale(id, step) {
+        const win = WidgetLayout.windows[id]
+        const from = WidgetLayout.scaleOf(id)
+        const to = WidgetLayout.clampScale(from + step * WidgetLayout.scaleStep)
+        if (to === from)
+            return
+        if (to > from) {
+            const anchorName = WidgetLayout.anchor(id)
+            const cx = WidgetLayout.cells(id, "x")
+            const cy = WidgetLayout.cells(id, "y")
+            const w = win.implicitWidth * to / from
+            const h = win.implicitHeight * to / from
+            const now = boxAt(anchorName, cx, cy, win.implicitWidth, win.implicitHeight)
+            const next = boxAt(anchorName, cx, cy, w, h)
+            if (next.x < 0 || next.y < 0 || next.x + w > root.width || next.y + h > root.height)
+                return
+            // a widget that already covers another is not held back by it
+            if (overlapsOther(id, next.x, next.y, w, h)
+                    && !overlapsOther(id, now.x, now.y, win.implicitWidth, win.implicitHeight))
+                return
+        }
+        WidgetLayout.resize(id, to)
     }
 
     // the line a dragged box is lined up with on each axis, or -1 for none
@@ -256,9 +284,23 @@ PanelWindow {
 
                         property real startX
                         property real startY
+                        // scroll not yet worth a step: touchpads send it in small parts
+                        property real scrolled: 0
 
                         anchors.fill: parent
                         cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+
+                        onWheel: e => {
+                            if (pressed || !WidgetLayout.scalable.includes(slot.modelData))
+                                return
+                            scrolled += e.angleDelta.y
+                            // 120 is one notch of a wheel
+                            const steps = Math.trunc(scrolled / 120)
+                            if (steps === 0)
+                                return
+                            scrolled -= steps * 120
+                            root.rescale(slot.modelData, Math.sign(steps))
+                        }
 
                         onPressed: m => {
                             const p = mapToItem(scene, m.x, m.y)

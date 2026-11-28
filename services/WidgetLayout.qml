@@ -3,14 +3,15 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Where the corner widgets sit and whether they show, kept in
+// Where the corner widgets sit, how big they are and whether they show, kept in
 // ~/.local/state/lumin/layout.json:
 //   {"todo": {"anchor": "top-left", "x": 0, "y": 0, "visible": true}}
 // anchor is one of top-left, top-right, bottom-left, bottom-right, or
 // bottom-center (centred, with no side margin); x and y are grid cells
 // (20 px at scale 1), fractional where a smart guide lined the widget up, further
 // in from that corner, on top of the usual edge
-// inset. A missing file, entry or key keeps the default place,
+// inset. scale (1 when missing) sizes the widgets listed in `scalable`.
+// A missing file, entry or key keeps the default place,
 // so with no file the widgets sit where they always did. `visible` wins over
 // the widget keys in config.toml's [settings] table once it is set. The edit mode writes this
 // file; it can also be edited by hand.
@@ -44,6 +45,12 @@ Singleton {
     })
 
     property var entries: ({})
+
+    // the widgets that draw themselves at their scale, and the range it is held to
+    readonly property var scalable: ["clock"]
+    readonly property real minScale: 0.75
+    readonly property real maxScale: 3
+    readonly property real scaleStep: 0.25
 
     // the widget windows by id, so the edit mode can see which are showing
     property var windows: ({})
@@ -87,6 +94,13 @@ Singleton {
         return 0
     }
 
+    function clampScale(v) { return Math.min(maxScale, Math.max(minScale, v)) }
+
+    function scaleOf(id) {
+        const e = entries[id]
+        return e && typeof e.scale === "number" && isFinite(e.scale) ? clampScale(e.scale) : 1
+    }
+
     function shown(id) {
         const e = entries[id]
         return e && typeof e.visible === "boolean" ? e.visible : legacy[id]
@@ -109,6 +123,7 @@ Singleton {
 
     function place(id, anchor, x, y) { save(id, { anchor: anchor, x: x, y: y }) }
     function toggle(id) { save(id, { visible: !shown(id) }) }
+    function resize(id, scale) { save(id, { scale: clampScale(scale) }) }
 
     function hasLeft(id) { return anchor(id).endsWith("left") }
     function hasRight(id) { return anchor(id).endsWith("right") }
