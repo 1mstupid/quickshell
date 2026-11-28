@@ -7,6 +7,7 @@ import "../../services"
 import "../notch"
 import "Query.js" as Query
 import "FileSearch.js" as FileSearch
+import "EmojiData.js" as EmojiData
 
 // The launcher grows out of the bar pill, the same way the wallpaper picker does. It is an
 // item of the origin bar's window (Bar.qml), so it drops from the pill with no seam.
@@ -49,10 +50,13 @@ Item {
     readonly property string query: searchQuery.trim()
     readonly property bool hasQuery: query !== ""
     readonly property bool isMath: Query.looksLikeMath(query)
+    // a leading ":" asks for an emoji, and for nothing else
+    readonly property bool isEmoji: query.startsWith(":")
+    readonly property var emojis: Query.parseEmoji(EmojiData.lines)
 
     // The calculator's answer, then windows, then apps, then files. Nothing until something is typed.
-    readonly property var results: hasQuery
-        ? calcResults(query).concat(windowResults(query.toLowerCase()), appResults(query.toLowerCase()), fileResults(query)) : []
+    readonly property var results: !hasQuery ? [] : isEmoji ? emojiResults(query)
+        : calcResults(query).concat(windowResults(query.toLowerCase()), appResults(query.toLowerCase()), fileResults(query))
 
     // The selection is the row picked, not its place: rows that arrive late (the answer, the
     // files) never move it. With nothing picked it is the top row, and new text picks nothing.
@@ -90,6 +94,14 @@ Item {
         if (ready ? Calc.result === "" : !Calc.busy) return []
         return [{ kind: "calc", key: "calc", title: ready ? Calc.result : "…", subtitle: q,
                   icon: "", glyph: "󰃬", value: ready ? Calc.result : "" }]
+    }
+
+    // far more match a letter or two than anyone would step through
+    function emojiResults(q) {
+        return Query.rankEmoji(emojis, Query.emojiTerm(q), 50).map(function (e) {
+            return { kind: "emoji", key: "emoji:" + e.emoji, title: ":" + e.names[0] + ":",
+                     subtitle: e.names[e.names.length - 1].replace(/_/g, " "), icon: "", glyph: e.emoji, value: e.emoji }
+        })
     }
 
     function appResults(q) {
@@ -156,6 +168,7 @@ Item {
     readonly property string hintText: {
         if (!current) return "esc close"
         if (current.kind === "calc") return "↵ copy    esc close"
+        if (current.kind === "emoji") return "↑↓ move    ↵ copy    esc close"
         if (current.kind === "app") return "↑↓ move    ↵ launch    esc close"
         if (current.kind === "window") {
             const canShift = !!current.matchedApp
@@ -278,7 +291,7 @@ Item {
             } else if (r.window) {
                 pendingFocus = r.window.address;
             }
-        } else if (r.kind === "calc") {
+        } else if (r.kind === "calc" || r.kind === "emoji") {
             if (r.value === "") return;
             Quickshell.execDetached(["wl-copy", "--", r.value]);
         } else {
@@ -326,7 +339,7 @@ Item {
     Binding {
         target: Files
         property: "query"
-        value: root.query.length >= 2 ? root.query : ""
+        value: root.query.length >= 2 && !root.isEmoji ? root.query : ""
     }
 
     // only the card takes clicks: the bar's window masks its input to this while the launcher is open

@@ -14,6 +14,8 @@ A Quickshell desktop shell in QML, for NixOS.
   the idea of leading with what the network can reach, merging IPv4 and IPv6 listeners, polling
   `ss` only while the page is open, and closing a process with a two-tap confirmation follows
   [k4-puertos](https://github.com/k4ditano/k4-puertos) (MIT). The code is written for this shell.
+- **Emoji shortcodes** (`widgets/app_launcher/EmojiData.js`): generated from
+  [gemoji](https://github.com/github/gemoji) by GitHub (MIT); its notice is in the file.
 
 ## Licence
 
