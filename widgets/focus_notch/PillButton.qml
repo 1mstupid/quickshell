@@ -18,6 +18,10 @@ Rectangle {
                 : (mouse.containsMouse ? Qt.alpha(Theme.fg, 0.2) : Qt.alpha(Theme.fg, 0.1))
     Behavior on color { ColorAnimation { duration: 120 } }
 
+    // keyboard hint tools find a target by its role
+    Accessible.role: Accessible.Button
+    Accessible.name: btn.label
+
     Row {
         id: content
         anchors.centerIn: parent

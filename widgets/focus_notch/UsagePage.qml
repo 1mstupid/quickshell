@@ -245,6 +245,8 @@ Item {
                     color: on ? Qt.alpha(Theme.fg, 0.14)
                          : periodMouse.containsMouse ? Qt.alpha(Theme.fg, 0.06) : "transparent"
                     Behavior on color { ColorAnimation { duration: 120 } }
+                    Accessible.role: Accessible.Button
+                    Accessible.name: modelData.name
 
                     Text {
                         id: periodName
