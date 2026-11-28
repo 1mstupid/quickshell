@@ -44,6 +44,9 @@ PanelWindow {
     readonly property real align: WidgetLayout.hasLeft("clock") ? 0
         : WidgetLayout.hasRight("clock") ? 1 : 0.5
 
+    // set in the layout edit mode; the type is sized by it, so it stays sharp
+    readonly property real zoom: WidgetLayout.scaleOf("clock")
+
     SystemClock {
         id: clock
         precision: SystemClock.Minutes
@@ -69,7 +72,7 @@ PanelWindow {
             color: Theme.fg
             // SF Rounded bold, as the bar's, the strip's and the lock's clock
             font.family: Theme.fontFamilyRounded
-            font.pixelSize: 64
+            font.pixelSize: Math.round(64 * root.zoom)
             font.bold: true
         }
 
@@ -78,7 +81,7 @@ PanelWindow {
             text: Qt.formatDate(clock.date, "dddd, MMMM d")
             color: Qt.alpha(Theme.fg, 0.8)
             font.family: Theme.fontFamilySans
-            font.pixelSize: 15
+            font.pixelSize: Math.round(15 * root.zoom)
         }
     }
 }
