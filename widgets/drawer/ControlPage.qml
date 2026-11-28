@@ -135,6 +135,10 @@ Item {
         color: Qt.alpha(Theme.fg, tileMouse.containsMouse ? 0.10 : 0.06)
         Behavior on color { ColorAnimation { duration: 120 } }
 
+        // keyboard hint tools find a target by its role
+        Accessible.role: Accessible.Button
+        Accessible.name: tile.title
+
         Rectangle {
             id: badge
             anchors.left: parent.left
