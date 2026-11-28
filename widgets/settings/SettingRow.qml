@@ -38,6 +38,7 @@ Item {
         anchors.rightMargin: 14
         anchors.verticalCenter: parent.verticalCenter
         checked: row.value === true
+        Accessible.name: row.def.label
         onToggled: {
             if (row.def.layout)
                 WidgetLayout.toggle(row.def.layout)

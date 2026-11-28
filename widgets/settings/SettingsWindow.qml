@@ -7,9 +7,10 @@ import "../../services/Settings.js" as Schema
 
 // The settings panel: a window of its own, in the middle of the screen, with a sidebar of
 // pages and the settings of the page beside it. `qs ipc call settings toggle` opens and closes
-// it; Escape and a click outside close it too. What it shows is the list in Settings.js: a page
-// for each group, a row for each setting in it. A setting is changed in UserSettings, which
-// writes config.toml, so the file and the panel never disagree.
+// it; Escape and a click outside close it too, and Tab and Shift+Tab step through the pages.
+// What it shows is the list in Settings.js: a page for each group, a row for each setting in
+// it. A setting is changed in UserSettings, which writes config.toml, so the file and the panel
+// never disagree.
 PanelWindow {
     id: root
 
@@ -71,6 +72,21 @@ PanelWindow {
             keys.forceActiveFocus()
     }
 
+    function showPage(id) {
+        // first, so a text being edited is written before its page goes
+        keys.forceActiveFocus()
+        if (id !== root.group)
+            Sounds.play("page")
+        root.group = id
+    }
+
+    // the next or previous page, round from either end
+    function stepPage(delta) {
+        const n = Schema.GROUPS.length
+        const i = Schema.GROUPS.findIndex(g => g.id === root.group)
+        showPage(Schema.GROUPS[(i + delta + n) % n].id)
+    }
+
     // the lock is about to take the screen: the settings close back first
     Connections {
         target: PillState
@@ -118,6 +134,10 @@ PanelWindow {
         opacity: root.t
         scale: 0.97 + 0.03 * root.t
 
+        // here, not on `keys`, so Tab from a text field gets this far too
+        Keys.onTabPressed: root.stepPage(1)
+        Keys.onBacktabPressed: root.stepPage(-1)
+
         // clicks on the window stay on it, not on the catcher behind; one that is not on a field
         // takes the focus back, which ends the editing of a text
         MouseArea {
@@ -154,6 +174,10 @@ PanelWindow {
                          : pageMouse.containsMouse ? Qt.alpha(Theme.fg, 0.05) : "transparent"
                     Behavior on color { ColorAnimation { duration: 120 } }
 
+                    // keyboard hint tools find a target by its role
+                    Accessible.role: Accessible.Button
+                    Accessible.name: page.modelData.title
+
                     Rectangle {
                         id: badge
                         x: 6
@@ -189,13 +213,7 @@ PanelWindow {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            // first, so a text being edited is written before its page goes
-                            keys.forceActiveFocus()
-                            if (page.modelData.id !== root.group)
-                                Sounds.play("page")
-                            root.group = page.modelData.id
-                        }
+                        onClicked: root.showPage(page.modelData.id)
                     }
                 }
             }
