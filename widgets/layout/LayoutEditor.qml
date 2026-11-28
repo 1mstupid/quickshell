@@ -14,8 +14,10 @@ import "../../services"
 // still cover one is refused: the preview turns red and the widget goes back. A
 // dot grid marks the cell edges a widget can land on. Scrolling over a widget
 // that can be scaled resizes it a step at a time; a step that would leave the
-// screen or cover another widget is refused. Nothing is written until a drop,
-// a scroll or a button press. Done or Escape (after a click, since
+// screen or cover another widget is refused. "+ frame" in the bar adds an image
+// frame at the free spot nearest the centre; a frame's outline has buttons to
+// change its shape, under the same rule as scrolling, and to remove it. Nothing is
+// written until a drop, a scroll or a button press. Done or Escape (after a click, since
 // the panel takes keyboard focus on demand) leaves.
 PanelWindow {
     id: root
@@ -61,7 +63,7 @@ PanelWindow {
     // refusal both use it.
     function overlapsOther(id, x, y, w, h) {
         const gap = WidgetLayout.cell
-        for (const other of Object.keys(WidgetLayout.defaults)) {
+        for (const other of WidgetLayout.ids) {
             const win = WidgetLayout.windows[other]
             if (other === id || !win || !WidgetLayout.shown(other))
                 continue
@@ -74,6 +76,21 @@ PanelWindow {
         return false
     }
 
+    // whether a widget may become w x h where it sits: on the screen, and not
+    // covering another widget. One that already covers another is not held back.
+    function canResize(id, w, h) {
+        const win = WidgetLayout.windows[id]
+        const anchorName = WidgetLayout.anchor(id)
+        const cx = WidgetLayout.cells(id, "x")
+        const cy = WidgetLayout.cells(id, "y")
+        const now = boxAt(anchorName, cx, cy, win.implicitWidth, win.implicitHeight)
+        const next = boxAt(anchorName, cx, cy, w, h)
+        if (next.x < 0 || next.y < 0 || next.x + w > root.width || next.y + h > root.height)
+            return false
+        return !overlapsOther(id, next.x, next.y, w, h)
+            || overlapsOther(id, now.x, now.y, win.implicitWidth, win.implicitHeight)
+    }
+
     // one step bigger (1) or smaller (-1). The new size is estimated from the
     // current one, as the widget only has it once it has drawn itself again.
     function rescale(id, step) {
@@ -82,22 +99,59 @@ PanelWindow {
         const to = WidgetLayout.clampScale(from + step * WidgetLayout.scaleStep)
         if (to === from)
             return
-        if (to > from) {
-            const anchorName = WidgetLayout.anchor(id)
-            const cx = WidgetLayout.cells(id, "x")
-            const cy = WidgetLayout.cells(id, "y")
-            const w = win.implicitWidth * to / from
-            const h = win.implicitHeight * to / from
-            const now = boxAt(anchorName, cx, cy, win.implicitWidth, win.implicitHeight)
-            const next = boxAt(anchorName, cx, cy, w, h)
-            if (next.x < 0 || next.y < 0 || next.x + w > root.width || next.y + h > root.height)
-                return
-            // a widget that already covers another is not held back by it
-            if (overlapsOther(id, next.x, next.y, w, h)
-                    && !overlapsOther(id, now.x, now.y, win.implicitWidth, win.implicitHeight))
-                return
-        }
+        if (to > from && !canResize(id, win.implicitWidth * to / from, win.implicitHeight * to / from))
+            return
         WidgetLayout.resize(id, to)
+    }
+
+    // a frame's next shape, passing over one that does not fit
+    function reshape(id) {
+        const names = Object.keys(WidgetLayout.shapes)
+        const at = names.indexOf(WidgetLayout.shapeOf(id))
+        const zoom = WidgetLayout.scaleOf(id)
+        for (let i = 1; i < names.length; i++) {
+            const name = names[(at + i) % names.length]
+            const size = WidgetLayout.shapes[name]
+            if (canResize(id, Math.round(size[0] * zoom), Math.round(size[1] * zoom))) {
+                WidgetLayout.save(id, { shape: name })
+                return
+            }
+        }
+    }
+
+    // the free place for a w x h box nearest the middle of the screen, as an anchor
+    // and whole cells in from it, or null when there is none
+    function freeSpot(id, w, h) {
+        const cell = WidgetLayout.cell
+        const inset = Theme.edgeInset
+        const maxX = Math.floor((root.width - w - 2 * inset) / cell)
+        const maxY = Math.floor((root.height - h - 2 * inset) / cell)
+        let best = null
+        for (const anchorName of ["top-left", "top-right", "bottom-left", "bottom-right"]) {
+            for (let cx = 0; cx <= maxX; cx++) {
+                for (let cy = 0; cy <= maxY; cy++) {
+                    const b = boxAt(anchorName, cx, cy, w, h)
+                    const mx = b.x + w / 2
+                    const my = b.y + h / 2
+                    // the anchor a drag to this place would choose
+                    if ((mx < root.width / 2) !== anchorName.endsWith("left")
+                            || (my < root.height / 2) !== anchorName.startsWith("top"))
+                        continue
+                    const d = Math.hypot(mx - root.width / 2, my - root.height / 2)
+                    if ((best === null || d < best.d) && !overlapsOther(id, b.x, b.y, w, h))
+                        best = { anchor: anchorName, x: cx, y: cy, d: d }
+                }
+            }
+        }
+        return best
+    }
+
+    function addFrame() {
+        const id = WidgetLayout.nextFrameId()
+        const size = WidgetLayout.shapes.square
+        const spot = freeSpot(id, size[0], size[1])
+        if (spot !== null)
+            WidgetLayout.save(id, { anchor: spot.anchor, x: spot.x, y: spot.y })
     }
 
     // the line a dragged box is lined up with on each axis, or -1 for none
@@ -123,7 +177,7 @@ PanelWindow {
         const reach = Math.round(6 * Theme.autoScale)
         const xs = [root.width / 2]
         const ys = [root.height / 2]
-        for (const other of Object.keys(WidgetLayout.defaults)) {
+        for (const other of WidgetLayout.ids) {
             const win = WidgetLayout.windows[other]
             if (other === id || !win || !WidgetLayout.shown(other))
                 continue
@@ -194,7 +248,7 @@ PanelWindow {
         }
 
         Repeater {
-            model: Object.keys(WidgetLayout.defaults)
+            model: WidgetLayout.ids
 
             Item {
                 id: slot
@@ -291,7 +345,7 @@ PanelWindow {
                         cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
 
                         onWheel: e => {
-                            if (pressed || !WidgetLayout.scalable.includes(slot.modelData))
+                            if (pressed || !WidgetLayout.canScale(slot.modelData))
                                 return
                             scrolled += e.angleDelta.y
                             // 120 is one notch of a wheel
@@ -356,6 +410,36 @@ PanelWindow {
                             slot.dy = 0
                         }
                     }
+
+                    // a frame's own buttons, above the drag area so a press on
+                    // them does not start a drag
+                    Rectangle {
+                        visible: WidgetLayout.isFrame(slot.modelData) && !slot.dragging
+                        anchors.top: parent.top
+                        anchors.right: parent.right
+                        anchors.margins: 8
+                        width: tools.implicitWidth + 8
+                        height: tools.implicitHeight + 8
+                        radius: 12
+                        color: Qt.alpha(Theme.bg, 0.92)
+
+                        Row {
+                            id: tools
+                            anchors.centerIn: parent
+                            spacing: 4
+
+                            WidgetGlyph {
+                                glyph: "󰨤"
+                                label: "change shape"
+                                onToggled: root.reshape(slot.modelData)
+                            }
+                            WidgetGlyph {
+                                glyph: "󰅖"
+                                label: "remove frame"
+                                onToggled: WidgetLayout.remove(slot.modelData)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -407,6 +491,24 @@ PanelWindow {
                         label: modelData
                         checked: WidgetLayout.shown(modelData)
                         onToggled: WidgetLayout.toggle(modelData)
+                    }
+                }
+
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "+ frame"
+                    color: addArea.containsMouse ? Theme.accent : Theme.fg
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 12
+                    font.bold: true
+
+                    MouseArea {
+                        id: addArea
+                        anchors.fill: parent
+                        anchors.margins: -4
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.addFrame()
                     }
                 }
 
