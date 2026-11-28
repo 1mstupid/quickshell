@@ -58,8 +58,13 @@ Singleton {
     // the image frames in the file, and every id there is to place
     property var frames: []
     readonly property var ids: Object.keys(defaults).concat(frames)
-    // a frame's width and height at scale 1
-    readonly property var shapes: ({ square: [240, 240], wide: [480, 240], tall: [240, 360] })
+    // a frame's width and height at scale 1. Wide spans two 240 px widgets set side by side
+    // as close as the grid allows.
+    readonly property var shapes: ({
+        square: [240, 240],
+        wide: [(Math.ceil(240 / cell) + 1) * cell + 240, 240],
+        tall: [240, 360]
+    })
 
     // the widget windows by id, so the edit mode can see which are showing
     property var windows: ({})
