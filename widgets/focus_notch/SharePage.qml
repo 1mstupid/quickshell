@@ -11,6 +11,7 @@ Item {
 
     // the queued files as tiles, wrapping; the area is clipped so a long queue scrolls away
     Item {
+        id: queue
         x: page.pad
         y: 12
         width: page.width - 2 * page.pad
@@ -67,6 +68,10 @@ Item {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: ShareService.removeFile(tile.modelData)
+                        Accessible.role: Accessible.Button
+                        Accessible.name: "Remove " + tile.modelData.split("/").pop()
+                        // not for a tile cut off below the area
+                        Accessible.ignored: tile.y + tile.height / 2 > queue.height
                     }
                 }
             }

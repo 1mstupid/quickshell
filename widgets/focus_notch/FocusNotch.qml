@@ -773,12 +773,14 @@ Item {
                     IconButton {
                         visible: root.focusOn
                         glyph: TaskFocus.running ? "󰏤" : "󰐊"
+                        Accessible.name: TaskFocus.running ? "Pause" : "Resume"
                         onClicked: TaskFocus.toggle()
                     }
                     IconButton {
                         visible: root.focusClearable
                         glyph: "󰄬"
                         main: true
+                        Accessible.name: "Done"
                         onClicked: TaskFocus.complete()
                     }
                 }
@@ -990,6 +992,8 @@ Item {
                                  : tabMouse.containsMouse ? Qt.alpha(Theme.fg, 0.06) : "transparent"
                             Behavior on width { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                             Behavior on color { ColorAnimation { duration: 120 } }
+                            Accessible.role: Accessible.Button
+                            Accessible.name: modelData.name
 
                             Text {
                                 width: 32
@@ -1104,6 +1108,8 @@ Item {
                     radius: 12
                     color: gearMouse.containsMouse ? Qt.alpha(Theme.fg, 0.2) : Qt.alpha(Theme.fg, 0.08)
                     Behavior on color { ColorAnimation { duration: 120 } }
+                    Accessible.role: Accessible.Button
+                    Accessible.name: "Control page"
 
                     Text {
                         anchors.centerIn: parent
@@ -1158,6 +1164,8 @@ Item {
                             color: on ? Qt.alpha(Theme.fg, 0.14)
                                  : segMouse.containsMouse ? Qt.alpha(Theme.fg, 0.06) : "transparent"
                             Behavior on color { ColorAnimation { duration: 120 } }
+                            Accessible.role: Accessible.Button
+                            Accessible.name: modelData.name
 
                             Text {
                                 id: segName
@@ -1395,6 +1403,10 @@ Item {
                             width: 40
                             height: 40
 
+                            Accessible.role: Accessible.Button
+                            // a button that does nothing now gets no hint
+                            Accessible.ignored: !allowed
+
                             Text {
                                 anchors.centerIn: parent
                                 text: cell.glyph
@@ -1415,27 +1427,32 @@ Item {
                         // playing sources on the left, output on the right
                         Transport {
                             glyph: "≡"
+                            Accessible.name: "Playing sources"
                             glyphSize: 18
                             onTapped: homeTab.mediaView = "sources"
                         }
                         Transport {
                             glyph: "󰑟"
+                            Accessible.name: "Previous"
                             allowed: media.player?.canGoPrevious ?? false
                             onTapped: media.player.previous()
                         }
                         Transport {
                             glyph: media.playing ? "󰏤" : "󰐊"
+                            Accessible.name: "Play or pause"
                             glyphSize: 32
                             allowed: media.player?.canTogglePlaying ?? false
                             onTapped: media.player.togglePlaying()
                         }
                         Transport {
                             glyph: "󰈑"
+                            Accessible.name: "Next"
                             allowed: media.player?.canGoNext ?? false
                             onTapped: media.player.next()
                         }
                         Transport {
                             glyph: "󰕾"
+                            Accessible.name: "Output"
                             glyphSize: 18
                             onTapped: homeTab.mediaView = "output"
                         }
@@ -1461,6 +1478,9 @@ Item {
                         font.pixelSize: 13
                         font.weight: Font.DemiBold
 
+                        Accessible.role: Accessible.Button
+                        Accessible.name: "Back to the player"
+
                         MouseArea {
                             id: backSources
                             anchors.fill: parent
@@ -1472,6 +1492,7 @@ Item {
                     }
 
                     ListView {
+                        id: sourceList
                         x: 14
                         y: sourcesBack.y + sourcesBack.height + 10
                         width: parent.width - 28
@@ -1502,6 +1523,11 @@ Item {
                             radius: 8
                             color: current ? Qt.alpha(Theme.fg, 0.1)
                                  : sourceMouse.containsMouse ? Qt.alpha(Theme.fg, 0.05) : "transparent"
+                            Accessible.role: Accessible.Button
+                            Accessible.name: modelData.identity
+                            // nor does a row scrolled out of the list
+                            Accessible.ignored: y + height / 2 < sourceList.contentY
+                                || y + height / 2 > sourceList.contentY + sourceList.height
 
                             Column {
                                 anchors.left: parent.left
@@ -1578,6 +1604,9 @@ Item {
                         font.pixelSize: 13
                         font.weight: Font.DemiBold
 
+                        Accessible.role: Accessible.Button
+                        Accessible.name: "Back to the player"
+
                         MouseArea {
                             id: backOutput
                             anchors.fill: parent
@@ -1607,6 +1636,8 @@ Item {
                                 height: 32
                                 radius: 8
                                 color: sinkMouse.containsMouse ? Qt.alpha(Theme.fg, 0.05) : "transparent"
+                                Accessible.role: Accessible.Button
+                                Accessible.name: modelData.description || modelData.name
 
                                 Text {
                                     anchors.left: parent.left
@@ -1757,6 +1788,8 @@ Item {
                             radius: 8
                             color: plusMouse.containsMouse ? Qt.alpha(Theme.fg, 0.2) : Qt.alpha(Theme.fg, 0.1)
                             Behavior on color { ColorAnimation { duration: 120 } }
+                            Accessible.role: Accessible.Button
+                            Accessible.name: "Add a task"
 
                             Text {
                                 anchors.centerIn: parent
@@ -1839,6 +1872,7 @@ Item {
                                 visible: !root.focusOn && root.nextRow !== null
                                 glyph: "󰐊"
                                 main: true
+                                Accessible.name: "Focus"
                                 onClicked: root.focusRow(root.nextRow)
                             }
                         }
@@ -1864,6 +1898,9 @@ Item {
                             color: Qt.alpha(Theme.fg, clearHit.containsMouse ? 0.9 : 0.5)
                             font.family: Theme.fontFamilySans
                             font.pixelSize: 10
+
+                            Accessible.role: Accessible.Button
+                            Accessible.name: "Clear notifications"
 
                             MouseArea {
                                 id: clearHit
@@ -1965,6 +2002,12 @@ Item {
                                         font.family: noteHover.hovered ? Theme.fontFamily : Theme.fontFamilyNum
                                         font.pixelSize: noteHover.hovered ? 13 : 10
 
+                                        Accessible.role: Accessible.Button
+                                        Accessible.name: "Dismiss " + note.modelData.summary
+                                        // not for a note scrolled out of the list
+                                        Accessible.ignored: note.y + note.height / 2 < noteList.contentY
+                                            || note.y + note.height / 2 > noteList.contentY + noteList.height
+
                                         MouseArea {
                                             anchors.fill: parent
                                             anchors.margins: -6
@@ -2035,6 +2078,9 @@ Item {
                                 : modelData.priority === 2 ? Theme.accent
                                 : modelData.priority === 3 ? Theme.secondary
                                 : root.titleTint(modelData.title)
+                            // scrolled out of the list, a row gets no hint
+                            readonly property bool onScreen: y + height / 2 > dayList.contentY
+                                && y + height / 2 < dayList.contentY + dayList.height
 
                             width: dayList.width
                             height: 32
@@ -2057,6 +2103,9 @@ Item {
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: root.focusRow(dayRowItem.modelData)
+                                Accessible.role: Accessible.Button
+                                Accessible.name: dayRowItem.modelData.title
+                                Accessible.ignored: !dayRowItem.onScreen
                             }
 
                             Rectangle {
@@ -2129,6 +2178,14 @@ Item {
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: root.tickRow(dayRowItem.modelData)
                                 }
+                            }
+                            // the tick only shows under the pointer, and a hidden item gets no hint: this
+                            // stands in its place, and the click lands on the tick
+                            Item {
+                                anchors.fill: tick
+                                visible: dayRowItem.onScreen && root.rowClearable(dayRowItem.modelData)
+                                Accessible.role: Accessible.Button
+                                Accessible.name: "Done: " + dayRowItem.modelData.title
                             }
                         }
                     }
@@ -2330,6 +2387,7 @@ Item {
                             width: 28
                             height: 28
                             glyph: "󰓛"
+                            Accessible.name: "Stop"
                             onClicked: TaskFocus.stop()
                         }
                     }
@@ -2511,6 +2569,9 @@ Item {
                         required property var modelData
                         // waiting for the second tap that closes its process
                         readonly property bool armed: Ports.armed === modelData.key
+                        // scrolled out of the list, a row gets no hint
+                        readonly property bool onScreen: y + height / 2 > portsList.contentY
+                            && y + height / 2 < portsList.contentY + portsList.height
 
                         width: portsList.width
                         height: 34
@@ -2530,6 +2591,9 @@ Item {
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
                             onClicked: Ports.copy(portRow.modelData)
+                            Accessible.role: Accessible.Button
+                            Accessible.name: "Copy port " + portRow.modelData.port
+                            Accessible.ignored: !portRow.onScreen
                         }
 
                         // red when the network can reach it, grey when only this machine can
@@ -2616,6 +2680,7 @@ Item {
                                 visible: Ports.isWeb(portRow.modelData) && !portRow.armed
                                 enabled: portActions.opacity > 0
                                 glyph: "󰏌"
+                                Accessible.name: "Open in browser"
                                 onClicked: Ports.openWeb(portRow.modelData)
                             }
                             IconButton {
@@ -2625,6 +2690,7 @@ Item {
                                 enabled: portActions.opacity > 0
                                 danger: portRow.armed
                                 glyph: "󰙦"
+                                Accessible.name: "Close process"
                                 onClicked: portRow.armed ? Ports.close(portRow.modelData) : Ports.arm(portRow.modelData)
                             }
                         }
