@@ -1,8 +1,8 @@
 .pragma library
 
-// What the launcher makes of the typed text: which apps match and in what order,
-// whether it is a calculation, and what qalc answered. Kept free of QML types so
-// it can be tested with plain node.
+// What the launcher makes of the typed text: which apps and emoji match and in what
+// order, whether it is a calculation, and what qalc answered. Kept free of QML types
+// so it can be tested with plain node.
 
 // a calculation starts with a number, a sign, a bracket or a function call
 const MATH_START = /^(?:[\d(.+\-]|(?:sqrt|cbrt|sin|cos|tan|ln|log|exp|abs)\s*\()/i
@@ -64,6 +64,46 @@ function rankApps(entries, q, recent) {
     }
     return entries.filter(e => appMatches(e, q)).sort((a, b) =>
         later(a) - later(b) || age(a) - age(b) || a.name.localeCompare(b.name))
+}
+
+// --- Emoji ---
+
+// the lines of EmojiData.js
+function parseEmoji(lines) {
+    return lines.trim().split("\n").map(l => {
+        const f = l.split("\t")
+        return { emoji: f[0], names: f[1].split(" "), tags: f[2] ? f[2].split(" ") : [] }
+    })
+}
+
+// what a shortcode asks for: ":cry", ":cry:" and ":crying face" are all taken
+function emojiTerm(text) {
+    return text.slice(1).replace(/:$/, "").trim().toLowerCase().replace(/\s+/g, "_")
+}
+
+// The matching emoji: the name itself, then names that start with the term, then words
+// that do, then anything holding it. Within each, the list's own order, faces first.
+function rankEmoji(list, term, limit) {
+    if (term === "")
+        return list.slice(0, limit)
+    const tier = e => {
+        if (e.names.indexOf(term) >= 0)
+            return 0
+        if (e.names.some(n => n.startsWith(term)))
+            return 1
+        const words = e.names.concat(e.tags)
+        if (words.some(w => w.startsWith(term) || w.indexOf("_" + term) >= 0))
+            return 2
+        return words.some(w => w.indexOf(term) >= 0) ? 3 : -1
+    }
+    // buckets, not a sort: the order within one has to survive
+    const found = [[], [], [], []]
+    for (const e of list) {
+        const t = tier(e)
+        if (t >= 0)
+            found[t].push(e)
+    }
+    return found[0].concat(found[1], found[2], found[3]).slice(0, limit)
 }
 
 // --- Hyprland Window Management ---
