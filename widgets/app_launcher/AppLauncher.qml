@@ -71,9 +71,9 @@ Item {
 
     Connections {
         target: Hyprland
-        function onFocusedWindowChanged() {
-            if (Hyprland.focusedWindow) {
-                const addr = Hyprland.focusedWindow.address;
+        function onActiveToplevelChanged() {
+            if (Hyprland.activeToplevel) {
+                const addr = Hyprland.activeToplevel.address;
                 let list = recentWindowAddresses.slice();
                 const idx = list.indexOf(addr);
                 if (idx >= 0) list.splice(idx, 1);
@@ -119,7 +119,7 @@ Item {
         if (typeof Hyprland === "undefined" || !Hyprland.toplevels) return []
         const toplevels = Hyprland.toplevels.values || []
         const desktopEntries = DesktopEntries.applications.values || []
-        const focusedAddress = Hyprland.focusedWindow ? Hyprland.focusedWindow.address : ""
+        const focusedAddress = Hyprland.activeToplevel ? Hyprland.activeToplevel.address : ""
 
         const ranked = Query.rankWindows(toplevels, q, recentWindowAddresses, focusedAddress)
 
@@ -158,7 +158,7 @@ Item {
         if (current.kind === "calc") return "↵ copy    esc close"
         if (current.kind === "app") return "↑↓ move    ↵ launch    esc close"
         if (current.kind === "window") {
-            const canShift = current.matchedApp !== null
+            const canShift = !!current.matchedApp
             return "↵ focus window" + (canShift ? "    ⇧↵ open new instance" : "") + "    esc close"
         }
         const kept = ShareService.favorites.indexOf(current.value) >= 0
@@ -177,6 +177,8 @@ Item {
         const from = PillState.takeOver();
         startW = from.w;
         startH = from.h;
+        focusDelay.stop();
+        pendingFocus = "";
         searchInput.text = "";
         selectedKey = "";
         pointer = null;
@@ -243,6 +245,22 @@ Item {
 
     onVisibleChanged: {
         if (visible) searchInput.forceActiveFocus();
+        // not when another panel took the pill: it holds the keyboard now
+        else if (pendingFocus !== "" && PillState.owner === "applauncher") focusDelay.start();
+    }
+
+    // The address of the window picked, focused once the launcher is gone: Hyprland gives no
+    // window the keyboard while the bar holds it.
+    property string pendingFocus: ""
+
+    Timer {
+        id: focusDelay
+        // a few frames, for the bar's release of the keyboard to reach Hyprland first
+        interval: 50
+        onTriggered: {
+            Hyprland.dispatch('hl.dsp.focus({ window = "address:0x' + root.pendingFocus + '" })');
+            root.pendingFocus = "";
+        }
     }
 
     function activate(r, shiftPressed) {
@@ -258,14 +276,7 @@ Item {
                 AppLauncherState.recordLaunch(r.matchedApp.id);
                 r.matchedApp.execute();
             } else if (r.window) {
-                const ipc = r.window.lastIpcObject ?? {};
-                const pid = ipc.pid ?? r.window.pid;
-                if (pid) {
-                    Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.focus({ window = \"pid:" + pid + "\" })"]);
-                } else {
-                    const addr = String(r.window.address ?? "").replace(/^0x/, "");
-                    Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.focus({ window = \"address:" + addr + "\" })"]);
-                }
+                pendingFocus = r.window.address;
             }
         } else if (r.kind === "calc") {
             if (r.value === "") return;
