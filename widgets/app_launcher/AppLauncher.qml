@@ -162,7 +162,7 @@ Item {
             return "↵ focus window" + (canShift ? "    ⇧↵ open new instance" : "") + "    esc close"
         }
         const kept = ShareService.favorites.indexOf(current.value) >= 0
-        return "↵ open    " + (kept ? "✓ in tray" : "^↵ add to tray") + "    esc close"
+        return "↵ open    ^c copy    " + (kept ? "✓ in tray" : "^↵ add to tray") + "    esc close"
     }
 
     function subtitleOf(entry) {
@@ -288,6 +288,13 @@ Item {
         AppLauncherState.hide();
     }
 
+    // the file itself, as a drag gives it, so a file manager pastes a copy. No line end: the
+    // same text lands in a terminal, where it would press Enter.
+    function copyFile(r) {
+        Quickshell.execDetached(["wl-copy", "--type", "text/uri-list", "--", ShareService.fileUrl(r.value)]);
+        AppLauncherState.hide();
+    }
+
     // keeps a found file or folder in the strip's tray
     function addToTray(r) {
         if (!r || r.kind !== "file" || ShareService.favorites.indexOf(r.value) >= 0) return;
@@ -400,6 +407,10 @@ Item {
                             root.navigate(root.maxVisible);
                         } else if (ctrl && event.key === Qt.Key_U) {
                             root.navigate(-root.maxVisible);
+                        } else if (ctrl && event.key === Qt.Key_C && searchInput.selectedText === ""
+                                && root.current?.kind === "file") {
+                            // with text selected, ^c stays the box's own copy
+                            root.copyFile(root.current);
                         } else if (event.key === Qt.Key_Home) {
                             root.navigate(-root.results.length);
                         } else if (event.key === Qt.Key_End) {
