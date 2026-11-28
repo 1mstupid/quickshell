@@ -27,6 +27,7 @@ Singleton {
         focus: "bottom-left",
         usage: "bottom-right",
         study: "bottom-right",
+        clock: "top-left",
         media: "bottom-center",
         lyrics: "bottom-center"
     })
@@ -37,6 +38,7 @@ Singleton {
         focus: "󰔟",
         usage: "󰄪",
         study: "󰑴",
+        clock: "󰅐",
         media: "󰝚",
         lyrics: "󰎈"
     })
@@ -53,6 +55,7 @@ Singleton {
         focus: UserSettings.focusWidget,
         usage: UserSettings.usageRing,
         study: UserSettings.studyWidget,
+        clock: UserSettings.clockWidget,
         media: UserSettings.mediaWidget,
         lyrics: false
     })
@@ -77,9 +80,9 @@ Singleton {
         const e = entries[id]
         if (e && typeof e[key] === "number" && isFinite(e[key]) && e[key] >= 0)
             return e[key]
-        // the study widget shares the usage ring's corner, so until it is placed it
-        // starts one cell to the left of the ring, which is 240 px wide
-        if (id === "study" && key === "x" && !(e && e.anchor))
+        // the study widget shares the usage ring's corner and the clock the todo widget's, so
+        // until placed each starts one cell in from that neighbour, which is 240 px wide
+        if ((id === "study" || id === "clock") && key === "x" && !(e && e.anchor))
             return Math.ceil(240 / cell) + 1
         return 0
     }
